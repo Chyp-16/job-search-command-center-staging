@@ -1869,7 +1869,7 @@ document.getElementById('dash-date').textContent = new Date().toLocaleDateString
 
 async function refreshDashboard() {
   if (!allApps.length) {
-    const data = await dbGet('applications', 'select=*&order=date_applied.desc');
+    const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
 
@@ -1954,7 +1954,7 @@ async function refreshDashboard() {
 // ── APPLICATIONS ───────────────────────────────────────────────────────
 async function loadApps() {
   if (allApps.length === 0) {
-    const data = await dbGet('applications', 'select=*&order=date_applied.desc');
+    const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
   filterApps();
@@ -2825,43 +2825,81 @@ async function runImport() {
   btn.textContent = 'Importing...';
   document.getElementById('import-progress-area').style.display = 'block';
 
+  const setStatus = (msg) => {
+    document.getElementById('import-status-text').textContent = msg;
+  };
+
   try {
-    // Fetch the full dataset from a JSON file we'll create separately
+    setStatus('Loading import file...');
     const r = await fetch('./import-data.json');
     if (!r.ok) throw new Error('Could not load import-data.json. Make sure it is uploaded to your GitHub repo.');
     const data = await r.json();
+    setStatus(`Found ${data.length} records. Starting import...`);
 
-    const BATCH = 50;
+    // Smaller batches + longer delay = more reliable on free-tier Cloudflare
+    const BATCH = 25;
     let done = 0;
+    let failed = 0;
 
     for (let i = 0; i < data.length; i += BATCH) {
-      const batch = data.slice(i, i + BATCH).map(row => ({
-        ...row,
-        status: STATUS_MAP[row.status] || row.status,
-      }));
+      const batch = data.slice(i, i + BATCH)
+        .filter(row => row.company) // skip blank rows
+        .map(row => ({
+          ...row,
+          status: STATUS_MAP[row.status] || row.status || 'Applied',
+          // Ensure date fields are null not empty string
+          date_applied: row.date_applied || null,
+          followup_3day_date: row.followup_3day_date || null,
+          followup_1week_date: row.followup_1week_date || null,
+          followup_2week_date: row.followup_2week_date || null,
+          rejection_followup_notes: row.rejection_followup_notes || null,
+        }));
 
-      await fetch(`${WORKER_URL}/db/applications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body: JSON.stringify(batch)
-      });
+      if (batch.length === 0) { done += BATCH; continue; }
 
+      // Retry logic — try each batch up to 3 times
+      let success = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await fetch(`${WORKER_URL}/db/applications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+            body: JSON.stringify(batch)
+          });
+          if (res.ok || res.status === 201) { success = true; break; }
+          // If not ok, wait and retry
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        } catch(e) {
+          if (attempt === 3) throw e;
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+
+      if (!success) failed += batch.length;
       done += batch.length;
+
       const pct = Math.round((done / data.length) * 100);
       document.getElementById('import-bar').style.width = pct + '%';
-      document.getElementById('import-status-text').textContent = `Imported ${done} of ${data.length} applications...`;
-      await new Promise(r => setTimeout(r, 100));
+      setStatus(`Imported ${done} of ${data.length}${failed > 0 ? ` (${failed} failed)` : ''}...`);
+
+      // 400ms between batches — gives Cloudflare time to breathe
+      await new Promise(r => setTimeout(r, 400));
     }
 
     allApps = [];
-    closeModal('modal-import');
-    await loadApps();
-    toast(`Import complete. ${done} applications loaded.`, 'success');
+    if (failed > 0) {
+      setStatus(`Done. ${done - failed} imported, ${failed} failed. Refresh and check your count.`);
+      toast(`Import finished with ${failed} errors. Check status bar.`, 'error');
+    } else {
+      closeModal('modal-import');
+      await loadApps();
+      toast(`Import complete. ${done} applications loaded.`, 'success');
+    }
   } catch(e) {
-    document.getElementById('import-status-text').textContent = 'Error: ' + e.message;
+    setStatus('Error: ' + e.message);
     toast('Import failed: ' + e.message, 'error');
     btn.disabled = false;
-    btn.textContent = 'Start Import';
+    btn.textContent = 'Retry Import';
   }
 }
 
