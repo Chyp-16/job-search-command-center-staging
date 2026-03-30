@@ -2475,13 +2475,26 @@ async function syncHubSpot() {
   if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
 
   try {
-    // Pull contacts from HubSpot via Cloudflare Worker /hubspot route
-    const r = await fetch(WORKER_URL + '/hubspot/contacts', {
-      headers: { 'Origin': location.origin }
-    });
+    // Use a 6-second timeout — if Worker doesn't have the route it may hang
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    let r;
+    try {
+      r = await fetch(WORKER_URL + '/hubspot/contacts', {
+        headers: { 'Origin': location.origin },
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+    } catch(fetchErr) {
+      // Timeout or network error — Worker route not set up yet
+      clearTimeout(timeout);
+      showHubSpotSetupGuide();
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+      return;
+    }
 
     if (!r.ok) {
-      // Any non-200 response means HubSpot isn't configured yet — show setup guide
       showHubSpotSetupGuide();
       if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
       return;
