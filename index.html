@@ -824,6 +824,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p id="dash-date"></p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="sendFollowUpReminders()">📧 Email Reminders</button>
           <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">↻ Refresh</button>
         </div>
       </div>
@@ -1903,39 +1904,60 @@ async function refreshDashboard() {
   const interviews = allApps.filter(a => ['Interview — Recruiter','Interview — Company'].includes(a.status)).length;
   const active = allApps.filter(a => !['Not Hired','Ghosted','Dead End','Position Canceled/Closed'].includes(a.status)).length;
   const responseRate = total > 0 ? ((responded / total) * 100).toFixed(1) : 0;
+  const interviewRate = total > 0 ? ((interviews / total) * 100).toFixed(1) : 0;
+  const mostActive = getMostActiveWeek();
 
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card highlight">
-      <div class="stat-label">Total Applications</div>
-      <div class="stat-value">${total}</div>
-      <div class="stat-sub">${active} active</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Response Rate</div>
-      <div class="stat-value">${responseRate}%</div>
-      <div class="stat-sub">${responded} responses</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Interviews</div>
-      <div class="stat-value">${interviews}</div>
-      <div class="stat-sub">recruiter + company</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Not Hired</div>
-      <div class="stat-value">${allApps.filter(a=>a.status==='Not Hired').length}</div>
-      <div class="stat-sub">formal rejections</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Ghosted</div>
-      <div class="stat-value">${allApps.filter(a=>a.status==='Ghosted').length}</div>
-      <div class="stat-sub">no response</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Dead End</div>
-      <div class="stat-value">${allApps.filter(a=>a.status==='Dead End').length}</div>
-      <div class="stat-sub">stalled without closure</div>
-    </div>
-  `;
+  // Count follow-ups due today
+  const nowCheck = new Date();
+  let dueTodayCount = 0;
+  allApps.forEach(a => {
+    [
+      { date: a.initial_outreach_date, status: a.initial_outreach_status },
+      { date: a.followup_3day_date, status: a.followup_3day_status },
+      { date: a.followup_1week_date, status: a.followup_1week_status },
+      { date: a.followup_2week_date, status: a.followup_2week_status },
+    ].forEach(c => {
+      if (c.date && c.status === 'Scheduled' && new Date(c.date) <= nowCheck) dueTodayCount++;
+    });
+  });
+
+  document.getElementById('stats-grid').innerHTML =
+    '<div class="stat-card highlight">' +
+      '<div class="stat-label">Total Applications</div>' +
+      '<div class="stat-value">' + total + '</div>' +
+      '<div class="stat-sub">' + active + ' active</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Response Rate</div>' +
+      '<div class="stat-value">' + responseRate + '%</div>' +
+      '<div class="stat-sub">' + responded + ' responses received</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Interview Rate</div>' +
+      '<div class="stat-value">' + interviewRate + '%</div>' +
+      '<div class="stat-sub">' + interviews + ' interviews</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Not Hired</div>' +
+      '<div class="stat-value">' + allApps.filter(a=>a.status==='Not Hired').length + '</div>' +
+      '<div class="stat-sub">formal rejections</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Ghosted</div>' +
+      '<div class="stat-value">' + allApps.filter(a=>a.status==='Ghosted').length + '</div>' +
+      '<div class="stat-sub">no response</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">Most Active Week</div>' +
+      '<div class="stat-value" style="font-size:22px">' + mostActive.week + '</div>' +
+      '<div class="stat-sub">' + mostActive.count + ' applications</div>' +
+    '</div>' +
+    (dueTodayCount > 0 ?
+    '<div class="stat-card" style="border-color:var(--burgundy);background:var(--burgundy-muted);cursor:pointer" onclick="sendFollowUpReminders()">' +
+      '<div class="stat-label" style="color:var(--burgundy)">Follow-Ups Due</div>' +
+      '<div class="stat-value" style="color:var(--burgundy)">' + dueTodayCount + '</div>' +
+      '<div class="stat-sub" style="color:var(--burgundy)">Click to compile reminder</div>' +
+    '</div>' : '');
 
   // Status breakdown
   const counts = {};
@@ -2449,7 +2471,211 @@ async function importRecruiters() {
 
 // ── HUBSPOT SYNC ────────────────────────────────────────────────────────
 async function syncHubSpot() {
-  toast('HubSpot sync: Add your HubSpot Private App key to Cloudflare Worker secrets as HUBSPOT_API_KEY to enable live sync. Full sync will be wired in Session 3.', '');
+  const btn = document.getElementById('hs-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+
+  try {
+    // Pull contacts from HubSpot via Cloudflare Worker /hubspot route
+    const r = await fetch(WORKER_URL + '/hubspot/contacts', {
+      headers: { 'Origin': location.origin }
+    });
+
+    if (!r.ok) {
+      // Any non-200 response means HubSpot isn't configured yet — show setup guide
+      showHubSpotSetupGuide();
+      if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+      return;
+    }
+
+    const hsContacts = await r.json();
+    if (!Array.isArray(hsContacts) || hsContacts.length === 0) {
+      toast('HubSpot returned no contacts.', '');
+      return;
+    }
+
+    let created = 0, updated = 0;
+    for (const hc of hsContacts) {
+      const name = ((hc.properties?.firstname || '') + ' ' + (hc.properties?.lastname || '')).trim();
+      if (!name) continue;
+
+      const company = hc.properties?.company || null;
+      const title = hc.properties?.jobtitle || null;
+      const email = hc.properties?.email || null;
+      const hsId = String(hc.id);
+
+      // Check if contact already exists by hubspot_contact_id
+      const existing = allContacts.find(c => c.hubspot_contact_id === hsId);
+
+      const payload = {
+        name, company, title,
+        contact_type: 'Recruiter',
+        connection_source: 'HubSpot',
+        hubspot_contact_id: hsId,
+        notes: email ? 'Email: ' + email : null,
+        last_contact_date: hc.properties?.lastmodifieddate
+          ? hc.properties.lastmodifieddate.split('T')[0] : null,
+      };
+
+      if (existing) {
+        await dbPatch('contacts', existing.id, payload);
+        const idx = allContacts.findIndex(c => c.id === existing.id);
+        if (idx >= 0) allContacts[idx] = { ...allContacts[idx], ...payload };
+        updated++;
+      } else {
+        const result = await dbPost('contacts', payload);
+        allContacts.unshift(Array.isArray(result) ? result[0] : result);
+        created++;
+      }
+    }
+
+    filteredContacts = allContacts;
+    renderContactsTable();
+    updateContactCount();
+    toast('HubSpot sync complete. ' + created + ' new, ' + updated + ' updated.', 'success');
+
+  } catch(e) {
+    if (e.message && e.message.includes('HUBSPOT')) {
+      showHubSpotSetupGuide();
+    } else {
+      toast('Sync error: ' + e.message, 'error');
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+  }
+}
+
+function showHubSpotSetupGuide() {
+  document.getElementById('detail-title').textContent = 'HubSpot Setup Required';
+  document.getElementById('detail-body').innerHTML =
+    '<div style="font-size:13px;line-height:1.8;">' +
+    '<p style="margin-bottom:16px;color:var(--text-secondary)">To enable live HubSpot sync, you need to add your HubSpot Private App token to Cloudflare. Takes about 5 minutes.</p>' +
+    '<div class="detail-section">' +
+      '<div class="detail-section-title">Step 1 — Create a HubSpot Private App</div>' +
+      '<ol style="margin-left:16px;font-size:13px;line-height:2">' +
+        '<li>Go to <strong>app.hubspot.com</strong> and sign in</li>' +
+        '<li>Click your account name (top right) → <strong>Account Settings</strong></li>' +
+        '<li>In the left sidebar click <strong>Integrations → Private Apps</strong></li>' +
+        '<li>Click <strong>Create a private app</strong></li>' +
+        '<li>Name it: <em>Job Search Command Center</em></li>' +
+        '<li>Go to the <strong>Scopes</strong> tab and enable these scopes:<br>' +
+          '<code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">crm.objects.contacts.read</code> &nbsp;' +
+          '<code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">crm.objects.contacts.write</code></li>' +
+        '<li>Click <strong>Create app</strong> → copy the token shown</li>' +
+      '</ol>' +
+    '</div>' +
+    '<div class="detail-section">' +
+      '<div class="detail-section-title">Step 2 — Add token to Cloudflare</div>' +
+      '<ol style="margin-left:16px;font-size:13px;line-height:2">' +
+        '<li>Go to <strong>dash.cloudflare.com</strong> → Workers & Pages</li>' +
+        '<li>Click <strong>job-search-proxy</strong></li>' +
+        '<li>Click <strong>Settings → Variables and Secrets</strong></li>' +
+        '<li>Click <strong>Add variable</strong></li>' +
+        '<li>Name: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">HUBSPOT_API_KEY</code></li>' +
+        '<li>Value: paste your Private App token</li>' +
+        '<li>Click <strong>Encrypt</strong> then <strong>Save</strong></li>' +
+      '</ol>' +
+    '</div>' +
+    '<div class="detail-section">' +
+      '<div class="detail-section-title">Step 3 — Update your Cloudflare Worker code</div>' +
+      '<p style="margin-bottom:8px">You also need to add the HubSpot route to your Worker. Go to your Worker → Edit code, and add this block inside the <code>fetch</code> handler before the final <code>return new Response('Not found'...)</code> line:</p>' +
+      '<pre style="background:var(--bg);padding:12px;border-radius:var(--radius);font-size:11px;overflow-x:auto;border:1px solid var(--border)">' +
+'// Route: HubSpot contacts
+' +
+'if (url.pathname === '/hubspot/contacts') {
+' +
+'  const after = url.searchParams.get('after') || '';
+' +
+'  const hsUrl = 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,email,company,jobtitle,lastmodifieddate' + (after ? '&after=' + after : '');
+' +
+'  const hsRes = await fetch(hsUrl, {
+' +
+'    headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY }
+' +
+'  });
+' +
+'  const hsData = await hsRes.json();
+' +
+'  const contacts = hsData.results || [];
+' +
+'  return new Response(JSON.stringify(contacts), {
+' +
+'    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+' +
+'  });
+' +
+'}
+' +
+'
+' +
+'// Route: HubSpot create/update contact
+' +
+'if (url.pathname === '/hubspot/contact') {
+' +
+'  const body = await request.json();
+' +
+'  const method = body.id ? 'PATCH' : 'POST';
+' +
+'  const hsUrl = body.id
+' +
+'    ? 'https://api.hubapi.com/crm/v3/objects/contacts/' + body.id
+' +
+'    : 'https://api.hubapi.com/crm/v3/objects/contacts';
+' +
+'  const hsRes = await fetch(hsUrl, {
+' +
+'    method,
+' +
+'    headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },
+' +
+'    body: JSON.stringify({ properties: body.properties })
+' +
+'  });
+' +
+'  const hsData = await hsRes.json();
+' +
+'  return new Response(JSON.stringify(hsData), {
+' +
+'    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+' +
+'  });
+' +
+'}' +
+      '</pre>' +
+    '</div>' +
+    '<p style="color:var(--text-secondary);font-size:12px">Once the token is saved and Worker is updated, click ⟳ Sync HubSpot again and your contacts will pull in automatically.</p>' +
+    '</div>';
+  document.getElementById('detail-edit-btn').style.display = 'none';
+  openModal('modal-detail');
+}
+
+// Push a contact to HubSpot when saved
+async function pushContactToHubSpot(contact) {
+  try {
+    const properties = {
+      firstname: contact.name.split(' ')[0] || contact.name,
+      lastname: contact.name.split(' ').slice(1).join(' ') || '',
+      company: contact.company || '',
+      jobtitle: contact.title || '',
+    };
+    const body = contact.hubspot_contact_id
+      ? { id: contact.hubspot_contact_id, properties }
+      : { properties };
+    const r = await fetch(WORKER_URL + '/hubspot/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      const data = await r.json();
+      if (data.id && !contact.hubspot_contact_id) {
+        // Save the new HubSpot ID back to our database
+        await dbPatch('contacts', contact.id, { hubspot_contact_id: String(data.id) });
+      }
+    }
+  } catch(e) {
+    // Silent fail — HubSpot push is best-effort
+    console.warn('HubSpot push failed:', e.message);
+  }
 }
 
 
@@ -3021,9 +3247,126 @@ async function runImport() {
   }
 }
 
+// ── EMAIL REMINDERS ────────────────────────────────────────────────────
+async function sendFollowUpReminders() {
+  // Collect all overdue scheduled follow-ups
+  const now = new Date();
+  const due = [];
+  allApps.forEach(a => {
+    const checks = [
+      { label: 'Initial Outreach', date: a.initial_outreach_date, status: a.initial_outreach_status },
+      { label: '3-Day Follow-Up', date: a.followup_3day_date, status: a.followup_3day_status },
+      { label: '1-Week Follow-Up', date: a.followup_1week_date, status: a.followup_1week_status },
+      { label: '2-Week Follow-Up', date: a.followup_2week_date, status: a.followup_2week_status },
+    ];
+    checks.forEach(c => {
+      if (c.date && c.status === 'Scheduled' && new Date(c.date) <= now) {
+        due.push({ company: a.company, title: a.job_title, action: c.label, date: c.date });
+      }
+    });
+  });
+
+  allContacts.forEach(c => {
+    if (c.next_action_date && c.next_action && new Date(c.next_action_date) <= now) {
+      due.push({ company: c.company, title: c.name, action: c.next_action, date: c.next_action_date, isContact: true });
+    }
+  });
+
+  if (due.length === 0) {
+    toast('No follow-ups due today.', 'success');
+    return;
+  }
+
+  // Build email body via Claude
+  const emailBody = await callAI([{
+    role: 'user',
+    content: 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.
+
+Items:
+' +
+      due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('
+')
+  }], JAY_SYSTEM_PROMPT);
+
+  // Save as AI output for reference
+  await dbPost('ai_outputs', {
+    output_type: 'email_reminder',
+    content: emailBody,
+  });
+
+  // Show in AI panel for now (email sending requires additional email service setup)
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-page="ai"]').classList.add('active');
+  document.getElementById('page-ai').classList.add('active');
+  showAIOutput(emailBody, 'email_reminder');
+  toast(due.length + ' follow-up items compiled. Copy and send via your email client.', 'success');
+}
+
+// ── DASHBOARD ANALYTICS ─────────────────────────────────────────────────
+function getMostActiveWeek() {
+  if (!allApps.length) return { week: 'N/A', count: 0 };
+  const weeks = {};
+  allApps.forEach(a => {
+    if (!a.date_applied) return;
+    const d = new Date(a.date_applied + 'T00:00:00');
+    // Get Monday of the week
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    const key = monday.toISOString().split('T')[0];
+    weeks[key] = (weeks[key] || 0) + 1;
+  });
+  const sorted = Object.entries(weeks).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return { week: 'N/A', count: 0 };
+  const [weekStart, count] = sorted[0];
+  const d = new Date(weekStart + 'T00:00:00');
+  const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' week';
+  return { week: label, count };
+}
+
+function getAvgTimeToResponse() {
+  const responded = allApps.filter(a =>
+    a.date_applied && ['Interview — Recruiter','Interview — Company','Initial Phone Call','In-Progress'].includes(a.status)
+  );
+  if (!responded.length) return '—';
+  // We don't have a response date field yet, so estimate based on status
+  return responded.length + ' roles progressed';
+}
+
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
 refreshDashboard();
+
+// Check for follow-ups on load and show badge
+setTimeout(async () => {
+  if (!allApps.length) {
+    const data = await dbGet('applications', 'select=id,company,job_title,initial_outreach_date,initial_outreach_status,followup_3day_date,followup_3day_status,followup_1week_date,followup_1week_status,followup_2week_date,followup_2week_status&order=date_applied.desc&limit=5000');
+    if (Array.isArray(data)) allApps = data;
+  }
+  const now = new Date();
+  let dueCount = 0;
+  allApps.forEach(a => {
+    [
+      { date: a.initial_outreach_date, status: a.initial_outreach_status },
+      { date: a.followup_3day_date, status: a.followup_3day_status },
+      { date: a.followup_1week_date, status: a.followup_1week_status },
+      { date: a.followup_2week_date, status: a.followup_2week_status },
+    ].forEach(c => {
+      if (c.date && c.status === 'Scheduled' && new Date(c.date) <= now) dueCount++;
+    });
+  });
+  if (dueCount > 0) {
+    // Show badge on dashboard nav item
+    const dashNav = document.querySelector('[data-page="dashboard"]');
+    if (dashNav) {
+      const badge = document.createElement('span');
+      badge.style.cssText = 'background:var(--burgundy);color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:6px';
+      badge.textContent = dueCount;
+      dashNav.appendChild(badge);
+    }
+  }
+}, 2000);
 </script>
 </body>
 </html>
