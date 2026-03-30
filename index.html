@@ -2558,108 +2558,45 @@ async function syncHubSpot() {
 }
 
 function showHubSpotSetupGuide() {
+  const workerCode = "// Route: HubSpot contacts\\nif (url.pathname === '/hubspot/contacts') {\\n  const hsUrl = 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,email,company,jobtitle,lastmodifieddate';\\n  const hsRes = await fetch(hsUrl, { headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY } });\\n  const hsData = await hsRes.json();\\n  return new Response(JSON.stringify(hsData.results || []), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });\\n}\\n\\n// Route: HubSpot create/update contact\\nif (url.pathname === '/hubspot/contact') {\\n  const body = await request.json();\\n  const method = body.id ? 'PATCH' : 'POST';\\n  const hsUrl = body.id ? 'https://api.hubapi.com/crm/v3/objects/contacts/' + body.id : 'https://api.hubapi.com/crm/v3/objects/contacts';\\n  const hsRes = await fetch(hsUrl, { method, headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ properties: body.properties }) });\\n  const hsData = await hsRes.json();\\n  return new Response(JSON.stringify(hsData), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });\\n}";
   document.getElementById('detail-title').textContent = 'HubSpot Setup Required';
-  document.getElementById('detail-body').innerHTML =
-    '<div style="font-size:13px;line-height:1.8;">' +
-    '<p style="margin-bottom:16px;color:var(--text-secondary)">To enable live HubSpot sync, you need to add your HubSpot Private App token to Cloudflare. Takes about 5 minutes.</p>' +
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Step 1 — Create a HubSpot Private App</div>' +
-      '<ol style="margin-left:16px;font-size:13px;line-height:2">' +
-        '<li>Go to <strong>app.hubspot.com</strong> and sign in</li>' +
-        '<li>Click your account name (top right) → <strong>Account Settings</strong></li>' +
-        '<li>In the left sidebar click <strong>Integrations → Private Apps</strong></li>' +
-        '<li>Click <strong>Create a private app</strong></li>' +
-        '<li>Name it: <em>Job Search Command Center</em></li>' +
-        '<li>Go to the <strong>Scopes</strong> tab and enable these scopes:<br>' +
-          '<code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">crm.objects.contacts.read</code> &nbsp;' +
-          '<code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">crm.objects.contacts.write</code></li>' +
-        '<li>Click <strong>Create app</strong> → copy the token shown</li>' +
-      '</ol>' +
-    '</div>' +
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Step 2 — Add token to Cloudflare</div>' +
-      '<ol style="margin-left:16px;font-size:13px;line-height:2">' +
-        '<li>Go to <strong>dash.cloudflare.com</strong> → Workers & Pages</li>' +
-        '<li>Click <strong>job-search-proxy</strong></li>' +
-        '<li>Click <strong>Settings → Variables and Secrets</strong></li>' +
-        '<li>Click <strong>Add variable</strong></li>' +
-        '<li>Name: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px">HUBSPOT_API_KEY</code></li>' +
-        '<li>Value: paste your Private App token</li>' +
-        '<li>Click <strong>Encrypt</strong> then <strong>Save</strong></li>' +
-      '</ol>' +
-    '</div>' +
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Step 3 — Update your Cloudflare Worker code</div>' +
-      '<p style="margin-bottom:8px">You also need to add the HubSpot route to your Worker. Go to your Worker → Edit code, and add this block inside the <code>fetch</code> handler before the final <code>return new Response('Not found'...)</code> line:</p>' +
-      '<pre style="background:var(--bg);padding:12px;border-radius:var(--radius);font-size:11px;overflow-x:auto;border:1px solid var(--border)">' +
-'// Route: HubSpot contacts
-' +
-'if (url.pathname === '/hubspot/contacts') {
-' +
-'  const after = url.searchParams.get('after') || '';
-' +
-'  const hsUrl = 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,email,company,jobtitle,lastmodifieddate' + (after ? '&after=' + after : '');
-' +
-'  const hsRes = await fetch(hsUrl, {
-' +
-'    headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY }
-' +
-'  });
-' +
-'  const hsData = await hsRes.json();
-' +
-'  const contacts = hsData.results || [];
-' +
-'  return new Response(JSON.stringify(contacts), {
-' +
-'    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
-' +
-'  });
-' +
-'}
-' +
-'
-' +
-'// Route: HubSpot create/update contact
-' +
-'if (url.pathname === '/hubspot/contact') {
-' +
-'  const body = await request.json();
-' +
-'  const method = body.id ? 'PATCH' : 'POST';
-' +
-'  const hsUrl = body.id
-' +
-'    ? 'https://api.hubapi.com/crm/v3/objects/contacts/' + body.id
-' +
-'    : 'https://api.hubapi.com/crm/v3/objects/contacts';
-' +
-'  const hsRes = await fetch(hsUrl, {
-' +
-'    method,
-' +
-'    headers: { Authorization: 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },
-' +
-'    body: JSON.stringify({ properties: body.properties })
-' +
-'  });
-' +
-'  const hsData = await hsRes.json();
-' +
-'  return new Response(JSON.stringify(hsData), {
-' +
-'    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
-' +
-'  });
-' +
-'}' +
-      '</pre>' +
-    '</div>' +
-    '<p style="color:var(--text-secondary);font-size:12px">Once the token is saved and Worker is updated, click ⟳ Sync HubSpot again and your contacts will pull in automatically.</p>' +
-    '</div>';
+  document.getElementById('detail-body').innerHTML = [
+    '<div style="font-size:13px;line-height:1.8">',
+    '<p style="margin-bottom:16px;color:var(--text-secondary)">To enable live HubSpot sync, add your HubSpot Private App token to Cloudflare. Takes about 5 minutes.</p>',
+    '<div class="detail-section">',
+      '<div class="detail-section-title">Step 1 — Create a HubSpot Private App</div>',
+      '<ol style="margin-left:16px;font-size:13px;line-height:2.2">',
+        '<li>Go to <strong>app.hubspot.com</strong> and sign in</li>',
+        '<li>Click your account name (top right) → <strong>Account Settings</strong></li>',
+        '<li>In the left sidebar click <strong>Integrations → Private Apps</strong></li>',
+        '<li>Click <strong>Create a private app</strong></li>',
+        '<li>Name it: Job Search Command Center</li>',
+        '<li>Go to the <strong>Scopes</strong> tab and enable: <code>crm.objects.contacts.read</code> and <code>crm.objects.contacts.write</code></li>',
+        '<li>Click <strong>Create app</strong> and copy the token shown</li>',
+      '</ol>',
+    '</div>',
+    '<div class="detail-section">',
+      '<div class="detail-section-title">Step 2 — Add token to Cloudflare</div>',
+      '<ol style="margin-left:16px;font-size:13px;line-height:2.2">',
+        '<li>Go to <strong>dash.cloudflare.com</strong> → Workers &amp; Pages</li>',
+        '<li>Click <strong>job-search-proxy</strong></li>',
+        '<li>Click <strong>Settings → Variables and Secrets</strong></li>',
+        '<li>Click <strong>Add variable</strong>, name it <code>HUBSPOT_API_KEY</code>, paste your token</li>',
+        '<li>Click <strong>Encrypt</strong> then <strong>Save</strong></li>',
+      '</ol>',
+    '</div>',
+    '<div class="detail-section">',
+      '<div class="detail-section-title">Step 3 — Update your Cloudflare Worker</div>',
+      '<p style="margin-bottom:8px;font-size:13px">In your Worker, click Edit code. Paste this block before the final <code>return new Response</code> line at the bottom:</p>',
+      '<pre style="background:var(--bg);padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;border:1px solid var(--border);white-space:pre-wrap">' + workerCode.replace(/\n/g, '&#10;') + '</pre>',
+      '<p style="margin-top:8px;font-size:12px;color:var(--text-secondary)">Click <strong>Deploy</strong> after pasting, then click ⟳ Sync HubSpot again.</p>',
+    '</div>',
+    '</div>'
+  ].join('');
   document.getElementById('detail-edit-btn').style.display = 'none';
   openModal('modal-detail');
 }
+
 
 // Push a contact to HubSpot when saved
 async function pushContactToHubSpot(contact) {
@@ -3291,15 +3228,9 @@ async function sendFollowUpReminders() {
   }
 
   // Build email body via Claude
-  const emailBody = await callAI([{
-    role: 'user',
-    content: 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.
-
-Items:
-' +
-      due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('
-')
-  }], JAY_SYSTEM_PROMPT);
+  const itemList = due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('\n');
+  const emailPrompt = 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.\n\nItems:\n' + itemList;
+  const emailBody = await callAI([{ role: 'user', content: emailPrompt }], JAY_SYSTEM_PROMPT);
 
   // Save as AI output for reference
   await dbPost('ai_outputs', {
