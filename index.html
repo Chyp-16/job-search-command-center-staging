@@ -920,6 +920,8 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="Hiring Manager">Hiring Managers</option>
             <option value="Networking">Networking</option>
           </select>
+          <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
+          <button class="btn btn-secondary btn-sm" onclick="syncHubSpot()" id="hs-sync-btn">⟳ Sync HubSpot</button>
           <button class="btn btn-primary" onclick="openAddContact()">+ Add Contact</button>
         </div>
       </div>
@@ -1655,6 +1657,29 @@ a { color: var(--burgundy); text-decoration: none; }
   </div>
 </div>
 
+
+<!-- Recruiter Import Modal -->
+<div class="modal-overlay" id="modal-recruiter-import">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Import Recruiter Contacts</h3>
+      <button class="modal-close" onclick="closeModal('modal-recruiter-import')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+        This imports your 18 recruiter contacts from the Recruiter Outreach sheet of your Job Log.
+      </p>
+      <div style="background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);padding:12px;">
+        <p style="font-size:12px;color:var(--burgundy);font-weight:600;">⚠️ Run this once only. Importing twice will create duplicate contacts.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-recruiter-import')">Cancel</button>
+      <button class="btn btn-primary" id="recruiter-import-btn" onclick="importRecruiters()">Start Import</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
 
@@ -2229,57 +2254,118 @@ function viewApp(id) {
 }
 
 // ── CONTACTS ───────────────────────────────────────────────────────────
+const CONTACT_TYPE_BADGE = {
+  'Recruiter': 'badge-interview-recruiter',
+  'Hiring Manager': 'badge-inprogress',
+  'Networking': 'badge-outreach',
+};
+
 async function loadContacts() {
-  const data = await dbGet('contacts', 'select=*&order=created_at.desc');
+  const data = await dbGet('contacts', 'select=*&order=created_at.desc&limit=2000');
   allContacts = Array.isArray(data) ? data : [];
   filteredContacts = allContacts;
-  document.getElementById('contact-filter-count').textContent = `${allContacts.length} contacts`;
   renderContactsTable();
+  updateContactCount();
+}
+
+function updateContactCount() {
+  const type = document.getElementById('contact-type-filter').value;
+  const shown = filteredContacts.length;
+  const total = allContacts.length;
+  const label = type ? shown + ' ' + type + 's' : shown + ' of ' + total + ' contacts';
+  document.getElementById('contact-filter-count').textContent = label;
 }
 
 function filterContacts() {
   const q = document.getElementById('contact-search').value.toLowerCase();
   const type = document.getElementById('contact-type-filter').value;
   filteredContacts = allContacts.filter(c => {
-    const text = `${c.name} ${c.company} ${c.title || ''}`.toLowerCase();
+    const text = (c.name + ' ' + (c.company||'') + ' ' + (c.title||'') + ' ' + (c.notes||'')).toLowerCase();
     if (q && !text.includes(q)) return false;
     if (type && c.contact_type !== type) return false;
     return true;
   });
-  document.getElementById('contact-filter-count').textContent = `${filteredContacts.length} of ${allContacts.length} contacts`;
+  updateContactCount();
   renderContactsTable();
 }
 
 function renderContactsTable() {
   const tbody = document.getElementById('contacts-tbody');
   if (filteredContacts.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👥</div><h3>No contacts yet</h3><p>Add recruiters and networking contacts here.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👥</div><h3>No contacts found</h3><p>Add a recruiter or networking contact to get started.</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = filteredContacts.map(c => `
-    <tr>
-      <td><strong>${c.name}</strong></td>
-      <td>${c.company || '—'}</td>
-      <td style="font-size:12px;color:var(--text-secondary)">${c.title || '—'}</td>
-      <td><span class="badge badge-applied">${c.contact_type || '—'}</span></td>
-      <td style="font-size:12px">${fmt(c.last_contact_date)}</td>
-      <td style="font-size:12px">${c.next_action || '—'}</td>
-      <td style="font-size:12px;${isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:600':''}">${fmt(c.next_action_date)}</td>
-      <td>
-        <div class="table-actions">
-          <button class="action-btn" onclick="editContact('${c.id}')" title="Edit">✏️</button>
-          <button class="action-btn danger" onclick="deleteContact('${c.id}')" title="Delete">🗑</button>
-        </div>
-      </td>
-    </tr>`).join('');
+  tbody.innerHTML = filteredContacts.map(c => {
+    const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+    const overdueStyle = isOverdue(c.next_action_date) && c.next_action_date ? 'color:var(--burgundy);font-weight:600' : '';
+    const hubspotLinked = c.hubspot_contact_id ? '<span title="Linked to HubSpot" style="color:#f97316;font-size:11px;margin-left:4px">● HS</span>' : '';
+    return '<tr>' +
+      '<td><strong>' + c.name + '</strong>' + hubspotLinked + '</td>' +
+      '<td>' + (c.company||'—') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></td>' +
+      '<td style="font-size:12px">' + fmt(c.last_contact_date) + '</td>' +
+      '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.next_action||'—') + '</td>' +
+      '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
+      '<td><div class="table-actions">' +
+        '<button class="action-btn" onclick="viewContact(\'' + c.id + '\')" title="View">👁</button>' +
+        '<button class="action-btn" onclick="editContact(\'' + c.id + '\')" title="Edit">✏️</button>' +
+        '<button class="action-btn danger" onclick="deleteContact(\'' + c.id + '\')" title="Delete">🗑</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
 }
 
-function openAddContact() {
+function viewContact(id) {
+  const c = allContacts.find(x => x.id === id);
+  if (!c) return;
+  const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+  document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
+  const touches = [
+    {l:'Touch 1', s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
+    {l:'Touch 2', s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
+    {l:'Touch 3', s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
+  ];
+  document.getElementById('detail-body').innerHTML =
+    '<div class="detail-section">' +
+      '<div class="detail-section-title">Contact Info</div>' +
+      '<div class="detail-grid">' +
+        '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+        '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
+        '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
+        '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
+        '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
+        '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
+        (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
+        (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
+        (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="detail-section">' +
+      '<div class="detail-section-title">Outreach Log</div>' +
+      '<div class="outreach-track" style="grid-template-columns:repeat(3,1fr)">' +
+        touches.map(t =>
+          '<div class="outreach-touch">' +
+            '<div class="touch-label">' + t.l + '</div>' +
+            '<div class="touch-status">' + (t.s||'—') + '</div>' +
+            '<div class="touch-date">' + fmt(t.d) + '</div>' +
+            (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
+          '</div>'
+        ).join('') +
+      '</div>' +
+    '</div>';
+  document.getElementById('detail-edit-btn').style.display = '';
+  document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
+  openModal('modal-detail');
+}
+
+function openAddContact(defaultType) {
   editingId = null;
   document.getElementById('modal-contact-title').textContent = 'Add Contact';
-  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action',
-   'cf-o1n','cf-o2n','cf-o3n'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
-  ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  ['cf-o1s','cf-o2s','cf-o3s'].forEach(function(id) { var e=document.getElementById(id); if(e) e.selectedIndex=0; });
+  if (defaultType) { var el=document.getElementById('cf-type'); if(el) el.value=defaultType; }
   openModal('modal-contact');
 }
 
@@ -2305,11 +2391,13 @@ async function saveContact() {
   const payload = {
     name, company: getVal('cf-company'), title: getVal('cf-title'),
     contact_type: getVal('cf-type'), connection_source: getVal('cf-source'),
-    last_contact_date: getVal('cf-last-date'), next_action: getVal('cf-next-action'),
-    next_action_date: getVal('cf-next-date'), notes: getVal('cf-notes'),
-    outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d'), outreach_1_notes: getVal('cf-o1n'),
-    outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d'), outreach_2_notes: getVal('cf-o2n'),
-    outreach_3_status: getVal('cf-o3s'), outreach_3_date: getVal('cf-o3d'), outreach_3_notes: getVal('cf-o3n'),
+    last_contact_date: getVal('cf-last-date') || null,
+    next_action: getVal('cf-next-action'),
+    next_action_date: getVal('cf-next-date') || null,
+    notes: getVal('cf-notes'),
+    outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
+    outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d') || null, outreach_2_notes: getVal('cf-o2n'),
+    outreach_3_status: getVal('cf-o3s'), outreach_3_date: getVal('cf-o3d') || null, outreach_3_notes: getVal('cf-o3n'),
   };
   try {
     if (editingId) {
@@ -2334,6 +2422,36 @@ async function deleteContact(id) {
   filterContacts();
   toast('Contact deleted.');
 }
+
+// ── RECRUITER IMPORT ────────────────────────────────────────────────────
+async function importRecruiters() {
+  const btn = document.getElementById('recruiter-import-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
+  try {
+    const r = await fetch('./recruiter-import.json');
+    if (!r.ok) throw new Error('Could not load recruiter-import.json');
+    const data = await r.json();
+    const res = await fetch(WORKER_URL + '/db/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Import request failed');
+    allContacts = [];
+    await loadContacts();
+    toast(data.length + ' recruiters imported.', 'success');
+    closeModal('modal-recruiter-import');
+  } catch(e) {
+    toast('Import failed: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Start Import'; }
+  }
+}
+
+// ── HUBSPOT SYNC ────────────────────────────────────────────────────────
+async function syncHubSpot() {
+  toast('HubSpot sync: Add your HubSpot Private App key to Cloudflare Worker secrets as HUBSPOT_API_KEY to enable live sync. Full sync will be wired in Session 3.', '');
+}
+
 
 // ── RESUMES ────────────────────────────────────────────────────────────
 async function loadResumes() {
