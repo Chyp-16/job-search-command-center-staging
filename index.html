@@ -795,6 +795,18 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="coverletters">
         <span class="nav-icon">✉️</span><span>Cover Letters</span>
       </div>
+      <div class="nav-item" data-page="interviewprep">
+        <span class="nav-icon">🎯</span><span>Interview Prep</span>
+      </div>
+      <div class="nav-item" data-page="resumetailor">
+        <span class="nav-icon">📝</span><span>Resume Tailor</span>
+      </div>
+      <div class="nav-item" data-page="coverlettergenerator">
+        <span class="nav-icon">✍️</span><span>Cover Letter AI</span>
+      </div>
+      <div class="nav-item" data-page="outreachbuilder">
+        <span class="nav-icon">📨</span><span>Outreach Builder</span>
+      </div>
       <div class="nav-section-label">Intelligence</div>
       <div class="nav-item" data-page="ai">
         <span class="nav-icon">✦</span><span>AI Tools</span>
@@ -978,9 +990,17 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Track every tailored resume by company and role</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">📄 Base Documents</button>
           <button class="btn btn-primary" onclick="openAddResume()">+ Add Version</button>
         </div>
       </div>
+
+      <!-- Base Documents Banner -->
+      <div id="base-doc-banner" style="display:none;margin:0 32px 0;padding:12px 16px;background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);font-size:12px;color:var(--burgundy);display:flex;align-items:center;justify-content:space-between">
+        <span>✓ Base resume loaded — Claude will use it automatically for all AI features.</span>
+        <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">Edit</button>
+      </div>
+
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -1160,6 +1180,7 @@ a { color: var(--burgundy); text-decoration: none; }
             ✦ Claude's Response
             <div style="display:flex;gap:8px;">
               <button class="btn btn-secondary btn-sm" onclick="copyAIOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportToDocx()">⬇ Export .docx</button>
               <button class="btn btn-primary btn-sm" onclick="saveAIOutput()">Save to App</button>
             </div>
           </div>
@@ -1243,6 +1264,263 @@ a { color: var(--burgundy); text-decoration: none; }
             <tr><td colspan="5"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+
+    <!-- ── INTERVIEW PREP ──────────────────────────────────────────── -->
+    <div class="page" id="page-interviewprep">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Interview Prep</h2>
+          <p>Generate a full 8-document prep pack for any role</p>
+        </div>
+      </div>
+      <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+
+          <div class="dash-card" style="grid-column:1/-1">
+            <div class="dash-card-header">🎯 Interview Prep Pack Generator</div>
+            <div style="padding:20px">
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">
+                Enter the company, role, and job description. Claude generates a complete prep pack covering company research, SWOT analysis, 30-60-90 day plan, resume-to-role fit, strategic questions, and a full Q&A guide — all in one shot.
+              </p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Company *</label>
+                  <input class="form-input" type="text" id="ip-company" placeholder="e.g. Salesforce">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Role Title *</label>
+                  <input class="form-input" type="text" id="ip-role" placeholder="e.g. VP of Marketing">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Link to Application (optional)</label>
+                  <select class="form-select" id="ip-link-app">
+                    <option value="">— Don't link —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Company URL (optional)</label>
+                  <input class="form-input" type="url" id="ip-url" placeholder="https://company.com">
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">Job Description *</label>
+                  <textarea class="form-textarea" id="ip-jd" rows="8" placeholder="Paste the full job description here..."></textarea>
+                </div>
+              </div>
+              <div style="margin-top:16px;display:flex;gap:10px">
+                <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runInterviewPrep()">
+                  ✦ Generate Full Prep Pack
+                </button>
+                <button class="btn btn-secondary" onclick="clearInterviewPrep()">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Panel -->
+        <div class="dash-card" id="ip-output-panel" style="display:none;">
+          <div class="dash-card-header">
+            ✦ Interview Prep Pack
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="copyIPOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportIPDocx()">⬇ Export .docx</button>
+              <button class="btn btn-primary btn-sm" onclick="saveIPOutput()">Save to App</button>
+            </div>
+          </div>
+          <div style="padding:20px;">
+            <div id="ip-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── RESUME TAILOR PAGE ─────────────────────────────────────── -->
+    <div class="page" id="page-resumetailor">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Resume Tailor</h2>
+          <p>Align your resume to any job description in seconds</p>
+        </div>
+      </div>
+      <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+        <div class="dash-card" style="margin-bottom:24px">
+          <div class="dash-card-header">📝 Resume Tailoring Tool</div>
+          <div style="padding:20px">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Paste the job description and enter keywords. Claude will walk through all 7 steps — keyword integration, core expertise restructuring, redundancy audit, preservation check, and final review — then output a fully tailored resume with all changes marked.</p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Must-Have Keywords <span style="color:var(--text-light);font-weight:400">(comma separated)</span></label>
+                <input class="form-input" type="text" id="rt-keywords-req" placeholder="e.g. brand strategy, GTM, SaaS, CMO">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nice-to-Have Keywords <span style="color:var(--text-light);font-weight:400">(comma separated)</span></label>
+                <input class="form-input" type="text" id="rt-keywords-nice" placeholder="e.g. HubSpot, demand generation, B2B">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Link to Application (optional)</label>
+                <select class="form-select" id="rt-link-app">
+                  <option value="">— Don't link —</option>
+                </select>
+              </div>
+              <div class="form-group"></div>
+              <div class="form-group full">
+                <label class="form-label">Job Description *</label>
+                <textarea class="form-textarea" id="rt-jd" rows="10" placeholder="Paste the full job description here..."></textarea>
+              </div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runResumeTailor()">✦ Tailor My Resume</button>
+              <button class="btn btn-secondary" onclick="clearRT()">Clear</button>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card" id="rt-output-panel" style="display:none">
+          <div class="dash-card-header">✦ Tailored Resume Analysis
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
+            </div>
+          </div>
+          <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COVER LETTER GENERATOR PAGE ────────────────────────────── -->
+    <div class="page" id="page-coverlettergenerator">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Cover Letter AI</h2>
+          <p>Generate cover letters, InMails, and emails in your voice</p>
+        </div>
+      </div>
+      <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+        <div class="dash-card" style="margin-bottom:24px">
+          <div class="dash-card-header">✉️ Document Generator</div>
+          <div style="padding:20px">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Document Type</label>
+                <select class="form-select" id="clg-type">
+                  <option value="cover_letter">Cover Letter</option>
+                  <option value="inmail">LinkedIn InMail (Day 1)</option>
+                  <option value="linkedin_connect">LinkedIn Connection Request (Day 3)</option>
+                  <option value="email_day1">Email — Day 1</option>
+                  <option value="email_followup">Email — Day 5 Follow-Up</option>
+                  <option value="email_ceo">Email — Day 7 CEO/HM</option>
+                  <option value="rejection_followup">Post-Rejection Follow-Up</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Link to Application (optional)</label>
+                <select class="form-select" id="clg-link-app">
+                  <option value="">— Don't link —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Company *</label>
+                <input class="form-input" type="text" id="clg-company" placeholder="Company name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Role Title *</label>
+                <input class="form-input" type="text" id="clg-role" placeholder="VP of Marketing">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hiring Manager / Contact Name</label>
+                <input class="form-input" type="text" id="clg-contact" placeholder="First name">
+              </div>
+              <div class="form-group"></div>
+              <div class="form-group full">
+                <label class="form-label">Job Description or Context</label>
+                <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role..."></textarea>
+              </div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runCLGenerator()">✦ Generate Document</button>
+              <button class="btn btn-secondary" onclick="clearCLG()">Clear</button>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card" id="clg-output-panel" style="display:none">
+          <div class="dash-card-header">✦ Generated Document
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="copyCLGOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportCLGDocx()">⬇ Export .docx</button>
+              <button class="btn btn-primary btn-sm" onclick="saveCLGOutput()">Save to Cover Letters</button>
+            </div>
+          </div>
+          <div style="padding:20px"><div id="clg-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── OUTREACH BUILDER PAGE ───────────────────────────────────── -->
+    <div class="page" id="page-outreachbuilder">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Outreach Builder</h2>
+          <p>Build a complete 4-part outreach sequence for any role</p>
+        </div>
+      </div>
+      <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+        <div class="dash-card" style="margin-bottom:24px">
+          <div class="dash-card-header">📨 4-Part Outreach Sequence Builder</div>
+          <div style="padding:20px">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Generates all 4 outreach touches in one shot — Day 1 InMail/Email, Day 3 LinkedIn connection request, Day 5 follow-up, and Day 7 CEO/hiring manager email. Includes subject lines and word counts.</p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Company *</label>
+                <input class="form-input" type="text" id="ob-company" placeholder="Company name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Role Title *</label>
+                <input class="form-input" type="text" id="ob-role" placeholder="VP of Marketing">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Recruiter / Primary Contact Name</label>
+                <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Recruiter Email</label>
+                <input class="form-input" type="email" id="ob-email" placeholder="recruiter@company.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hiring Manager / CEO Name</label>
+                <input class="form-input" type="text" id="ob-hm" placeholder="First name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Link to Application (optional)</label>
+                <select class="form-select" id="ob-link-app">
+                  <option value="">— Don't link —</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label class="form-label">Company URL</label>
+                <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
+              </div>
+              <div class="form-group full">
+                <label class="form-label">Recent Company News or Context</label>
+                <textarea class="form-textarea" id="ob-context" rows="4" placeholder="e.g. Series B funding announced, new product launch, recent leadership hire..."></textarea>
+              </div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runOutreachBuilder()">✦ Build Outreach Sequence</button>
+              <button class="btn btn-secondary" onclick="clearOB()">Clear</button>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card" id="ob-output-panel" style="display:none">
+          <div class="dash-card-header">✦ Outreach Sequence
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="copyOBOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
+            </div>
+          </div>
+          <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+        </div>
       </div>
     </div>
 
@@ -1744,6 +2022,44 @@ a { color: var(--burgundy); text-decoration: none; }
   </div>
 </div>
 
+
+<!-- Base Documents Modal -->
+<div class="modal-overlay" id="modal-base-docs">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>📄 Base Documents</h3>
+      <button class="modal-close" onclick="closeModal('modal-base-docs')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Paste your master resume and cover letter template here. Claude will use these automatically as the base for all AI-generated documents. Plain text only — formatting is applied on export.</p>
+
+      <div class="form-group" style="margin-bottom:20px">
+        <label class="form-label" style="font-size:13px;font-weight:700;color:var(--text)">Master Resume</label>
+        <p style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Paste your full resume as plain text. Copy from Word using Ctrl+A → Ctrl+C, then paste here.</p>
+        <textarea class="form-textarea" id="base-resume-text" rows="14" placeholder="Paste your full resume text here...&#10;&#10;Jay Wadhwa&#10;847-910-9377 | jvwadhwa@gmail.com&#10;..."></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <span style="font-size:11px;color:var(--text-light)" id="resume-char-count">0 characters</span>
+          <span style="font-size:11px;color:var(--text-secondary)" id="resume-saved-indicator"></span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" style="font-size:13px;font-weight:700;color:var(--text)">Master Cover Letter Template</label>
+        <p style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Optional. Paste your standard cover letter template. Claude will use this as a starting point for all cover letter generation.</p>
+        <textarea class="form-textarea" id="base-cl-text" rows="10" placeholder="Paste your cover letter template here..."></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <span style="font-size:11px;color:var(--text-light)" id="cl-char-count">0 characters</span>
+          <span style="font-size:11px;color:var(--text-secondary)" id="cl-saved-indicator"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-base-docs')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBaseDocs()">Save Base Documents</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
 
@@ -1876,6 +2192,10 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (page === 'coverletters') loadCoverLetters();
     if (page === 'prompts') loadPrompts();
     if (page === 'resources') loadResources();
+    if (page === 'interviewprep') loadInterviewPrepPage();
+    if (page === 'resumetailor') loadRTPage();
+    if (page === 'coverlettergenerator') loadCLGPage();
+    if (page === 'outreachbuilder') loadOBPage();
   });
 });
 
@@ -3002,7 +3322,7 @@ async function loadPrompts() {
       '<td style="font-size:12px;color:var(--text-secondary)">' + (vars.join(', ') || 'None') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (p.system_prompt||'').length + ' chars</td>' +
       '<td><div class="table-actions">' +
-        '<button class="action-btn" onclick="openFirePrompt(\"' + p.id + '\")" title="Fire prompt" style="font-size:16px">▶</button>' +
+        '<button class="action-btn" onclick="openFirePrompt(\'' + p.id + '\')" title="Fire prompt" style="font-size:16px;color:var(--burgundy)">▶</button>' +
         '<button class="action-btn" onclick="editPrompt(\"' + p.id + '\")" title="Edit">✏️</button>' +
         '<button class="action-btn danger" onclick="deletePrompt(\"' + p.id + '\")" title="Delete">🗑</button>' +
       '</div></td>' +
@@ -3062,42 +3382,46 @@ async function deletePrompt(id) {
 let activePromptId = null;
 async function openFirePrompt(id) {
   const data = await dbGet('prompts', 'select=*&id=eq.' + id);
-  const p = Array.isArray(data) ? data[0] : data;
-  if (!p) return;
+  const rows = Array.isArray(data) ? data : [data];
+  const p = rows.find(r => r && r.id) || null;
+  if (!p) { toast('Could not load prompt.', 'error'); return; }
   activePromptId = id;
 
   const vars = Array.isArray(p.variable_fields) ? p.variable_fields : [];
   const container = document.getElementById('fire-prompt-fields');
+  if (!container) return;
   document.getElementById('fire-prompt-name').textContent = p.name;
 
   if (vars.length === 0) {
-    container.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">No variable fields — this prompt fires as-is.</p>';
+    container.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">No variable fields. Click Generate to run as-is.</p>';
   } else {
-    container.innerHTML = vars.map(v => {
-      const isLong = ['job_description','context','notes'].includes(v);
-      const label = v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      return '<div class="form-group" style="margin-bottom:12px">' +
+    container.innerHTML = vars.map(function(v) {
+      const isLong = ['job_description', 'context', 'notes', 'company_context'].includes(v);
+      const label = v.replace(/_/g, ' ').replace(/(?:^|\s)\S/g, function(c){ return c.toUpperCase(); });
+      return '<div class="form-group" style="margin-bottom:14px">' +
         '<label class="form-label">' + label + '</label>' +
         (isLong
-          ? '<textarea class="form-textarea" id="fp-' + v + '" rows="5" placeholder="Paste ' + label.toLowerCase() + ' here..."></textarea>'
+          ? '<textarea class="form-textarea" id="fp-' + v + '" rows="6" placeholder="Paste ' + label.toLowerCase() + ' here..."></textarea>'
           : '<input class="form-input" type="text" id="fp-' + v + '" placeholder="Enter ' + label.toLowerCase() + '...">') +
         '</div>';
     }).join('');
   }
 
-  // Populate application link dropdown
   const linkSel = document.getElementById('fp-link-app');
-  linkSel.innerHTML = '<option value="">— Don\'t link —</option>';
-  const recentApps = allApps.slice(0, 50);
-  recentApps.forEach(a => {
-    const opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.company + ' — ' + a.job_title;
-    linkSel.appendChild(opt);
-  });
+  if (linkSel) {
+    linkSel.innerHTML = '<option value="">— Don\'t link to application —</option>';
+    allApps.slice(0, 100).forEach(function(a) {
+      if (!a.company) return;
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+      linkSel.appendChild(opt);
+    });
+  }
 
   openModal('modal-fire-prompt');
 }
+
 
 async function runFirePrompt() {
   const data = await dbGet('prompts', 'select=*&id=eq.' + activePromptId);
@@ -3128,7 +3452,7 @@ async function runFirePrompt() {
   showAIOutput('Generating with Claude...\n\nThis may take a moment for longer documents.', p.name);
 
   try {
-    const result = await callAI([{ role: 'user', content: promptText }], JAY_SYSTEM_PROMPT);
+    const result = await callAI([{ role: 'user', content: promptText }], getSystemPromptWithResume());
     showAIOutput(result, p.name);
     lastAIOutput = result;
     lastAIOutputType = p.category ? p.category.toLowerCase().replace(/ /g,'_') : 'prompt';
@@ -3306,6 +3630,189 @@ For InMail: Subject format is [Role Title] | Jay Wadhwa. One paragraph. Open wit
 For emails: First name only. Open naturally. Under 150 words. One metric. Clear ask. Close with Cheers.
 For cover letters: Lead with strongest result. Match keywords naturally. Show company research. Clear next step.`;
 
+// ── BASE DOCUMENTS ─────────────────────────────────────────────────────
+let baseResumeText = '';
+let baseCoverLetterText = '';
+
+async function loadBaseDocs() {
+  // Load from Supabase resumes table where is_base_version = true
+  const data = await dbGet('resumes', 'select=*&is_base_version=eq.true&order=created_at.desc&limit=1');
+  const base = Array.isArray(data) && data.length > 0 ? data[0] : null;
+  if (base && base.notes) {
+    // We store base doc text in the notes field as JSON
+    try {
+      const parsed = JSON.parse(base.notes);
+      baseResumeText = parsed.resume || '';
+      baseCoverLetterText = parsed.cover_letter || '';
+      // Show the banner on resumes page
+      const banner = document.getElementById('base-doc-banner');
+      if (banner && baseResumeText) banner.style.display = 'flex';
+    } catch(e) {
+      baseResumeText = base.notes || '';
+    }
+  }
+}
+
+function openBaseDocModal() {
+  document.getElementById('base-resume-text').value = baseResumeText;
+  document.getElementById('base-cl-text').value = baseCoverLetterText;
+  updateBaseDocCounts();
+  openModal('modal-base-docs');
+}
+
+function updateBaseDocCounts() {
+  const rt = document.getElementById('base-resume-text').value;
+  const ct = document.getElementById('base-cl-text').value;
+  const rc = document.getElementById('resume-char-count');
+  const cc = document.getElementById('cl-char-count');
+  if (rc) rc.textContent = rt.length.toLocaleString() + ' characters';
+  if (cc) cc.textContent = ct.length.toLocaleString() + ' characters';
+}
+
+// Live character counts
+document.addEventListener('DOMContentLoaded', () => {
+  const rt = document.getElementById('base-resume-text');
+  const ct = document.getElementById('base-cl-text');
+  if (rt) rt.addEventListener('input', updateBaseDocCounts);
+  if (ct) ct.addEventListener('input', updateBaseDocCounts);
+});
+
+async function saveBaseDocs() {
+  const resumeText = document.getElementById('base-resume-text').value.trim();
+  const clText = document.getElementById('base-cl-text').value.trim();
+
+  if (!resumeText) { toast('Paste your resume text before saving.', 'error'); return; }
+
+  const payload = {
+    version_name: 'Master Resume — Base',
+    target_role: 'All Roles',
+    target_company: null,
+    date_created: today(),
+    is_base_version: true,
+    notes: JSON.stringify({ resume: resumeText, cover_letter: clText }),
+    keywords_required: [],
+    keywords_nice: [],
+  };
+
+  try {
+    // Delete any existing base version first
+    const existing = await dbGet('resumes', 'select=id&is_base_version=eq.true');
+    if (Array.isArray(existing)) {
+      for (const r of existing) {
+        await dbDelete('resumes', r.id);
+      }
+    }
+
+    await dbPost('resumes', payload);
+    baseResumeText = resumeText;
+    baseCoverLetterText = clText;
+
+    // Show banner
+    const banner = document.getElementById('base-doc-banner');
+    if (banner) banner.style.display = 'flex';
+
+    const ri = document.getElementById('resume-saved-indicator');
+    const ci = document.getElementById('cl-saved-indicator');
+    if (ri) ri.textContent = '✓ Saved';
+    if (ci && clText) ci.textContent = '✓ Saved';
+
+    closeModal('modal-base-docs');
+    toast('Base documents saved. Claude will use these for all AI features.', 'success');
+    loadResumes();
+  } catch(e) {
+    toast('Error saving: ' + e.message, 'error');
+  }
+}
+
+function getSystemPromptWithResume() {
+  let prompt = JAY_SYSTEM_PROMPT;
+  if (baseResumeText) {
+    prompt += `\n\n--- JAY'S MASTER RESUME ---\n` + baseResumeText;
+  }
+  if (baseCoverLetterText) {
+    prompt += `\n\n--- JAY'S COVER LETTER TEMPLATE ---\n` + baseCoverLetterText;
+  }
+  return prompt;
+}
+
+// ── DOCX EXPORT ─────────────────────────────────────────────────────────
+function exportToDocx() {
+  if (!lastAIOutput) { toast('No output to export.', 'error'); return; }
+
+  // Build a formatted HTML document and trigger download as .doc
+  // (true .docx requires server-side; this approach opens in Word perfectly)
+  const title = lastAIOutputType
+    ? lastAIOutputType.replace(/_/g, ' ').replace(/\w/g, l => l.toUpperCase())
+    : 'Claude Output';
+
+  const styles = `
+    body { font-family: Calibri, sans-serif; font-size: 11pt; margin: 1in; line-height: 1.0; color: #000; }
+    h1, h2, h3 { color: #972b32; font-family: Calibri, sans-serif; }
+    h1 { font-size: 14pt; border-bottom: 2px solid #972b32; padding-bottom: 4px; margin-bottom: 8px; }
+    h2 { font-size: 12pt; margin-top: 16px; margin-bottom: 4px; }
+    p { margin: 4px 0; }
+    ul, ol { margin: 4px 0 4px 20px; }
+    li { margin: 2px 0; }
+    strong, b { font-weight: bold; }
+    .highlight { background: yellow; }
+  `;
+
+  // Convert plain text to basic HTML — preserve line breaks, detect headers
+  const lines = lastAIOutput.split('\n');
+  let html = '';
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) { html += '<br>'; continue; }
+    // Detect ALL CAPS section headers
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && trimmed.length < 80 && /[A-Z]/.test(trimmed)) {
+      html += `<h2>${trimmed}</h2>`;
+    }
+    // Detect markdown-style headers
+    else if (trimmed.startsWith('# ')) { html += `<h1>${trimmed.slice(2)}</h1>`; }
+    else if (trimmed.startsWith('## ')) { html += `<h2>${trimmed.slice(3)}</h2>`; }
+    else if (trimmed.startsWith('### ')) { html += `<h2>${trimmed.slice(4)}</h2>`; }
+    // Detect bullets
+    else if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+      html += `<ul><li>${trimmed.slice(2)}</li></ul>`;
+    }
+    else if (/^\d+\.\s/.test(trimmed)) {
+      html += `<ol><li>${trimmed.replace(/^\d+\.\s/, '')}</li></ol>`;
+    }
+    else { html += `<p>${trimmed}</p>`; }
+  }
+
+  const fullHtml = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office'
+          xmlns:w='urn:schemas-microsoft-com:office:word'
+          xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset='utf-8'>
+      <title>${title}</title>
+      <!--[if gte mso 9]>
+      <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+      <![endif]-->
+      <style>${styles}</style>
+    </head>
+    <body>
+      <h1>${title}</h1>
+      <p style="font-size:9pt;color:#666;margin-bottom:16px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Jay Wadhwa Job Search Command Center</p>
+      ${html}
+    </body>
+    </html>`;
+
+  const blob = new Blob([fullHtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+
+  // Name the file based on output type
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.download = `Jay_Wadhwa_${title.replace(/\s+/g, '_')}_${dateStr}.doc`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Document downloaded. Open in Word to review and edit.', 'success');
+}
+
 // ── AI TOOLS ───────────────────────────────────────────────────────────
 function showAIOutput(content, type = '') {
   const panel = document.getElementById('ai-output-panel');
@@ -3397,7 +3904,7 @@ Instructions:
 5. Recommend the best Core Expertise categories and order for this specific role
 
 Format clearly with sections: KEYWORDS ANALYSIS | SUGGESTED BULLET REWRITES | CORE EXPERTISE RECOMMENDATIONS | KEYWORDS TO SKIP`
-    }], JAY_SYSTEM_PROMPT);
+    }], getSystemPromptWithResume());
 
     showAIOutput(result, 'resume_edits');
   } catch(e) { showAIOutput('Error: ' + e.message); }
@@ -3431,7 +3938,7 @@ async function generateDoc() {
 
     const prompt = prompts[outputType] || prompts.cover_letter;
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     showAIOutput(result, outputType);
   } catch(e) { showAIOutput('Error: ' + e.message); }
 }
@@ -3469,7 +3976,7 @@ async function networkingIntel(mode) {
     `\nWrite everything in Jay's voice. Confident, peer-to-peer, results-first. No banned words.`;
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     showAIOutput(result, 'networking');
   } catch(e) { showAIOutput('Error: ' + e.message); }
 }
@@ -3631,7 +4138,7 @@ async function sendFollowUpReminders() {
   // Build email body via Claude
   const itemList = due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('\n');
   const emailPrompt = 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.\n\nItems:\n' + itemList;
-  const emailBody = await callAI([{ role: 'user', content: emailPrompt }], JAY_SYSTEM_PROMPT);
+  const emailBody = await callAI([{ role: 'user', content: emailPrompt }], getSystemPromptWithResume());
 
   // Save as AI output for reference
   await dbPost('ai_outputs', {
@@ -3769,7 +4276,7 @@ DATA:
 Jay is a senior marketing executive (VP/CMO level) targeting roles in SaaS, Web3, media, and nonprofits in Chicago and remote. Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     body.innerHTML = '<div style="padding:20px;white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text)">' +
       result.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
   } catch(e) {
@@ -3808,6 +4315,394 @@ function getAvgTimeToResponse() {
   if (!responded.length) return '—';
   // We don't have a response date field yet, so estimate based on status
   return responded.length + ' roles progressed';
+}
+
+// ── INTERVIEW PREP PAGE ─────────────────────────────────────────────────
+let ipOutput = '';
+
+function loadInterviewPrepPage() {
+  // Populate application dropdown
+  const sel = document.getElementById('ip-link-app');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Don\'t link —</option>';
+  allApps.slice(0, 100).forEach(function(a) {
+    if (!a.company) return;
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    sel.appendChild(opt);
+  });
+}
+
+async function runInterviewPrep() {
+  const company = (document.getElementById('ip-company').value || '').trim();
+  const role = (document.getElementById('ip-role').value || '').trim();
+  const jd = (document.getElementById('ip-jd').value || '').trim();
+  const url = (document.getElementById('ip-url').value || '').trim();
+
+  if (!company || !role) { toast('Company and role are required.', 'error'); return; }
+  if (!jd) { toast('Paste the job description to get the best results.', 'error'); return; }
+
+  const panel = document.getElementById('ip-output-panel');
+  const contentEl = document.getElementById('ip-output-content');
+  panel.style.display = 'block';
+  contentEl.textContent = 'Generating your full interview prep pack... This takes 30-60 seconds.';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Load the Interview Prep prompt from the prompts library
+  const promptsData = await dbGet('prompts', 'select=*&name=eq.Interview Prep Pack');
+  const promptRows = Array.isArray(promptsData) ? promptsData : [];
+  let basePrompt = promptRows.length > 0 ? (promptRows[0].system_prompt || '') : '';
+
+  // If no saved prompt, use the built-in version
+  if (!basePrompt) {
+    basePrompt = 'Use the information below to create a comprehensive interview prep pack for Jay Wadhwa. Cover all 8 areas: (1) Company Overview with founding, HQ, revenue, leadership, competitors, recent news; (2) SWOT + Competitive Analysis; (3) Target Niche Analysis; (4) 30-60-90 Day Plan covering brand, content, partnerships, demand gen; (5) Resume-to-Role Fit Analysis with side-by-side table; (6) One-Page Executive Summary in bullets only; (7) Strategic Questions for the Recruiter (questions only, no answers) covering team dynamics, priorities, measurement, budget, culture; (8) Interview Q&A Guide with 12 questions and prepared answers tied to real results.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description: {{job_description}}';
+  }
+
+  // Replace variables
+  let prompt = basePrompt
+    .replace(/\{\{company\}\}/g, company)
+    .replace(/\{\{role\}\}/g, role)
+    .replace(/\{\{job_description\}\}/g, jd);
+
+  if (url) prompt += '\n\nCompany URL: ' + url;
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    ipOutput = result;
+    contentEl.textContent = result;
+
+    // Auto-save
+    const linkedAppId = document.getElementById('ip-link-app').value || null;
+    await dbPost('ai_outputs', {
+      output_type: 'interview_prep',
+      linked_application_id: linkedAppId || null,
+      prompt_used: 'Interview Prep Pack',
+      content: result,
+    });
+
+    if (linkedAppId) {
+      const app = allApps.find(function(a) { return a.id === linkedAppId; });
+      if (app) {
+        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+        const newOutput = existing.concat([{ type: 'interview_prep', prompt: 'Interview Prep Pack', content: result, date: today() }]);
+        await dbPatch('applications', linkedAppId, { ai_output: newOutput });
+        const idx = allApps.findIndex(function(a) { return a.id === linkedAppId; });
+        if (idx >= 0) allApps[idx].ai_output = newOutput;
+        toast('Prep pack generated and saved to ' + app.company + '.', 'success');
+      }
+    } else {
+      toast('Interview prep pack generated.', 'success');
+    }
+  } catch(e) {
+    contentEl.textContent = 'Error: ' + e.message;
+    toast('Generation failed: ' + e.message, 'error');
+  }
+}
+
+function clearInterviewPrep() {
+  ['ip-company','ip-role','ip-jd','ip-url'].forEach(function(id) {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const panel = document.getElementById('ip-output-panel');
+  if (panel) panel.style.display = 'none';
+  ipOutput = '';
+}
+
+function copyIPOutput() {
+  if (!ipOutput) return;
+  navigator.clipboard.writeText(ipOutput).then(function() { toast('Copied to clipboard.', 'success'); });
+}
+
+function exportIPDocx() {
+  if (!ipOutput) { toast('No output to export.', 'error'); return; }
+  const company = (document.getElementById('ip-company').value || 'Company').trim();
+  const role = (document.getElementById('ip-role').value || 'Role').trim();
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}h1{font-size:14pt;border-bottom:2px solid #972b32;padding-bottom:4px;margin-bottom:8px}h2{font-size:12pt;margin-top:16px;margin-bottom:4px}p{margin:4px 0}ul,ol{margin:4px 0 4px 20px}li{margin:2px 0}strong,b{font-weight:bold}';
+
+  const lines = ipOutput.split('\n');
+  let html = '';
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) { html += '<br>'; continue; }
+    if (t.startsWith('# ')) { html += '<h1>' + t.slice(2) + '</h1>'; }
+    else if (t.startsWith('## ')) { html += '<h2>' + t.slice(3) + '</h2>'; }
+    else if (t.startsWith('### ')) { html += '<h2>' + t.slice(4) + '</h2>'; }
+    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t)) { html += '<h2>' + t + '</h2>'; }
+    else if (t.startsWith('- ') || t.startsWith('• ')) { html += '<ul><li>' + t.slice(2) + '</li></ul>'; }
+    else if (/^\d+\.\s/.test(t)) { html += '<ol><li>' + t.replace(/^\d+\.\s/, '') + '</li></ol>'; }
+    else { html += '<p>' + t + '</p>'; }
+  }
+
+  const fullHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Interview Prep</title><style>' + styles + '</style></head><body><h1>Interview Prep Pack — ' + company + '</h1><p style="font-size:9pt;color:#666;margin-bottom:16px">' + role + ' · Generated ' + new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) + ' · Jay Wadhwa</p>' + html + '</body></html>';
+
+  const blob = new Blob([fullHtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Jay_Wadhwa_InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + dateStr + '.doc';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Prep pack downloaded. Open in Word to review.', 'success');
+}
+
+async function saveIPOutput() {
+  if (!ipOutput) return;
+  const company = (document.getElementById('ip-company').value || '').trim();
+  const linkedAppId = document.getElementById('ip-link-app').value || null;
+  if (!linkedAppId && company) {
+    const match = allApps.find(function(a) { return a.company && a.company.toLowerCase().includes(company.toLowerCase()); });
+    if (match) {
+      const existing = Array.isArray(match.ai_output) ? match.ai_output : [];
+      await dbPatch('applications', match.id, { ai_output: existing.concat([{ type: 'interview_prep', content: ipOutput, date: today() }]) });
+      toast('Saved to ' + match.company + '.', 'success');
+      return;
+    }
+  }
+  toast('Use the dropdown above to link to an application before saving.', '');
+}
+
+// ── RESUME TAILOR PAGE JS ───────────────────────────────────────────────
+let rtOutput = '';
+
+function loadRTPage() {
+  const sel = document.getElementById('rt-link-app');
+  if (!sel) return;
+  sel.innerHTML = "<option value=''>— Don't link —</option>";
+  allApps.slice(0, 100).forEach(function(a) {
+    if (!a.company) return;
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    sel.appendChild(opt);
+  });
+}
+
+async function runResumeTailor() {
+  const jd = (document.getElementById('rt-jd').value || '').trim();
+  const req = (document.getElementById('rt-keywords-req').value || '').trim();
+  const nice = (document.getElementById('rt-keywords-nice').value || '').trim();
+  if (!jd) { toast('Paste a job description first.', 'error'); return; }
+
+  const panel = document.getElementById('rt-output-panel');
+  const contentEl = document.getElementById('rt-output-content');
+  panel.style.display = 'block';
+  contentEl.textContent = 'Running all 7 resume tailoring steps... This may take 30-60 seconds.';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const promptsData = await dbGet('prompts', 'select=*&name=eq.Resume Tailoring');
+  const rows = Array.isArray(promptsData) ? promptsData : [];
+  let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
+  if (!prompt) {
+    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+  }
+  prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
+                 .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
+                 .replace(/\{\{job_description\}\}/g, jd);
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    rtOutput = result;
+    contentEl.textContent = result;
+    const linkedId = document.getElementById('rt-link-app').value || null;
+    await dbPost('ai_outputs', { output_type: 'resume_tailor', linked_application_id: linkedId, content: result });
+    if (linkedId) {
+      const app = allApps.find(function(a) { return a.id === linkedId; });
+      if (app) {
+        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+        await dbPatch('applications', linkedId, { ai_output: existing.concat([{ type: 'resume_tailor', content: result, date: today() }]) });
+        const idx = allApps.findIndex(function(a) { return a.id === linkedId; });
+        if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'resume_tailor', content: result, date: today() }]);
+      }
+    }
+    toast('Resume tailoring complete.', 'success');
+  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+}
+
+function clearRT() {
+  ['rt-jd','rt-keywords-req','rt-keywords-nice'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
+}
+function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
+function exportRTDocx() { exportGenericDocx(rtOutput, 'Resume_Tailoring'); }
+
+// ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
+let clgOutput = '';
+
+function loadCLGPage() {
+  const sel = document.getElementById('clg-link-app');
+  if (!sel) return;
+  sel.innerHTML = "<option value=''>— Don't link —</option>";
+  allApps.slice(0, 100).forEach(function(a) {
+    if (!a.company) return;
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    sel.appendChild(opt);
+  });
+}
+
+async function runCLGenerator() {
+  const type = document.getElementById('clg-type').value;
+  const company = (document.getElementById('clg-company').value || '').trim();
+  const role = (document.getElementById('clg-role').value || '').trim();
+  const contact = (document.getElementById('clg-contact').value || '').trim();
+  const jd = (document.getElementById('clg-jd').value || '').trim();
+  if (!company || !role) { toast('Company and role are required.', 'error'); return; }
+
+  const panel = document.getElementById('clg-output-panel');
+  const contentEl = document.getElementById('clg-output-content');
+  panel.style.display = 'block';
+  contentEl.textContent = 'Generating...';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const typePrompts = {
+    cover_letter: `Write a cover letter for Jay Wadhwa applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
+    inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
+    linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
+    email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
+    email_followup: `Write a Day 5 follow-up email for Jay Wadhwa on his application for ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
+    email_ceo: `Write a Day 7 peer-to-peer email for Jay Wadhwa to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''} Length: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.`,
+    rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
+  };
+
+  const prompt = typePrompts[type] || typePrompts.cover_letter;
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    clgOutput = result;
+    contentEl.textContent = result;
+    const linkedId = document.getElementById('clg-link-app').value || null;
+    await dbPost('ai_outputs', { output_type: type, linked_application_id: linkedId, content: result });
+    toast('Document generated.', 'success');
+  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+}
+
+function clearCLG() {
+  ['clg-company','clg-role','clg-contact','clg-jd'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
+}
+function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
+function exportCLGDocx() { exportGenericDocx(clgOutput, 'Cover_Letter_' + (document.getElementById('clg-company').value||'').trim().replace(/\s+/g,'_')); }
+
+async function saveCLGOutput() {
+  if (!clgOutput) return;
+  const company = (document.getElementById('clg-company').value||'').trim();
+  const role = (document.getElementById('clg-role').value||'').trim();
+  const payload = {
+    version_name: 'CL_' + company + '_' + role,
+    target_role: role, target_company: company,
+    date_created: today(), content: clgOutput, ai_generated: true,
+    linked_application_id: document.getElementById('clg-link-app').value || null
+  };
+  try {
+    await dbPost('cover_letters', payload);
+    toast('Saved to Cover Letters.', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ── OUTREACH BUILDER PAGE JS ─────────────────────────────────────────────
+let obOutput = '';
+
+function loadOBPage() {
+  const sel = document.getElementById('ob-link-app');
+  if (!sel) return;
+  sel.innerHTML = "<option value=''>— Don't link —</option>";
+  allApps.slice(0, 100).forEach(function(a) {
+    if (!a.company) return;
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    sel.appendChild(opt);
+  });
+}
+
+async function runOutreachBuilder() {
+  const company = (document.getElementById('ob-company').value||'').trim();
+  const role = (document.getElementById('ob-role').value||'').trim();
+  const recruiter = (document.getElementById('ob-recruiter').value||'').trim();
+  const email = (document.getElementById('ob-email').value||'').trim();
+  const hm = (document.getElementById('ob-hm').value||'').trim();
+  const url = (document.getElementById('ob-url').value||'').trim();
+  const context = (document.getElementById('ob-context').value||'').trim();
+  if (!company || !role) { toast('Company and role are required.', 'error'); return; }
+
+  const panel = document.getElementById('ob-output-panel');
+  const contentEl = document.getElementById('ob-output-content');
+  panel.style.display = 'block';
+  contentEl.textContent = 'Building your outreach sequence...';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const promptsData = await dbGet('prompts', 'select=*&name=eq.Outreach Sequence (4-Part)');
+  const rows = Array.isArray(promptsData) ? promptsData : [];
+  let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
+  if (!prompt) {
+    prompt = 'Write a complete 4-part outreach sequence for Jay Wadhwa who applied to the {{role}} role at {{company}}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include subject line, word count, and formatted copy. Select the 3-4 most relevant wins from Jay background for this company and role.';
+  }
+  prompt = prompt
+    .replace(/\{\{company\}\}/g, company)
+    .replace(/\{\{role\}\}/g, role)
+    .replace(/\{\{recruiter_name\}\}/g, recruiter)
+    .replace(/\{\{recruiter_email\}\}/g, email)
+    .replace(/\{\{hiring_manager\}\}/g, hm)
+    .replace(/\{\{company_url\}\}/g, url)
+    .replace(/\{\{company_context\}\}/g, context);
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    obOutput = result;
+    contentEl.textContent = result;
+    const linkedId = document.getElementById('ob-link-app').value || null;
+    await dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: linkedId, content: result });
+    if (linkedId) {
+      const app = allApps.find(function(a){ return a.id === linkedId; });
+      if (app) {
+        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+        await dbPatch('applications', linkedId, { ai_output: existing.concat([{ type: 'outreach_sequence', content: result, date: today() }]) });
+        const idx = allApps.findIndex(function(a){ return a.id === linkedId; });
+        if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'outreach_sequence', content: result, date: today() }]);
+      }
+    }
+    toast('Outreach sequence generated.', 'success');
+  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+}
+
+function clearOB() {
+  ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
+}
+function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
+function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
+
+// ── SHARED DOCX EXPORT ───────────────────────────────────────────────────
+function exportGenericDocx(text, filename) {
+  if (!text) { toast('No output to export.', 'error'); return; }
+  const dateStr = new Date().toISOString().split('T')[0];
+  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}h1{font-size:14pt;border-bottom:2px solid #972b32;padding-bottom:4px;margin-bottom:8px}h2{font-size:12pt;margin-top:16px;margin-bottom:4px}p{margin:4px 0}ul,ol{margin:4px 0 4px 20px}li{margin:2px 0}strong,b{font-weight:bold}';
+  const lines = text.split('\n');
+  let html = '';
+  for (var i=0; i<lines.length; i++) {
+    var t = lines[i].trim();
+    if (!t) { html += '<br>'; continue; }
+    if (t.startsWith('# ')) { html += '<h1>'+t.slice(2)+'</h1>'; }
+    else if (t.startsWith('## ')) { html += '<h2>'+t.slice(3)+'</h2>'; }
+    else if (t.startsWith('### ')) { html += '<h2>'+t.slice(4)+'</h2>'; }
+    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t)) { html += '<h2>'+t+'</h2>'; }
+    else if (t.startsWith('- ') || t.startsWith('• ')) { html += '<ul><li>'+t.slice(2)+'</li></ul>'; }
+    else if (/^\d+\.\s/.test(t)) { html += '<ol><li>'+t.replace(/^\d+\.\s/,'')+'</li></ol>'; }
+    else { html += '<p>'+t+'</p>'; }
+  }
+  var fullHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>'+styles+'</style></head><body><h1>'+filename.replace(/_/g,' ')+'</h1><p style="font-size:9pt;color:#666;margin-bottom:16px">Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+' · Jay Wadhwa</p>'+html+'</body></html>';
+  var blob = new Blob([fullHtml], { type: 'application/msword' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Jay_Wadhwa_'+filename+'_'+dateStr+'.doc';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Document downloaded.', 'success');
 }
 
 // ── QUICK FIRE AI ──────────────────────────────────────────────────────
@@ -3863,6 +4758,8 @@ populateDropdowns();
 refreshDashboard();
 // Auto-seed prompts on first load
 setTimeout(seedPrompts, 1500);
+// Load base documents
+loadBaseDocs();
 
 // Check for follow-ups on load and show badge
 setTimeout(async () => {
