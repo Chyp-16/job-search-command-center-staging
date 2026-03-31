@@ -1088,9 +1088,13 @@ a { color: var(--burgundy); text-decoration: none; }
                 <label class="form-label">Output Type</label>
                 <select class="form-select" id="ai-output-type">
                   <option value="cover_letter">Cover Letter</option>
-                  <option value="inmail">LinkedIn InMail</option>
-                  <option value="email">Follow-Up Email</option>
+                  <option value="inmail">LinkedIn InMail (Day 1)</option>
+                  <option value="linkedin_connect">LinkedIn Connection Request (Day 3)</option>
+                  <option value="email_day1">Email — Day 1</option>
+                  <option value="email_followup">Email — Day 5 Follow-Up</option>
+                  <option value="email_ceo">Email — Day 7 CEO/HM</option>
                   <option value="rejection_followup">Post-Rejection Follow-Up</option>
+                  <option value="outreach_sequence">Full 4-Part Outreach Sequence</option>
                 </select>
               </div>
               <div class="form-group" style="margin-bottom:10px;">
@@ -2125,6 +2129,7 @@ function renderAppsTable() {
           <div class="table-actions">
             <button class="action-btn" onclick="viewApp('${a.id}')" title="View">👁</button>
             <button class="action-btn" onclick="editApp('${a.id}')" title="Edit">✏️</button>
+            <button class="action-btn" onclick="quickFireAI('${a.id}')" title="Generate outreach" style="color:var(--burgundy)">✦</button>
             <button class="action-btn danger" onclick="deleteApp('${a.id}')" title="Delete">🗑</button>
           </div>
         </td>
@@ -2342,8 +2347,21 @@ const CONTACT_TYPE_BADGE = {
 };
 
 async function loadContacts() {
-  const data = await dbGet('contacts', 'select=*&order=created_at.desc&limit=2000');
-  allContacts = Array.isArray(data) ? data : [];
+  // Paginate through all contacts — Supabase caps at 1000 per request
+  const PAGE = 1000;
+  let allData = [];
+  let offset = 0;
+
+  while (true) {
+    const data = await dbGet('contacts', 'select=*&order=created_at.desc&limit=' + PAGE + '&offset=' + offset);
+    const page = Array.isArray(data) ? data : [];
+    allData = allData.concat(page);
+    if (page.length < PAGE) break; // last page
+    offset += PAGE;
+    if (offset > 9000) break; // safety cap at 10,000
+  }
+
+  allContacts = allData;
   filteredContacts = allContacts;
   renderContactsTable();
   updateContactCount();
@@ -2899,7 +2917,7 @@ const SEED_PROMPTS = [
   {
     "name": "Outreach Sequence (4-Part)",
     "category": "Networking",
-    "system_prompt": "Use Jay Wadhwa's resume and the details below to create a 4-part outreach sequence for a role Jay already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let's talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from Jay's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
+    "system_prompt": "Use Jay Wadhwa's resume and the details below to create a 4-part outreach sequence for a role Jay already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let us talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from Jay's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
     "variable_fields": [
       "company",
       "company_url",
@@ -3355,29 +3373,31 @@ async function generateDoc() {
   const jd = document.getElementById('ai-gen-jd').value.trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
-
   showAIOutput('Generating with Claude...');
 
-  const typeLabels = {
-    cover_letter: 'a cover letter',
-    inmail: 'a LinkedIn InMail message',
-    email: 'a follow-up email',
-    rejection_followup: 'a post-rejection follow-up email'
+  const jdLine = jd ? ('\n\nJob description / context:\n' + jd) : '';
+  const contactLine = contact ? ('\nAddress it to ' + contact + '.') : '';
+  const contactStr = contact ? ('\nPrimary contact: ' + contact) : '';
+  const recipientStr = contact ? (' Recipient: ' + contact + '.') : '';
+
+  const prompts = {
+    cover_letter: `Write a cover letter for Jay Wadhwa applying to the ${role} role at ${company}.${contact ? ' Address it to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with the strongest relevant result. Show company research. Match role keywords naturally. End with a clear next step.`,
+    inmail: `Write a LinkedIn InMail for Jay Wadhwa to the hiring manager at ${company} about the ${role} role.${contact ? ' Recipient first name: ' + contact + '.' : ''}\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with a hook or strong result. Never "I saw your posting." Direct ask to close. No calendar links.${jd ? '\n\nRole context:\n' + jd : ''}`,
+    linkedin_connect: `Write a LinkedIn connection request note from Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific about their role or company. Peer-to-peer, no generic phrases.`,
+    email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 100-120 words. Subject line includes the role and a standout credential.${jd ? '\n\n' + jd : ''}`,
+    email_followup: `Write a Day 5 follow-up email for Jay Wadhwa checking in on his application for the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
+    email_ceo: `Write a Day 7 peer-to-peer email for Jay Wadhwa to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''}\n\nLength: 90-100 words. Executive-to-executive tone. Lead with a business result relevant to their company. Use a direct closing ask. No soft language.`,
+    rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} role at ${company}.${contact ? ' Send to: ' + contact + '.' : ''}\n\nLength: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind for future roles. Close with Cheers.`,
+    outreach_sequence: `Write a complete 4-part outreach sequence for Jay Wadhwa who applied to the ${role} role at ${company}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include: subject line, word count, formatted copy.\nSelect the 3-4 most relevant wins from Jay's background for this company and role.${contact ? '\n\nPrimary contact: ' + contact : ''}${jd ? '\n\nRole context:\n' + jd : ''}`,
   };
 
+    const prompt = prompts[outputType] || prompts.cover_letter;
   try {
-    const result = await callAI([{
-      role: 'user',
-      content: `Write ${typeLabels[outputType]} for Jay Wadhwa applying to the ${role} role at ${company}.
-${contact ? `The contact's first name is: ${contact}` : ''}
-${jd ? `Job description / context:\n${jd}` : ''}
-
-Follow all of Jay's writing rules exactly. Match his voice. Lead with a strong result.`
-    }], JAY_SYSTEM_PROMPT);
-
+    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
     showAIOutput(result, outputType);
   } catch(e) { showAIOutput('Error: ' + e.message); }
 }
+
 
 async function networkingIntel(mode) {
   const company = document.getElementById('ai-net-company').value.trim();
@@ -3386,28 +3406,36 @@ async function networkingIntel(mode) {
   const role = document.getElementById('ai-net-role').value.trim();
 
   if (!company) { toast('Enter a target company.', 'error'); return; }
-
   showAIOutput('Building networking strategy...');
 
+  // Pull any logged contacts at this company
+  const loggedContacts = allContacts.filter(c =>
+    c.company && c.company.toLowerCase().includes(company.toLowerCase())
+  );
+
+  const contactSection = loggedContacts.length > 0
+    ? `\n\nJay already has these contacts logged at ${company}:\n` +
+      loggedContacts.map(c => `- ${c.name}${c.title ? ', ' + c.title : ''}${c.contact_type ? ' (' + c.contact_type + ')' : ''}`).join('\n')
+    : `\n\nJay has no existing contacts logged at ${company}.`;
+
+  const prompt = `Jay Wadhwa is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.` +
+    contactSection +
+    `\n\nBuild a complete networking strategy for Jay including:\n` +
+    `1. Who to connect with at ${company} — specific titles, departments, and why each matters\n` +
+    `2. Best outreach approach for a ${type} company of this size\n` +
+    `3. Talking points that connect Jay's background to ${company}'s likely priorities\n` +
+    `4. A draft LinkedIn InMail subject line and opening paragraph for the hiring manager\n` +
+    `5. A draft connection request note (under 300 characters)\n` +
+    (loggedContacts.length > 0 ? `6. How Jay should leverage his existing contacts at ${company}\n` : '') +
+    (mode === 'web' ? `7. Specific LinkedIn search queries to find the right people at ${company}\n` : '') +
+    `\nWrite everything in Jay's voice. Confident, peer-to-peer, results-first. No banned words.`;
+
   try {
-    const result = await callAI([{
-      role: 'user',
-      content: `Jay Wadhwa is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.
-
-Build a networking strategy for Jay including:
-1. Types of people worth connecting with (titles, departments, why they matter)
-2. The best outreach approach for a ${type} company of ${size} employees
-3. Suggested talking points that tie Jay's background to ${company}'s likely priorities
-4. A draft LinkedIn InMail subject and opening line for the hiring manager
-5. A draft connection request note (under 300 characters)
-${mode === 'web' ? '6. Suggest specific LinkedIn search queries Jay can run to find the right people at this company' : ''}
-
-Keep everything in Jay's voice. Confident, peer-to-peer, results-first.`
-    }], JAY_SYSTEM_PROMPT);
-
+    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
     showAIOutput(result, 'networking');
   } catch(e) { showAIOutput('Error: ' + e.message); }
 }
+
 
 function copyAIOutput() {
   if (!lastAIOutput) return;
@@ -3743,6 +3771,54 @@ function getAvgTimeToResponse() {
   // We don't have a response date field yet, so estimate based on status
   return responded.length + ' roles progressed';
 }
+
+// ── QUICK FIRE AI ──────────────────────────────────────────────────────
+function quickFireAI(appId) {
+  const app = allApps.find(a => a.id === appId);
+  if (!app) return;
+
+  // Switch to AI tools page
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-page="ai"]').classList.add('active');
+  document.getElementById('page-ai').classList.add('active');
+
+  // Pre-fill the generate doc form
+  document.getElementById('ai-gen-company').value = app.company || '';
+  document.getElementById('ai-gen-role').value = app.job_title || '';
+  document.getElementById('ai-output-type').value = 'outreach_sequence';
+
+  // Try to find a contact for this company
+  const match = allContacts.find(c =>
+    c.company && app.company && c.company.toLowerCase().includes(app.company.toLowerCase())
+  );
+  if (match) document.getElementById('ai-gen-contact').value = match.name.split(' ')[0];
+
+  toast('Pre-filled from ' + app.company + ' — click Generate to create outreach.', 'success');
+
+  // Scroll to the generate form
+  setTimeout(() => {
+    const el = document.getElementById('ai-gen-company');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 200);
+}
+
+// ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // Escape closes any open modal
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  }
+  // Cmd/Ctrl+K focuses search on applications page
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    const search = document.getElementById('app-search');
+    const appPage = document.getElementById('page-applications');
+    if (appPage && appPage.classList.contains('active') && search) {
+      e.preventDefault();
+      search.focus();
+    }
+  }
+});
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
