@@ -883,6 +883,31 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
           </div>
         </div>
+
+        <!-- Activity Feed + Tasks Row -->
+        <div class="dashboard-cols" style="margin-top:20px">
+          <div class="dash-card">
+            <div class="dash-card-header">
+              📋 Tasks
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>
+                <button class="btn btn-primary btn-sm" onclick="openAddTask()">+ Add</button>
+              </div>
+            </div>
+            <div class="dash-card-body" id="tasks-list">
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load your tasks.</div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-header">
+              🕐 Activity Feed
+              <button class="btn btn-secondary btn-sm" onclick="syncHubSpotActivity()" id="activity-sync-btn">⟳ Sync HubSpot</button>
+            </div>
+            <div class="dash-card-body" id="activity-feed">
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load recent activity.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1313,6 +1338,14 @@ a { color: var(--burgundy); text-decoration: none; }
                   <label class="form-label">Company URL (optional)</label>
                   <input class="form-input" type="url" id="ip-url" placeholder="https://company.com">
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Interviewer Name (optional)</label>
+                  <input class="form-input" type="text" id="ip-interviewer-name" placeholder="e.g. Sarah Chen">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Interviewer Title (optional)</label>
+                  <input class="form-input" type="text" id="ip-interviewer-title" placeholder="e.g. Chief Marketing Officer">
+                </div>
                 <div class="form-group full">
                   <label class="form-label">Job Description *</label>
                   <textarea class="form-textarea" id="ip-jd" rows="8" placeholder="Paste the full job description here..."></textarea>
@@ -1335,6 +1368,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <div style="display:flex;gap:8px;">
               <button class="btn btn-secondary btn-sm" onclick="copyIPOutput()">Copy All</button>
               <button class="btn btn-secondary btn-sm" onclick="exportIPDocx()">⬇ Export .docx</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportIPZip()">⬇ Export All as .zip</button>
               <button class="btn btn-primary btn-sm" onclick="saveIPOutput()">Save to App</button>
             </div>
           </div>
@@ -2194,6 +2228,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <select class="form-select" id="upload-doc-type">
             <option value="Resume">Resume</option>
             <option value="Cover Letter">Cover Letter</option>
+            <option value="Job Description">Job Description</option>
             <option value="Other">Other</option>
           </select>
         </div>
@@ -3575,7 +3610,7 @@ async function loadPrompts() {
       '<td style="font-size:12px;color:var(--text-secondary)">' + (p.system_prompt||'').length + ' chars</td>' +
       '<td><div class="table-actions">' +
         '<button class="action-btn" onclick="openFirePrompt(\'' + p.id + '\')" title="Fire prompt" style="font-size:16px;color:var(--burgundy)">▶</button>' +
-        '<button class="action-btn" onclick="editPrompt(\"' + p.id + '\")" title="Edit">✏️</button>' +
+        '<button class="action-btn" data-pid="' + p.id + '" onclick="editPrompt(this.dataset.pid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" onclick="deletePrompt(\"' + p.id + '\")" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
@@ -4584,12 +4619,12 @@ function getAvgTimeToResponse() {
 
 // ── INTERVIEW PREP PAGE ─────────────────────────────────────────────────
 let ipOutput = '';
+let ipSections = {}; // stores each of the 8 sections separately
 
 function loadInterviewPrepPage() {
-  // Populate application dropdown
   const sel = document.getElementById('ip-link-app');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— Don\'t link —</option>';
+  sel.innerHTML = "<option value=''>— Don't link —</option>";
   allApps.slice(0, 100).forEach(function(a) {
     if (!a.company) return;
     const opt = document.createElement('option');
@@ -4604,6 +4639,8 @@ async function runInterviewPrep() {
   const role = (document.getElementById('ip-role').value || '').trim();
   const jd = (document.getElementById('ip-jd').value || '').trim();
   const url = (document.getElementById('ip-url').value || '').trim();
+  const interviewerName = (document.getElementById('ip-interviewer-name').value || '').trim();
+  const interviewerTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
   if (!jd) { toast('Paste the job description to get the best results.', 'error'); return; }
@@ -4611,33 +4648,72 @@ async function runInterviewPrep() {
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
   panel.style.display = 'block';
-  contentEl.textContent = 'Generating your full interview prep pack... This takes 30-60 seconds.';
+  contentEl.textContent = 'Generating your full interview prep pack... This takes 45-90 seconds.';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // Load the Interview Prep prompt from the prompts library
-  const promptsData = await dbGet('prompts', 'select=*&name=eq.Interview Prep Pack');
-  const promptRows = Array.isArray(promptsData) ? promptsData : [];
-  let basePrompt = promptRows.length > 0 ? (promptRows[0].system_prompt || '') : '';
+  // Build the full prompt following the exact project instructions
+  const interviewerLine = interviewerName ? '\nInterviewer: ' + interviewerName + (interviewerTitle ? ', ' + interviewerTitle : '') : '';
+  const urlLine = url ? '\nCompany URL: ' + url : '';
 
-  // If no saved prompt, use the built-in version
-  if (!basePrompt) {
-    basePrompt = 'Use the information below to create a comprehensive interview prep pack for Jay Wadhwa. Cover all 8 areas: (1) Company Overview with founding, HQ, revenue, leadership, competitors, recent news; (2) SWOT + Competitive Analysis; (3) Target Niche Analysis; (4) 30-60-90 Day Plan covering brand, content, partnerships, demand gen; (5) Resume-to-Role Fit Analysis with side-by-side table; (6) One-Page Executive Summary in bullets only; (7) Strategic Questions for the Recruiter (questions only, no answers) covering team dynamics, priorities, measurement, budget, culture; (8) Interview Q&A Guide with 12 questions and prepared answers tied to real results.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description: {{job_description}}';
-  }
+  const prompt = `You are creating a complete interview prep pack for Jay Wadhwa. Follow these instructions EXACTLY. Generate ALL 8 documents in full. Use proper markdown formatting — use ## for document headers, ### for sub-headers, **bold** for emphasis and stats, and | pipe characters for tables.
 
-  // Replace variables
-  let prompt = basePrompt
-    .replace(/\{\{company\}\}/g, company)
-    .replace(/\{\{role\}\}/g, role)
-    .replace(/\{\{job_description\}\}/g, jd);
+COMPANY: ${company}
+ROLE: ${role}${interviewerLine}${urlLine}
+JOB DESCRIPTION:
+${jd}
 
-  if (url) prompt += '\n\nCompany URL: ' + url;
+Generate each of the following 8 documents in full, separated by a clear header:
+
+## DOCUMENT 1: COMPANY OVERVIEW
+Include: Founding year, HQ, employee count, revenue estimate, valuation/net worth (cite sources). Products, services, target customers, market segments. Leadership and ownership structure. Key milestones, funding, major deals. Market position and brand perception. Positioning and core offerings. Top 3-5 competitors. Top 3-4 opportunities and risks. Recent news (last 6 months).
+
+## DOCUMENT 2: SWOT + COMPETITIVE ANALYSIS
+Include a SWOT table using markdown table format (| Strengths | Weaknesses | etc). Include a competitor grid table comparing ${company} to 3-5 peers across key dimensions. Pros and cons vs target company. Market share, growth trajectory, key differentiators.
+
+## DOCUMENT 3: TARGET NICHE ANALYSIS
+Core customer niches. Unmet needs and market gaps. Where ${company} can win. High-growth micro-segments worth targeting.
+
+## DOCUMENT 4: 30-60-90 DAY PLAN
+Days 0-30: Learn and audit (specific actions for brand, team, data, stakeholders).
+Days 31-60: Test and build (campaigns, partnerships, content, quick wins).
+Days 61-90: Scale and optimize (full execution, measurement, roadmap).
+Senior-level, practical actions only.
+
+## DOCUMENT 5: RESUME-TO-ROLE FIT ANALYSIS
+Create a markdown table with columns: Company Need | Jay's Experience | Evidence/Metric.
+Key overlaps. Why Jay's cross-industry background is an advantage for ${company}. Short fit summary paragraph.
+
+## DOCUMENT 6: ONE-PAGE EXECUTIVE SUMMARY
+Company snapshot in bullets only (founding, size, revenue, market position, key product, top competitor).
+Key strengths and risks. Primary growth paths. Role fit. Bottom-line takeaway in 2-3 sentences.
+This must stand alone from Document 1.
+
+## DOCUMENT 7: STRATEGIC QUESTIONS FOR THE RECRUITER${interviewerName ? ' / ' + interviewerName : ''}
+Questions ONLY — no answers.
+Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture and Leadership
+At least 3 questions per category.${interviewerName ? `\nInclude 3-4 questions specifically tailored to ${interviewerName}` + (interviewerTitle ? ` as ${interviewerTitle}` : '') + '.' : ''}
+
+## DOCUMENT 8: INTERVIEW Q&A GUIDE
+12 common interview questions for a ${role} role.
+For each: write Jay's prepared answer in his voice — peer-to-peer, direct, results-first, sentences under 15 words.
+Lead every answer with a specific metric or result. Tie directly to ${company}'s known priorities.
+
+FORMATTING RULES:
+- Use **bold** for all statistics, metrics, and key achievements
+- Use markdown tables (| col | col |) for SWOT, competitor grids, and fit analysis
+- Use bullet points for lists
+- Keep headers clean with ##
+- No em dashes anywhere
+- Write every answer in Jay's voice`;
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     ipOutput = result;
     contentEl.textContent = result;
 
-    // Auto-save
+    // Parse sections for individual doc export
+    ipSections = parseIPSections(result, company, role);
+
     const linkedAppId = document.getElementById('ip-link-app').value || null;
     await dbPost('ai_outputs', {
       output_type: 'interview_prep',
@@ -4645,19 +4721,17 @@ async function runInterviewPrep() {
       prompt_used: 'Interview Prep Pack',
       content: result,
     });
-
     if (linkedAppId) {
       const app = allApps.find(function(a) { return a.id === linkedAppId; });
       if (app) {
         const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
-        const newOutput = existing.concat([{ type: 'interview_prep', prompt: 'Interview Prep Pack', content: result, date: today() }]);
-        await dbPatch('applications', linkedAppId, { ai_output: newOutput });
+        await dbPatch('applications', linkedAppId, { ai_output: existing.concat([{ type: 'interview_prep', content: result, date: today() }]) });
         const idx = allApps.findIndex(function(a) { return a.id === linkedAppId; });
-        if (idx >= 0) allApps[idx].ai_output = newOutput;
+        if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'interview_prep', content: result, date: today() }]);
         toast('Prep pack generated and saved to ' + app.company + '.', 'success');
       }
     } else {
-      toast('Interview prep pack generated.', 'success');
+      toast('Interview prep pack generated. Use Export buttons to download.', 'success');
     }
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
@@ -4665,13 +4739,42 @@ async function runInterviewPrep() {
   }
 }
 
+function parseIPSections(text, company, role) {
+  // Split output into individual documents by ## DOCUMENT N header
+  const sections = {};
+  const docNames = [
+    'Company Overview',
+    'SWOT + Competitive Analysis',
+    'Target Niche Analysis',
+    '30-60-90 Day Plan',
+    'Resume-to-Role Fit Analysis',
+    'One-Page Executive Summary',
+    'Strategic Questions',
+    'Interview Q&A Guide'
+  ];
+  const parts = text.split(/(?=##\s+DOCUMENT\s+\d+:)/i);
+  parts.forEach(function(part) {
+    const match = part.match(/##\s+DOCUMENT\s+(\d+):\s*(.+?)(?:\n|$)/i);
+    if (match) {
+      const num = parseInt(match[1]) - 1;
+      const name = docNames[num] || ('Document ' + match[1]);
+      sections[name] = part.trim();
+    }
+  });
+  // If parsing failed, put everything in one section
+  if (Object.keys(sections).length === 0) {
+    sections['Full Prep Pack'] = text;
+  }
+  return sections;
+}
+
 function clearInterviewPrep() {
-  ['ip-company','ip-role','ip-jd','ip-url'].forEach(function(id) {
+  ['ip-company','ip-role','ip-jd','ip-url','ip-interviewer-name','ip-interviewer-title'].forEach(function(id) {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   const panel = document.getElementById('ip-output-panel');
   if (panel) panel.style.display = 'none';
-  ipOutput = '';
+  ipOutput = ''; ipSections = {};
 }
 
 function copyIPOutput() {
@@ -4684,33 +4787,78 @@ function exportIPDocx() {
   const company = (document.getElementById('ip-company').value || 'Company').trim();
   const role = (document.getElementById('ip-role').value || 'Role').trim();
   const dateStr = new Date().toISOString().split('T')[0];
+  exportGenericDocx(ipOutput, 'InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + role.replace(/\s+/g,'_') + '_' + dateStr);
+}
 
-  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}h1{font-size:14pt;border-bottom:2px solid #972b32;padding-bottom:4px;margin-bottom:8px}h2{font-size:12pt;margin-top:16px;margin-bottom:4px}p{margin:4px 0}ul,ol{margin:4px 0 4px 20px}li{margin:2px 0}strong,b{font-weight:bold}';
+async function exportIPZip() {
+  if (!ipOutput) { toast('Generate the prep pack first.', 'error'); return; }
+  if (typeof JSZip === 'undefined') { toast('JSZip not loaded. Try refreshing.', 'error'); return; }
 
-  const lines = ipOutput.split('\n');
-  let html = '';
-  for (let i = 0; i < lines.length; i++) {
-    const t = lines[i].trim();
-    if (!t) { html += '<br>'; continue; }
-    if (t.startsWith('# ')) { html += '<h1>' + t.slice(2) + '</h1>'; }
-    else if (t.startsWith('## ')) { html += '<h2>' + t.slice(3) + '</h2>'; }
-    else if (t.startsWith('### ')) { html += '<h2>' + t.slice(4) + '</h2>'; }
-    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t)) { html += '<h2>' + t + '</h2>'; }
-    else if (t.startsWith('- ') || t.startsWith('• ')) { html += '<ul><li>' + t.slice(2) + '</li></ul>'; }
-    else if (/^\d+\.\s/.test(t)) { html += '<ol><li>' + t.replace(/^\d+\.\s/, '') + '</li></ol>'; }
-    else { html += '<p>' + t + '</p>'; }
+  const company = (document.getElementById('ip-company').value || 'Company').trim();
+  const role = (document.getElementById('ip-role').value || 'Role').trim();
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  toast('Building zip file...', '');
+
+  const zip = new JSZip();
+  const sections = Object.keys(ipSections).length > 0 ? ipSections : { 'Full_Prep_Pack': ipOutput };
+
+  for (const [name, sectionText] of Object.entries(sections)) {
+    const safeName = name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    const html = buildWordHtml(sectionText, company + ' — ' + name);
+    zip.file('Jay_Wadhwa_' + safeName + '_' + company.replace(/\s+/g,'_') + '.doc', html);
   }
 
-  const fullHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Interview Prep</title><style>' + styles + '</style></head><body><h1>Interview Prep Pack — ' + company + '</h1><p style="font-size:9pt;color:#666;margin-bottom:16px">' + role + ' · Generated ' + new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) + ' · Jay Wadhwa</p>' + html + '</body></html>';
-
-  const blob = new Blob([fullHtml], { type: 'application/msword' });
+  const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Jay_Wadhwa_InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + dateStr + '.doc';
+  a.download = 'Jay_Wadhwa_InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + dateStr + '.zip';
   a.click();
   URL.revokeObjectURL(url);
-  toast('Prep pack downloaded. Open in Word to review.', 'success');
+  toast(Object.keys(sections).length + ' documents downloaded as zip.', 'success');
+}
+
+function buildWordHtml(text, title) {
+  const styles =
+    '@page { margin: 1in; }' +
+    'body { font-family: Calibri, sans-serif; font-size: 11pt; margin: 0; line-height: 1.15; color: #000; }' +
+    'h1 { color: #972b32; font-size: 13pt; border-bottom: 1.5pt solid #972b32; margin: 12pt 0 4pt 0; padding-bottom: 2pt; }' +
+    'h2 { color: #972b32; font-size: 12pt; margin: 10pt 0 3pt 0; }' +
+    'h3 { font-size: 11pt; font-weight: bold; margin: 8pt 0 2pt 0; }' +
+    'p { margin: 0 0 4pt 0; }' +
+    'ul, ol { margin: 2pt 0 4pt 0; padding-left: 18pt; }' +
+    'li { margin: 1pt 0; }' +
+    'table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 10.5pt; }' +
+    'th { background: #972b32; color: #fff; padding: 4pt 6pt; text-align: left; font-weight: bold; }' +
+    'td { border: 0.5pt solid #ccc; padding: 3pt 6pt; vertical-align: top; }' +
+    'tr:nth-child(even) td { background: #f5eaeb; }' +
+    'strong, b { font-weight: bold; }';
+
+  const html = textToHtmlWithTables(text);
+  return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]--><style>' + styles + '</style></head><body><h1>' + title + '</h1><p style="font-size:8pt;color:#999;margin-bottom:10pt">Jay Wadhwa · ' + new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) + '</p>' + html + '</body></html>';
+}
+
+function textToHtmlWithTables(text) {
+  // Handle markdown tables before line-by-line processing
+  // Replace markdown tables with HTML tables
+  const tableRegex = /(\|.+\|\n)+/g;
+  text = text.replace(tableRegex, function(tableBlock) {
+    const rows = tableBlock.trim().split('\n').filter(function(r) { return r.trim(); });
+    if (rows.length < 2) return tableBlock;
+    let html = '<table>';
+    rows.forEach(function(row, idx) {
+      if (row.match(/^\|[-:\s|]+\|$/)) return; // skip separator row
+      const cells = row.split('|').filter(function(c,i,a) { return i > 0 && i < a.length - 1; });
+      const tag = idx === 0 ? 'th' : 'td';
+      html += '<tr>' + cells.map(function(c) {
+        return '<' + tag + '>' + c.trim().replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') + '</' + tag + '>';
+      }).join('') + '</tr>';
+    });
+    return html + '</table>';
+  });
+  // Now process remaining lines
+  return textToHtmlLines(text);
 }
 
 async function saveIPOutput() {
@@ -4728,6 +4876,7 @@ async function saveIPOutput() {
   }
   toast('Use the dropdown above to link to an application before saving.', '');
 }
+
 
 // ── RESUME TAILOR PAGE JS ───────────────────────────────────────────────
 let rtOutput = '';
@@ -5160,7 +5309,7 @@ function exportGenericDocx(text, filename) {
     'strong, b { font-weight: bold; }' +
     'em, i { font-style: italic; }';
 
-  const html = textToHtmlLines(text);
+  const html = textToHtmlWithTables(text);
 
   const fullHtml =
     '<!DOCTYPE html>' +
@@ -5576,6 +5725,153 @@ document.addEventListener('keydown', e => {
     }
   }
 });
+
+// ── HUBSPOT TASKS + ACTIVITY ────────────────────────────────────────────
+let hubspotTasks = [];
+
+async function syncHubSpotTasks() {
+  const btn = document.getElementById('tasks-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+  const listEl = document.getElementById('tasks-list');
+
+  try {
+    // Fetch tasks from HubSpot via Worker
+    const controller = new AbortController();
+    const timeout = setTimeout(function() { controller.abort(); }, 10000);
+    const r = await fetch(WORKER_URL + '/hubspot/tasks', {
+      headers: { 'Origin': location.origin },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!r.ok) {
+      listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">HubSpot tasks sync requires the /hubspot/tasks Worker route. See setup instructions.</div>';
+      return;
+    }
+
+    const data = await r.json();
+    hubspotTasks = Array.isArray(data.results) ? data.results : [];
+    renderTasksList();
+    toast('Tasks synced: ' + hubspotTasks.length + ' tasks loaded.', 'success');
+  } catch(e) {
+    listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load tasks. Add /hubspot/tasks route to your Cloudflare Worker to enable this feature.</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+  }
+}
+
+function renderTasksList() {
+  const listEl = document.getElementById('tasks-list');
+  if (!listEl) return;
+  if (hubspotTasks.length === 0) {
+    listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">No tasks found in HubSpot.</div>';
+    return;
+  }
+
+  const now = new Date();
+  // Sort: overdue first, then by due date
+  const sorted = [...hubspotTasks].sort(function(a, b) {
+    const da = a.properties?.hs_task_due_date ? new Date(a.properties.hs_task_due_date) : new Date('2099-01-01');
+    const db = b.properties?.hs_task_due_date ? new Date(b.properties.hs_task_due_date) : new Date('2099-01-01');
+    return da - db;
+  });
+
+  listEl.innerHTML = sorted.slice(0, 15).map(function(t) {
+    const props = t.properties || {};
+    const title = props.hs_task_subject || props.subject || 'Untitled Task';
+    const dueDate = props.hs_task_due_date ? new Date(props.hs_task_due_date) : null;
+    const status = props.hs_task_status || 'NOT_STARTED';
+    const isOverdueTask = dueDate && dueDate < now && status !== 'COMPLETED';
+    const isDone = status === 'COMPLETED';
+    const type = props.hs_task_type || '';
+
+    const icon = isDone ? '✅' : isOverdueTask ? '🔴' : '⬜';
+    const dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const color = isDone ? 'var(--text-light)' : isOverdueTask ? 'var(--burgundy)' : 'var(--text)';
+
+    return '<div class="followup-item" style="' + (isDone ? 'opacity:0.5' : '') + '">' +
+      '<div style="font-size:16px;flex-shrink:0">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:600;font-size:13px;color:' + color + '">' + title + '</div>' +
+        (type ? '<div style="font-size:11px;color:var(--text-light)">' + type + '</div>' : '') +
+      '</div>' +
+      (dateStr ? '<div style="font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + dateStr + '</div>' : '') +
+    '</div>';
+  }).join('');
+
+  if (hubspotTasks.length > 15) {
+    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">+ ' + (hubspotTasks.length - 15) + ' more tasks in HubSpot</div>';
+  }
+}
+
+function openAddTask() {
+  // Open HubSpot tasks in a new tab
+  window.open('https://app.hubspot.com/tasks', '_blank');
+}
+
+async function syncHubSpotActivity() {
+  const btn = document.getElementById('activity-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+  const feedEl = document.getElementById('activity-feed');
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(function() { controller.abort(); }, 10000);
+    const r = await fetch(WORKER_URL + '/hubspot/activity', {
+      headers: { 'Origin': location.origin },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!r.ok) {
+      feedEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">HubSpot activity sync requires the /hubspot/activity Worker route. See setup instructions.</div>';
+      return;
+    }
+
+    const data = await r.json();
+    const activities = Array.isArray(data.results) ? data.results : [];
+    renderActivityFeed(activities);
+    toast('Activity feed synced.', 'success');
+  } catch(e) {
+    feedEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load activity. Add /hubspot/activity route to your Cloudflare Worker to enable this feature.</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+  }
+}
+
+function renderActivityFeed(activities) {
+  const feedEl = document.getElementById('activity-feed');
+  if (!feedEl) return;
+  if (activities.length === 0) {
+    feedEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">No recent activity found.</div>';
+    return;
+  }
+
+  const typeIcons = {
+    'EMAIL': '📧', 'CALL': '📞', 'MEETING': '📅',
+    'NOTE': '📝', 'TASK': '✅', 'LINKEDIN_MESSAGE': '💼'
+  };
+
+  feedEl.innerHTML = activities.slice(0, 20).map(function(a) {
+    const props = a.properties || {};
+    const type = (props.hs_activity_type || a.type || 'NOTE').toUpperCase();
+    const icon = typeIcons[type] || '📌';
+    const title = props.hs_email_subject || props.hs_call_title || props.hs_meeting_title || props.hs_note_body || 'Activity';
+    const shortTitle = title.length > 60 ? title.slice(0, 57) + '...' : title;
+    const dateRaw = props.hs_timestamp || props.createdate || a.createdAt;
+    const date = dateRaw ? new Date(dateRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const contact = props.hs_contact_name || '';
+
+    return '<div class="followup-item">' +
+      '<div style="font-size:15px;flex-shrink:0">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px;font-weight:500;color:var(--text)">' + shortTitle + '</div>' +
+        (contact ? '<div style="font-size:11px;color:var(--text-secondary)">' + contact + '</div>' : '') +
+      '</div>' +
+      (date ? '<div style="font-size:11px;color:var(--text-light);white-space:nowrap">' + date + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
