@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ── DESIGN TOKENS ─────────────────────────────────────────────────── */
 :root {
@@ -3737,6 +3738,19 @@ function getSystemPromptWithResume() {
 
 // ── DOCX EXPORT ─────────────────────────────────────────────────────────
 function exportToDocx() {
+  // If the output looks like a cover letter, use the template
+  const clTypes = ['cover_letter', 'coverletter', 'Cover Letter'];
+  if (clTypes.includes(lastAIOutputType) || lastAIOutputType === 'cover_letter') {
+    const co = (document.getElementById('ai-gen-company') ? document.getElementById('ai-gen-company').value : '').trim();
+    const ro = (document.getElementById('ai-gen-role') ? document.getElementById('ai-gen-role').value : '').trim();
+    const ct = (document.getElementById('ai-gen-contact') ? document.getElementById('ai-gen-contact').value : '').trim();
+    exportCoverLetterDocx(lastAIOutput, co, ro, ct);
+    return;
+  }
+  // Otherwise use generic export
+  _exportToDocxGeneric();
+}
+function _exportToDocxGeneric() {
   if (!lastAIOutput) { toast('No output to export.', 'error'); return; }
 
   // Build a formatted HTML document and trigger download as .doc
@@ -4585,7 +4599,7 @@ function clearCLG() {
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
-function exportCLGDocx() { exportGenericDocx(clgOutput, 'Cover_Letter_' + (document.getElementById('clg-company').value||'').trim().replace(/\s+/g,'_')); }
+function exportCLGDocx() { const co=(document.getElementById('clg-company').value||'').trim(); const ro=(document.getElementById('clg-role').value||'').trim(); const ct=(document.getElementById('clg-contact').value||'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct); }
 
 async function saveCLGOutput() {
   if (!clgOutput) return;
@@ -4677,24 +4691,82 @@ function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).t
 function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
 
 // ── SHARED DOCX EXPORT ───────────────────────────────────────────────────
+const BASE_URL = 'https://chyp-16.github.io/job-search-command-center';
+
+// Fetch a base .docx from GitHub, modify it, and download
+async function exportFromTemplate(templateFile, replacements, downloadName) {
+  try {
+    toast('Preparing document...', '');
+    const response = await fetch(BASE_URL + '/' + templateFile);
+    if (!response.ok) throw new Error('Could not load template. Make sure ' + templateFile + ' is in your GitHub repo.');
+    const arrayBuffer = await response.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // Modify document.xml — replace placeholder text
+    const docXml = await zip.file('word/document.xml').async('string');
+    let modified = docXml;
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      // Escape for XML and replace
+      const xmlValue = (value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      modified = modified.split(placeholder).join(xmlValue);
+    }
+    zip.file('word/document.xml', modified);
+
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = downloadName + '.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded ' + downloadName + '.docx — open in Word to review.', 'success');
+  } catch(e) {
+    toast('Export error: ' + e.message, 'error');
+  }
+}
+
+// Cover letter export — uses base-coverletter.docx template
+async function exportCoverLetterDocx(text, company, role, contactName) {
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const dateStr = new Date().toISOString().split('T')[0];
+  await exportFromTemplate('base-coverletter.docx', {
+    '[TODAY&#x2019;S DATE]': today,
+    '[TODAY\'S DATE]': today,
+    '[NAME, JOB TITLE]': contactName ? contactName : '[Name, Job Title]',
+    '[COMPANY NAME]': company || '[Company Name]',
+    '[JOB TITLE]': role || '[Job Title]',
+    '[BODY COPY]': text || '',
+  }, 'Jay_Wadhwa_CoverLetter_' + (company || 'Company').replace(/\s+/g,'_') + '_' + dateStr);
+}
+
+// Generic export for resume tailor, interview prep, outreach — clean Word format
 function exportGenericDocx(text, filename) {
   if (!text) { toast('No output to export.', 'error'); return; }
   const dateStr = new Date().toISOString().split('T')[0];
-  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}h1{font-size:14pt;border-bottom:2px solid #972b32;padding-bottom:4px;margin-bottom:8px}h2{font-size:12pt;margin-top:16px;margin-bottom:4px}p{margin:4px 0}ul,ol{margin:4px 0 4px 20px}li{margin:2px 0}strong,b{font-weight:bold}';
+  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}' +
+    'h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}' +
+    'h1{font-size:13pt;border-bottom:2px solid #972b32;padding-bottom:3px;margin-bottom:6px;margin-top:14px}' +
+    'h2{font-size:11pt;font-weight:bold;margin-top:10px;margin-bottom:2px}' +
+    'p{margin:3px 0}ul,ol{margin:3px 0 3px 18px}li{margin:1px 0}strong,b{font-weight:bold}';
   const lines = text.split('\n');
   let html = '';
   for (var i=0; i<lines.length; i++) {
     var t = lines[i].trim();
-    if (!t) { html += '<br>'; continue; }
-    if (t.startsWith('# ')) { html += '<h1>'+t.slice(2)+'</h1>'; }
-    else if (t.startsWith('## ')) { html += '<h2>'+t.slice(3)+'</h2>'; }
-    else if (t.startsWith('### ')) { html += '<h2>'+t.slice(4)+'</h2>'; }
-    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t)) { html += '<h2>'+t+'</h2>'; }
-    else if (t.startsWith('- ') || t.startsWith('• ')) { html += '<ul><li>'+t.slice(2)+'</li></ul>'; }
-    else if (/^\d+\.\s/.test(t)) { html += '<ol><li>'+t.replace(/^\d+\.\s/,'')+'</li></ol>'; }
-    else { html += '<p>'+t+'</p>'; }
+    if (!t) { html += '<p style="margin:2px 0">&nbsp;</p>'; continue; }
+    if (t.startsWith('# ')) html += '<h1>'+t.slice(2)+'</h1>';
+    else if (t.startsWith('## ')) html += '<h2>'+t.slice(3)+'</h2>';
+    else if (t.startsWith('### ')) html += '<h2>'+t.slice(4)+'</h2>';
+    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t) && !/[.!?]$/.test(t)) html += '<h1>'+t+'</h1>';
+    else if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('• ')) html += '<ul><li>'+t.slice(2)+'</li></ul>';
+    else if (/^\d+\.\s/.test(t)) html += '<ol><li>'+t.replace(/^\d+\.\s/,'')+'</li></ol>';
+    else if (t.startsWith('**') && t.endsWith('**')) html += '<p><strong>'+t.slice(2,-2)+'</strong></p>';
+    else html += '<p>'+t+'</p>';
   }
-  var fullHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>'+styles+'</style></head><body><h1>'+filename.replace(/_/g,' ')+'</h1><p style="font-size:9pt;color:#666;margin-bottom:16px">Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+' · Jay Wadhwa</p>'+html+'</body></html>';
+  var fullHtml = '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">' +
+    '<style>'+styles+'</style></head><body>' +
+    '<p style="font-size:9pt;color:#999;margin-bottom:12px">Jay Wadhwa &nbsp;·&nbsp; '+
+    new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+
+    '</p>'+html+'</body></html>';
   var blob = new Blob([fullHtml], { type: 'application/msword' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -4702,7 +4774,7 @@ function exportGenericDocx(text, filename) {
   a.download = 'Jay_Wadhwa_'+filename+'_'+dateStr+'.doc';
   a.click();
   URL.revokeObjectURL(url);
-  toast('Document downloaded.', 'success');
+  toast('Downloaded — open in Word to review.', 'success');
 }
 
 // ── QUICK FIRE AI ──────────────────────────────────────────────────────
