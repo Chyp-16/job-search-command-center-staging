@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 /* ── DESIGN TOKENS ─────────────────────────────────────────────────── */
 :root {
@@ -836,9 +837,13 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card">
             <div class="dash-card-header">
               Applications by Status
-              <span style="font-size:11px;color:var(--text-light);font-weight:400">all time</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:11px;color:var(--text-light);font-weight:400">all time</span>
+                <button class="btn btn-ghost btn-sm" onclick="toggleStatusChart()" id="chart-toggle-btn" style="font-size:11px;padding:2px 8px">📊 Chart</button>
+              </div>
             </div>
             <div class="dash-card-body" id="status-breakdown"></div>
+            <canvas id="status-chart" style="display:none;padding:16px;max-height:280px"></canvas>
           </div>
           <div class="dash-card">
             <div class="dash-card-header">
@@ -846,6 +851,17 @@ a { color: var(--burgundy); text-decoration: none; }
               <span style="font-size:11px;color:var(--burgundy);font-weight:600" id="followup-count-badge"></span>
             </div>
             <div class="dash-card-body" id="followups-list"></div>
+          </div>
+        </div>
+        <div class="dashboard-cols" style="margin-top:20px">
+          <div class="dash-card" style="grid-column:1/-1">
+            <div class="dash-card-header">
+              ✦ AI Insights
+              <button class="btn btn-primary btn-sm" onclick="generateDashboardInsights()" id="insights-btn">Generate Insights</button>
+            </div>
+            <div class="dash-card-body" id="ai-insights-body">
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click Generate Insights to get Claude's analysis of your job search performance and recommendations.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1158,6 +1174,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Saved Claude prompts — fire with one click</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="seedPrompts()">⬇ Load Default Prompts</button>
           <button class="btn btn-primary" onclick="openAddPrompt()">+ Add Prompt</button>
         </div>
       </div>
@@ -1168,6 +1185,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <th>Name</th>
               <th>Category</th>
               <th>Variable Fields</th>
+              <th>Size</th>
               <th></th>
             </tr>
           </thead>
@@ -1183,18 +1201,35 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="page-header">
         <div class="page-header-left">
           <h2>Resources</h2>
-          <p>Links, notes, and research</p>
+          <p>Links, research, and reference materials</p>
         </div>
         <div class="page-header-actions">
           <button class="btn btn-primary" onclick="openAddResource()">+ Add Resource</button>
         </div>
       </div>
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" type="text" placeholder="Search resources..." id="resource-search" oninput="filterResources()">
+        </div>
+        <select class="filter-select" id="resource-cat-filter" onchange="filterResources()">
+          <option value="">All Categories</option>
+          <option>Interview Prep</option>
+          <option>Salary Research</option>
+          <option>Industry Research</option>
+          <option>Company Research</option>
+          <option>Job Boards</option>
+          <option>Networking</option>
+          <option>Other</option>
+        </select>
+        <span class="filter-count" id="resource-count"></span>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Category</th>
+              <th onclick="sortResources('title')">Title ↕</th>
+              <th onclick="sortResources('category')">Category ↕</th>
               <th>URL</th>
               <th>Notes</th>
               <th></th>
@@ -1677,6 +1712,30 @@ a { color: var(--burgundy); text-decoration: none; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-recruiter-import')">Cancel</button>
       <button class="btn btn-primary" id="recruiter-import-btn" onclick="importRecruiters()">Start Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fire Prompt Modal -->
+<div class="modal-overlay" id="modal-fire-prompt">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>▶ <span id="fire-prompt-name"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-fire-prompt')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Fill in the fields below then click Generate. Claude will use your prompt with these values substituted in.</p>
+      <div id="fire-prompt-fields"></div>
+      <div class="form-group" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <label class="form-label">Link output to application (optional)</label>
+        <select class="form-select" id="fp-link-app">
+          <option value="">— Don't link —</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-fire-prompt')">Cancel</button>
+      <button class="btn btn-primary" onclick="runFirePrompt()">✦ Generate with Claude</button>
     </div>
   </div>
 </div>
@@ -2803,31 +2862,119 @@ async function viewCL(id) {
 }
 
 // ── PROMPTS ────────────────────────────────────────────────────────────
+
+// Seed prompts — your Claude Projects pre-loaded
+const SEED_PROMPTS = [
+  {
+    "name": "Interview Prep Pack",
+    "category": "Interview Prep",
+    "system_prompt": "Use the attached resume and job description to create a full interview prep pack for a senior marketing executive role.\n\nDELIVERABLES \u2014 create content covering all 8 areas:\n\n1. COMPANY OVERVIEW: Founding year, HQ, employee count, revenue estimate, valuation/net worth (with sources). Products, services, target customers, market segments. Leadership and ownership structure. Key milestones, funding, major deals. Market position and brand perception. Positioning and core offerings. Top 3-5 competitors. Top 3-4 opportunities and risks. Recent news.\n\n2. SWOT + COMPETITIVE ANALYSIS: SWOT table. Competitor grid with 3-5 peers. Pros and cons versus the target company. Market share, growth, key differentiators.\n\n3. TARGET NICHE ANALYSIS: Core customer niches. Unmet needs and market gaps. Where the company can win. High-growth micro-segments.\n\n4. 30-60-90 DAY PLAN: Days 0-30 (learn and audit). Days 31-60 (test and build). Days 61-90 (scale and optimize). Cover brand, content, partnerships, demand gen. Senior-level, practical actions.\n\n5. RESUME-TO-ROLE FIT ANALYSIS: Side-by-side table of company needs vs. Jay's experience. Key overlap areas and strengths. Why a multi-industry background is an advantage. Short fit summary.\n\n6. ONE-PAGE EXECUTIVE SUMMARY (separate from the deep research \u2014 bullets only for company snapshot): Key strengths and risks. Primary growth paths. Role fit. Bottom-line takeaway.\n\n7. STRATEGIC QUESTIONS FOR THE RECRUITER (questions only, no answers): Team dynamics, strategic priorities, measurement and success, budget and resources, culture.\n\n8. INTERVIEW Q&A GUIDE: 12 common interview questions with prepared answers tied to real results and metrics. Concise, built for recall.\n\nWRITING RULES: Peer-to-peer, direct, confident. Sentences 15 words or fewer. Active voice. Lead with results and business impact. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, exploring, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful).\n\nCompany: {{company}}\nRole: {{role}}\nJob Description: {{job_description}}",
+    "variable_fields": [
+      "company",
+      "role",
+      "job_description"
+    ]
+  },
+  {
+    "name": "Resume Tailoring",
+    "category": "Resume",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "variable_fields": [
+      "keywords_required",
+      "keywords_nice",
+      "job_description"
+    ]
+  },
+  {
+    "name": "Cover Letter",
+    "category": "Cover Letter",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to write a concise cover letter for a senior marketing executive role.\n\nREQUIREMENTS:\n- Write in Jay's voice \u2014 human, specific, peer-to-peer, never deferential\n- Lead with the strongest relevant result or metric\n- Highlight key skills and proof points that align directly with the role\n- Use bullets only when they improve flow\n- Show evidence of company research \u2014 reference something specific about the company\n- Address the hiring manager by name if provided. If unknown, say so. Do not guess.\n- End with a clear, direct next step\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful, I'd love to, I'd welcome, at your convenience).\n\nCompany: {{company}}\nRole: {{role}}\nHiring Manager: {{hiring_manager}}\nJob Description: {{job_description}}",
+    "variable_fields": [
+      "company",
+      "role",
+      "hiring_manager",
+      "job_description"
+    ]
+  },
+  {
+    "name": "Outreach Sequence (4-Part)",
+    "category": "Networking",
+    "system_prompt": "Use Jay Wadhwa's resume and the details below to create a 4-part outreach sequence for a role Jay already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let's talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from Jay's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
+    "variable_fields": [
+      "company",
+      "company_url",
+      "role",
+      "recruiter_name",
+      "recruiter_email",
+      "hiring_manager",
+      "company_context"
+    ]
+  }
+]
+
+async function seedPrompts() {
+  const existing = await dbGet('prompts', 'select=id,name');
+  const existingMap = {};
+  if (Array.isArray(existing)) existing.forEach(p => { existingMap[p.name] = p.id; });
+
+  for (const p of SEED_PROMPTS) {
+    if (existingMap[p.name]) {
+      // Update existing with latest content from document
+      await dbPatch('prompts', existingMap[p.name], p);
+    } else {
+      await dbPost('prompts', p);
+    }
+  }
+  toast('Prompts library loaded with your 4 Claude Projects.', 'success');
+  loadPrompts();
+}
+
 async function loadPrompts() {
-  const data = await dbGet('prompts', 'select=*&order=created_at.desc');
+  const data = await dbGet('prompts', 'select=*&order=created_at.asc');
   const prompts = Array.isArray(data) ? data : [];
   const tbody = document.getElementById('prompts-tbody');
   if (prompts.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">💬</div><h3>No prompts yet</h3><p>Add your Claude Projects prompts here.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">💬</div><h3>No prompts yet</h3><p>Your Claude Projects prompts will appear here.</p><button class="btn btn-primary" style="margin-top:12px" onclick="seedPrompts()">Load Default Prompts</button></div></td></tr>';
     return;
   }
   tbody.innerHTML = prompts.map(p => {
     const vars = Array.isArray(p.variable_fields) ? p.variable_fields : [];
-    return `<tr>
-      <td><strong>${p.name}</strong></td>
-      <td><span class="badge badge-applied">${p.category||'—'}</span></td>
-      <td style="font-size:12px;color:var(--text-secondary)">${vars.join(', ')||'None'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="action-btn" onclick="firePrompt('${p.id}')" title="Fire prompt">▶</button>
-          <button class="action-btn danger" onclick="deletePrompt('${p.id}')" title="Delete">🗑</button>
-        </div>
-      </td>
-    </tr>`;
+    const preview = (p.system_prompt || '').slice(0, 80).replace(/\n/g, ' ');
+    return '<tr>' +
+      '<td><strong>' + p.name + '</strong><div style="font-size:11px;color:var(--text-secondary);margin-top:2px">' + preview + '...</div></td>' +
+      '<td><span class="badge badge-applied">' + (p.category||'—') + '</span></td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (vars.join(', ') || 'None') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (p.system_prompt||'').length + ' chars</td>' +
+      '<td><div class="table-actions">' +
+        '<button class="action-btn" onclick="openFirePrompt(\"' + p.id + '\")" title="Fire prompt" style="font-size:16px">▶</button>' +
+        '<button class="action-btn" onclick="editPrompt(\"' + p.id + '\")" title="Edit">✏️</button>' +
+        '<button class="action-btn danger" onclick="deletePrompt(\"' + p.id + '\")" title="Delete">🗑</button>' +
+      '</div></td>' +
+    '</tr>';
   }).join('');
 }
 
-function openAddPrompt() { openModal('modal-prompt'); }
+function openAddPrompt() {
+  editingId = null;
+  ['pf-name','pf-prompt','pf-vars'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  document.getElementById('modal-prompt').querySelector('h3').textContent = 'Add Prompt';
+  openModal('modal-prompt');
+}
+
+function editPrompt(id) {
+  // Load and open for editing
+  dbGet('prompts', 'select=*&id=eq.' + id).then(data => {
+    const p = Array.isArray(data) ? data[0] : data;
+    if (!p) return;
+    editingId = id;
+    document.getElementById('pf-name').value = p.name || '';
+    document.getElementById('pf-category').value = p.category || 'Interview Prep';
+    document.getElementById('pf-prompt').value = p.system_prompt || '';
+    document.getElementById('pf-vars').value = Array.isArray(p.variable_fields) ? p.variable_fields.join(', ') : '';
+    document.getElementById('modal-prompt').querySelector('h3').textContent = 'Edit Prompt';
+    openModal('modal-prompt');
+  });
+}
 
 async function savePrompt() {
   const name = getVal('pf-name');
@@ -2835,10 +2982,16 @@ async function savePrompt() {
   const vars = getVal('pf-vars') ? getVal('pf-vars').split(',').map(s=>s.trim()).filter(Boolean) : [];
   const payload = { name, category: getVal('pf-category'), system_prompt: getVal('pf-prompt'), variable_fields: vars };
   try {
-    await dbPost('prompts', payload);
+    if (editingId) {
+      await dbPatch('prompts', editingId, payload);
+      toast('Prompt updated.', 'success');
+    } else {
+      await dbPost('prompts', payload);
+      toast('Prompt saved.', 'success');
+    }
     closeModal('modal-prompt');
+    editingId = null;
     loadPrompts();
-    toast('Prompt saved.', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -2849,75 +3002,223 @@ async function deletePrompt(id) {
   toast('Prompt deleted.');
 }
 
-async function firePrompt(id) {
-  const data = await dbGet('prompts', `select=*&id=eq.${id}`);
+// Fire prompt modal — shows variable fields dynamically
+let activePromptId = null;
+async function openFirePrompt(id) {
+  const data = await dbGet('prompts', 'select=*&id=eq.' + id);
+  const p = Array.isArray(data) ? data[0] : data;
+  if (!p) return;
+  activePromptId = id;
+
+  const vars = Array.isArray(p.variable_fields) ? p.variable_fields : [];
+  const container = document.getElementById('fire-prompt-fields');
+  document.getElementById('fire-prompt-name').textContent = p.name;
+
+  if (vars.length === 0) {
+    container.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">No variable fields — this prompt fires as-is.</p>';
+  } else {
+    container.innerHTML = vars.map(v => {
+      const isLong = ['job_description','context','notes'].includes(v);
+      const label = v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      return '<div class="form-group" style="margin-bottom:12px">' +
+        '<label class="form-label">' + label + '</label>' +
+        (isLong
+          ? '<textarea class="form-textarea" id="fp-' + v + '" rows="5" placeholder="Paste ' + label.toLowerCase() + ' here..."></textarea>'
+          : '<input class="form-input" type="text" id="fp-' + v + '" placeholder="Enter ' + label.toLowerCase() + '...">') +
+        '</div>';
+    }).join('');
+  }
+
+  // Populate application link dropdown
+  const linkSel = document.getElementById('fp-link-app');
+  linkSel.innerHTML = '<option value="">— Don\'t link —</option>';
+  const recentApps = allApps.slice(0, 50);
+  recentApps.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + ' — ' + a.job_title;
+    linkSel.appendChild(opt);
+  });
+
+  openModal('modal-fire-prompt');
+}
+
+async function runFirePrompt() {
+  const data = await dbGet('prompts', 'select=*&id=eq.' + activePromptId);
   const p = Array.isArray(data) ? data[0] : data;
   if (!p) return;
 
   const vars = Array.isArray(p.variable_fields) ? p.variable_fields : [];
-  let prompt = p.system_prompt || '';
+  let promptText = p.system_prompt || '';
 
-  if (vars.length > 0) {
-    for (const v of vars) {
-      const val = window.prompt(`Enter value for {{${v}}}:`);
-      if (val) prompt = prompt.replaceAll(`{{${v}}}`, val);
-    }
+  // Replace all variable fields
+  for (const v of vars) {
+    const el = document.getElementById('fp-' + v);
+    const val = el ? el.value.trim() : '';
+    if (val) promptText = promptText.split('{{' + v + '}}').join(val);
   }
 
+  // Get linked application ID before closing modal
+  const linkedAppId = document.getElementById('fp-link-app').value || null;
+
+  closeModal('modal-fire-prompt');
+
+  // Switch to AI page and show output
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
   document.querySelector('[data-page="ai"]').classList.add('active');
   document.getElementById('page-ai').classList.add('active');
 
-  showAIOutput('Generating...', p.name);
+  showAIOutput('Generating with Claude...\n\nThis may take a moment for longer documents.', p.name);
+
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
+    const result = await callAI([{ role: 'user', content: promptText }], JAY_SYSTEM_PROMPT);
     showAIOutput(result, p.name);
     lastAIOutput = result;
-    lastAIOutputType = 'prompt';
-  } catch(e) { showAIOutput('Error: ' + e.message, p.name); }
+    lastAIOutputType = p.category ? p.category.toLowerCase().replace(/ /g,'_') : 'prompt';
+
+    // Auto-save output to ai_outputs table
+    await dbPost('ai_outputs', {
+      output_type: lastAIOutputType,
+      linked_application_id: linkedAppId || null,
+      prompt_used: p.name,
+      content: result,
+    });
+
+    // If linked to an application, also append to its ai_output JSONB field
+    if (linkedAppId) {
+      const app = allApps.find(a => a.id === linkedAppId);
+      if (app) {
+        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+        const newOutput = [...existing, { type: lastAIOutputType, prompt: p.name, content: result, date: today() }];
+        await dbPatch('applications', linkedAppId, { ai_output: newOutput });
+        const idx = allApps.findIndex(a => a.id === linkedAppId);
+        if (idx >= 0) allApps[idx].ai_output = newOutput;
+        toast(p.name + ' generated and saved to ' + (app.company || 'application') + '.', 'success');
+      }
+    } else {
+      toast(p.name + ' generated.', 'success');
+    }
+
+  } catch(e) {
+    showAIOutput('Error: ' + e.message, p.name);
+    toast('Generation failed: ' + e.message, 'error');
+  }
 }
 
 // ── RESOURCES ──────────────────────────────────────────────────────────
+let allResources = [];
+let filteredResources = [];
+let resourceSortField = 'created_at';
+let resourceSortDir = 'desc';
+
 async function loadResources() {
-  const data = await dbGet('resources', 'select=*&order=created_at.desc');
-  const resources = Array.isArray(data) ? data : [];
-  const tbody = document.getElementById('resources-tbody');
-  if (resources.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🔖</div><h3>No resources yet</h3><p>Save links, research notes, and reference materials here.</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = resources.map(r => `<tr>
-    <td><strong>${r.title}</strong></td>
-    <td><span class="badge badge-applied">${r.category||'—'}</span></td>
-    <td style="font-size:12px">${r.url?`<a href="${r.url}" target="_blank">Open link</a>`:'—'}</td>
-    <td style="font-size:12px;color:var(--text-secondary)">${(r.notes||'').slice(0,60)||'—'}</td>
-    <td>
-      <div class="table-actions">
-        <button class="action-btn danger" onclick="deleteResource('${r.id}')" title="Delete">🗑</button>
-      </div>
-    </td>
-  </tr>`).join('');
+  const data = await dbGet('resources', 'select=*&order=created_at.desc&limit=1000');
+  allResources = Array.isArray(data) ? data : [];
+  filteredResources = allResources;
+  renderResourcesTable();
+  updateResourceCount();
 }
 
-function openAddResource() { openModal('modal-resource'); }
+function updateResourceCount() {
+  const el = document.getElementById('resource-count');
+  if (el) el.textContent = filteredResources.length + ' of ' + allResources.length + ' resources';
+}
+
+function filterResources() {
+  const q = (document.getElementById('resource-search').value || '').toLowerCase();
+  const cat = (document.getElementById('resource-cat-filter').value || '');
+  filteredResources = allResources.filter(r => {
+    const text = ((r.title||'') + ' ' + (r.notes||'') + ' ' + (r.url||'')).toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (cat && r.category !== cat) return false;
+    return true;
+  });
+  updateResourceCount();
+  renderResourcesTable();
+}
+
+function sortResources(field) {
+  if (resourceSortField === field) resourceSortDir = resourceSortDir === 'asc' ? 'desc' : 'asc';
+  else { resourceSortField = field; resourceSortDir = 'asc'; }
+  filteredResources.sort((a, b) => {
+    const av = (a[field] || '').toLowerCase();
+    const bv = (b[field] || '').toLowerCase();
+    return resourceSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  renderResourcesTable();
+}
+
+function renderResourcesTable() {
+  const tbody = document.getElementById('resources-tbody');
+  if (filteredResources.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🔖</div><h3>No resources found</h3><p>Save links, research notes, and reference materials here.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filteredResources.map(r =>
+    '<tr>' +
+    '<td><strong>' + (r.title||'—') + '</strong></td>' +
+    '<td><span class="badge badge-applied">' + (r.category||'—') + '</span></td>' +
+    '<td style="font-size:12px">' + (r.url ? '<a href="' + r.url + '" target="_blank" style="color:var(--burgundy)">Open link ↗</a>' : '—') + '</td>' +
+    '<td style="font-size:12px;color:var(--text-secondary);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ((r.notes||'').slice(0,80)||'—') + '</td>' +
+    '<td><div class="table-actions">' +
+      '<button class="action-btn" onclick="editResource(\'' + r.id + '\')" title="Edit">✏️</button>' +
+      '<button class="action-btn danger" onclick="deleteResource(\'' + r.id + '\')" title="Delete">🗑</button>' +
+    '</div></td>' +
+    '</tr>'
+  ).join('');
+}
+
+function openAddResource() {
+  editingId = null;
+  ['rsf-title','rsf-url','rsf-notes'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  const sel = document.getElementById('rsf-cat'); if(sel) sel.selectedIndex = 0;
+  const modal = document.getElementById('modal-resource');
+  if (modal) modal.querySelector('h3').textContent = 'Add Resource';
+  openModal('modal-resource');
+}
+
+function editResource(id) {
+  const r = allResources.find(x => x.id === id);
+  if (!r) return;
+  editingId = id;
+  const sv = (fid, val) => { const e=document.getElementById(fid); if(e) e.value = val||''; };
+  sv('rsf-title', r.title); sv('rsf-url', r.url); sv('rsf-notes', r.notes);
+  const sel = document.getElementById('rsf-cat'); if(sel) sel.value = r.category || '';
+  const modal = document.getElementById('modal-resource');
+  if (modal) modal.querySelector('h3').textContent = 'Edit Resource';
+  openModal('modal-resource');
+}
 
 async function saveResource() {
   const title = getVal('rsf-title');
   if (!title) { toast('Title required.', 'error'); return; }
   const payload = { title, category: getVal('rsf-cat'), url: getVal('rsf-url'), notes: getVal('rsf-notes') };
   try {
-    await dbPost('resources', payload);
+    if (editingId) {
+      await dbPatch('resources', editingId, payload);
+      const idx = allResources.findIndex(x => x.id === editingId);
+      if (idx >= 0) allResources[idx] = { ...allResources[idx], ...payload };
+      toast('Resource updated.', 'success');
+    } else {
+      const result = await dbPost('resources', payload);
+      allResources.unshift(Array.isArray(result) ? result[0] : result);
+      toast('Resource saved.', 'success');
+    }
+    editingId = null;
     closeModal('modal-resource');
-    loadResources();
-    toast('Resource saved.', 'success');
+    filteredResources = allResources;
+    filterResources();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function deleteResource(id) {
   if (!confirm('Delete this resource?')) return;
   await dbDelete('resources', id);
-  loadResources();
+  allResources = allResources.filter(x => x.id !== id);
+  filteredResources = filteredResources.filter(x => x.id !== id);
+  renderResourcesTable();
+  updateResourceCount();
   toast('Resource deleted.');
 }
 
@@ -3272,13 +3573,144 @@ async function sendFollowUpReminders() {
     content: emailBody,
   });
 
-  // Show in AI panel for now (email sending requires additional email service setup)
-  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelector('[data-page="ai"]').classList.add('active');
-  document.getElementById('page-ai').classList.add('active');
-  showAIOutput(emailBody, 'email_reminder');
-  toast(due.length + ' follow-up items compiled. Copy and send via your email client.', 'success');
+  // Show in a modal with mailto link for direct email sending
+  const subject = 'Job Search Follow-Ups — ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const mailtoBody = encodeURIComponent(emailBody);
+  const mailtoLink = 'mailto:jvwadhwa@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + mailtoBody;
+
+  // Store email body globally so copy button can access it
+  window._reminderEmailBody = emailBody;
+
+  document.getElementById('detail-title').textContent = 'Follow-Up Digest — ' + due.length + ' items due';
+  document.getElementById('detail-body').innerHTML =
+    '<div style="margin-bottom:16px;display:flex;gap:8px">' +
+      '<a href="' + mailtoLink + '" class="btn btn-primary" style="text-decoration:none">📧 Open in Email Client</a>' +
+      '<button class="btn btn-secondary" onclick="copyReminderEmail()">Copy Text</button>' +
+    '</div>' +
+    '<div style="white-space:pre-wrap;font-size:13px;line-height:1.8;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px">' +
+    emailBody.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+    '</div>';
+  document.getElementById('detail-edit-btn').style.display = 'none';
+  openModal('modal-detail');
+  toast(due.length + ' follow-up items ready. Click "Open in Email Client" to send.', 'success');
+}
+
+// ── STATUS CHART ──────────────────────────────────────────────────────
+let chartInstance = null;
+let chartVisible = false;
+
+function toggleStatusChart() {
+  const canvas = document.getElementById('status-chart');
+  const breakdown = document.getElementById('status-breakdown');
+  const btn = document.getElementById('chart-toggle-btn');
+  chartVisible = !chartVisible;
+
+  if (chartVisible) {
+    breakdown.style.display = 'none';
+    canvas.style.display = 'block';
+    btn.textContent = '📋 List';
+    renderStatusChart();
+  } else {
+    breakdown.style.display = '';
+    canvas.style.display = 'none';
+    btn.textContent = '📊 Chart';
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  }
+}
+
+function renderStatusChart() {
+  const canvas = document.getElementById('status-chart');
+  if (!canvas) return;
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const counts = {};
+  allApps.forEach(a => { if (a.status) counts[a.status] = (counts[a.status] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const labels = sorted.map(([s]) => s);
+  const values = sorted.map(([, c]) => c);
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const textColor = isDark ? '#f0ece8' : '#1a1714';
+
+  chartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: 'rgba(151,43,50,0.75)',
+        borderColor: 'rgba(151,43,50,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' applications' } }
+      },
+      scales: {
+        x: { ticks: { color: textColor, font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: textColor, font: { size: 11 }, stepSize: 1 }, grid: { color: isDark ? '#2e2a28' : '#e8e2dd' } }
+      }
+    }
+  });
+}
+
+// ── AI DASHBOARD INSIGHTS ──────────────────────────────────────────────
+async function generateDashboardInsights() {
+  const btn = document.getElementById('insights-btn');
+  const body = document.getElementById('ai-insights-body');
+  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+  body.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary)">Claude is analyzing your job search data...</div>';
+
+  const total = allApps.length;
+  const responded = allApps.filter(a => ['Interview — Recruiter','Interview — Company','Initial Phone Call','In-Progress'].includes(a.status)).length;
+  const interviews = allApps.filter(a => ['Interview — Recruiter','Interview — Company'].includes(a.status)).length;
+  const notHired = allApps.filter(a => a.status === 'Not Hired').length;
+  const ghosted = allApps.filter(a => a.status === 'Ghosted').length;
+  const deadEnd = allApps.filter(a => a.status === 'Dead End').length;
+  const active = allApps.filter(a => !['Not Hired','Ghosted','Dead End','Position Canceled/Closed'].includes(a.status)).length;
+  const responseRate = total > 0 ? ((responded / total) * 100).toFixed(1) : 0;
+  const interviewRate = total > 0 ? ((interviews / total) * 100).toFixed(1) : 0;
+  const mostActive = getMostActiveWeek();
+
+  // Source breakdown
+  const sources = {};
+  allApps.forEach(a => { if (a.source) sources[a.source] = (sources[a.source] || 0) + 1; });
+  const topSources = Object.entries(sources).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,c])=>s+': '+c).join(', ');
+
+  // Industry breakdown
+  const industries = {};
+  allApps.forEach(a => { if (a.industry) industries[a.industry] = (industries[a.industry] || 0) + 1; });
+  const topIndustries = Object.entries(industries).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([i,c])=>i+': '+c).join(', ');
+
+  const prompt = `Analyze Jay Wadhwa job search data and provide 4-6 specific, actionable insights and recommendations. Be direct and data-driven. No fluff.
+
+DATA:
+- Total applications: ${total}
+- Active applications: ${active}
+- Response rate: ${responseRate}% (${responded} responses)
+- Interview rate: ${interviewRate}% (${interviews} interviews)
+- Not Hired (formal rejection): ${notHired}
+- Ghosted (no response): ${ghosted}
+- Dead End (stalled): ${deadEnd}
+- Most active week: ${mostActive.week} (${mostActive.count} apps)
+- Top sources: ${topSources || 'N/A'}
+- Top industries: ${topIndustries || 'N/A'}
+
+Jay is a senior marketing executive (VP/CMO level) targeting roles in SaaS, Web3, media, and nonprofits in Chicago and remote. Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], JAY_SYSTEM_PROMPT);
+    body.innerHTML = '<div style="padding:20px;white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text)">' +
+      result.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+  } catch(e) {
+    body.innerHTML = '<div style="padding:20px;color:var(--burgundy);font-size:13px">Error: ' + e.message + '</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Regenerate'; }
+  }
 }
 
 // ── DASHBOARD ANALYTICS ─────────────────────────────────────────────────
@@ -3315,6 +3747,8 @@ function getAvgTimeToResponse() {
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
 refreshDashboard();
+// Auto-seed prompts on first load
+setTimeout(seedPrompts, 1500);
 
 // Check for follow-ups on load and show badge
 setTimeout(async () => {
