@@ -808,6 +808,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="outreachbuilder">
         <span class="nav-icon">📨</span><span>Outreach Builder</span>
       </div>
+      <div class="nav-item" data-page="uploads">
+        <span class="nav-icon">📁</span><span>My Documents</span>
+      </div>
       <div class="nav-item" data-page="uploaddocs">
         <span class="nav-icon">🗂</span><span>Uploaded Docs</span>
       </div>
@@ -1578,6 +1581,53 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
     </div>
 
+
+    <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
+    <div class="page" id="page-uploads">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>My Documents</h2>
+          <p>Upload and track resumes, cover letters, and job descriptions</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openUploadModal()">⬆ Upload Document</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs()">
+        </div>
+        <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
+          <option value="">All Types</option>
+          <option>Resume</option>
+          <option>Cover Letter</option>
+          <option>Job Description</option>
+          <option>Other</option>
+        </select>
+        <span class="filter-count" id="docs-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th onclick="sortDocs('file_name')">File Name ↕</th>
+              <th onclick="sortDocs('doc_type')">Type ↕</th>
+              <th onclick="sortDocs('company')">Company ↕</th>
+              <th onclick="sortDocs('role')">Role ↕</th>
+              <th>Linked Application</th>
+              <th>Contact</th>
+              <th onclick="sortDocs('created_at')">Uploaded ↕</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="docs-tbody">
+            <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -2186,6 +2236,80 @@ a { color: var(--burgundy); text-decoration: none; }
   </div>
 </div>
 
+
+<!-- Upload Document Modal -->
+<div class="modal-overlay" id="modal-upload">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⬆ Upload Document</h3>
+      <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Drop zone -->
+      <div id="upload-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px;background:var(--bg)"
+           onclick="document.getElementById('upload-file-input').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
+           ondragleave="this.style.borderColor='var(--border-strong)'"
+           ondrop="handleFileDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px">📄</div>
+        <p style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to browse or drag a file here</p>
+        <p style="font-size:12px;color:var(--text-secondary)">Accepts .docx, .pdf, .doc &nbsp;·&nbsp; Max 10MB</p>
+        <input type="file" id="upload-file-input" accept=".docx,.pdf,.doc" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+      <div id="upload-file-info" style="display:none;background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--burgundy);display:flex;align-items:center;gap:8px">
+        <span>📄</span><span id="upload-file-name"></span>
+        <button onclick="clearUploadFile()" style="margin-left:auto;background:none;border:none;color:var(--burgundy);cursor:pointer;font-size:16px">✕</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Document Type</label>
+          <select class="form-select" id="upload-doc-type" onchange="autoFillUploadType()">
+            <option value="Resume">Resume</option>
+            <option value="Cover Letter">Cover Letter</option>
+            <option value="Job Description">Job Description</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link to Application (optional)</label>
+          <select class="form-select" id="upload-link-app" onchange="autoFillFromApp()">
+            <option value="">— Don't link —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company</label>
+          <input class="form-input" type="text" id="upload-company" placeholder="Company name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <input class="form-input" type="text" id="upload-role" placeholder="VP of Marketing">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link to Contact (optional)</label>
+          <select class="form-select" id="upload-link-contact">
+            <option value="">— Don't link —</option>
+          </select>
+        </div>
+        <div class="form-group"></div>
+        <div class="form-group full">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="upload-notes" rows="2" placeholder="e.g. Final version submitted, tailored for SaaS roles..."></textarea>
+        </div>
+      </div>
+
+      <div id="upload-progress" style="display:none;margin-top:12px">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="upload-progress-bar" style="width:0%"></div></div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="upload-progress-text">Uploading...</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-upload')">Cancel</button>
+      <button class="btn btn-primary" id="upload-submit-btn" onclick="submitUpload()">Upload Document</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
 
@@ -2322,6 +2446,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (page === 'resumetailor') loadRTPage();
     if (page === 'coverlettergenerator') loadCLGPage();
     if (page === 'outreachbuilder') loadOBPage();
+    if (page === 'uploads') loadDocsPage();
     if (page === 'uploaddocs') loadUploadedDocs();
   });
 });
@@ -5066,187 +5191,42 @@ function exportGenericDocx(text, filename) {
   toast('Downloaded — open in Word to review.', 'success');
 }
 
-// ── UPLOADED DOCUMENTS ─────────────────────────────────────────────────
+// ── MY DOCUMENTS ────────────────────────────────────────────────────────
 let allDocs = [];
 let filteredDocs = [];
 let docSortField = 'created_at';
 let docSortDir = 'desc';
 let uploadFile = null;
 
-function openUploadDoc(defaultType) {
-  uploadFile = null;
-  document.getElementById('upload-file-name').style.display = 'none';
-  document.getElementById('upload-file-name').textContent = '';
-  document.getElementById('upload-file-input').value = '';
-  document.getElementById('upload-progress-wrap').style.display = 'none';
-  document.getElementById('upload-progress-bar').style.width = '0%';
-  ['upload-company','upload-role','upload-notes'].forEach(function(id){
-    var e=document.getElementById(id); if(e) e.value='';
-  });
-
-  // Set doc type
-  var typeEl = document.getElementById('upload-doc-type');
-  if (typeEl && defaultType) typeEl.value = defaultType;
-  document.getElementById('upload-modal-title').textContent =
-    defaultType === 'Resume' ? '⬆ Upload Resume' :
-    defaultType === 'Cover Letter' ? '⬆ Upload Cover Letter' : '⬆ Upload Document';
-
-  // Populate application dropdown
-  var appSel = document.getElementById('upload-link-app');
-  appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0,150).forEach(function(a) {
-    if (!a.company) return;
-    var opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
-    appSel.appendChild(opt);
-  });
-
-  // Populate contact dropdown
-  var conSel = document.getElementById('upload-link-contact');
-  conSel.innerHTML = "<option value=''>— No contact —</option>";
-  allContacts.slice(0,150).forEach(function(c) {
-    if (!c.name) return;
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (c.company ? ' (' + c.company + ')' : '');
-    conSel.appendChild(opt);
-  });
-
-  openModal('modal-upload-doc');
-}
-
-function handleFileSelect(event) {
-  var file = event.target.files[0];
-  if (!file) return;
-  uploadFile = file;
-  var nameEl = document.getElementById('upload-file-name');
-  nameEl.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
-  nameEl.style.display = 'block';
-
-  // Auto-detect document type from filename
-  var lower = file.name.toLowerCase();
-  var typeEl = document.getElementById('upload-doc-type');
-  if (lower.includes('cover') || lower.includes('cl_') || lower.includes('_cl')) {
-    typeEl.value = 'Cover Letter';
-  } else if (lower.includes('resume') || lower.includes('cv')) {
-    typeEl.value = 'Resume';
-  }
-
-  // Try to extract company/role from filename (e.g. Jay_Wadhwa_CMO_Salesforce)
-  var parts = file.name.replace(/\.[^.]+$/, '').split(/[_\-\s]+/);
-  if (parts.length >= 3) {
-    // Pattern: FirstName_LastName_Role_Company or similar
-    var companyEl = document.getElementById('upload-company');
-    var roleEl = document.getElementById('upload-role');
-    if (!companyEl.value && parts.length >= 4) companyEl.value = parts.slice(-1)[0];
-    if (!roleEl.value && parts.length >= 3) roleEl.value = parts.slice(-2,-1)[0];
-  }
-}
-
-function handleFileDrop(event) {
-  event.preventDefault();
-  document.getElementById('upload-dropzone').style.borderColor = '';
-  var file = event.dataTransfer.files[0];
-  if (!file) return;
-  document.getElementById('upload-file-input').files = event.dataTransfer.files;
-  handleFileSelect({ target: { files: [file] } });
-}
-
-function autoFillFromApp() {
-  var appId = document.getElementById('upload-link-app').value;
-  if (!appId) return;
-  var app = allApps.find(function(a) { return a.id === appId; });
-  if (!app) return;
-  if (app.company) document.getElementById('upload-company').value = app.company;
-  if (app.job_title) document.getElementById('upload-role').value = app.job_title;
-
-  // Try to find a matching contact
-  var contactSel = document.getElementById('upload-link-contact');
-  var match = allContacts.find(function(c) {
-    return c.company && app.company && c.company.toLowerCase().includes(app.company.toLowerCase());
-  });
-  if (match) contactSel.value = match.id;
-}
-
-async function submitUpload() {
-  if (!uploadFile) { toast('Please select a file first.', 'error'); return; }
-
-  var btn = document.getElementById('upload-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Uploading...';
-  document.getElementById('upload-progress-wrap').style.display = 'block';
-  document.getElementById('upload-progress-text').textContent = 'Uploading ' + uploadFile.name + '...';
-
-  try {
-    // Build a unique storage path: timestamp_filename
-    var timestamp = Date.now();
-    var safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    var storagePath = timestamp + '_' + safeName;
-
-    // Upload to Supabase Storage via Worker
-    document.getElementById('upload-progress-bar').style.width = '40%';
-    var uploadRes = await fetch(WORKER_URL + '/storage/upload/' + storagePath, {
-      method: 'POST',
-      headers: {
-        'Content-Type': uploadFile.type || 'application/octet-stream',
-        'Origin': location.origin
-      },
-      body: uploadFile
+async function loadDocsPage() {
+  // Populate dropdowns
+  const appSel = document.getElementById('upload-link-app');
+  if (appSel) {
+    appSel.innerHTML = "<option value=''>— Don't link —</option>";
+    allApps.slice(0, 200).forEach(function(a) {
+      if (!a.company) return;
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+      appSel.appendChild(opt);
     });
-
-    if (!uploadRes.ok) {
-      var err = await uploadRes.json().catch(function(){ return {}; });
-      throw new Error(err.message || err.error || 'Upload failed');
-    }
-
-    document.getElementById('upload-progress-bar').style.width = '75%';
-    document.getElementById('upload-progress-text').textContent = 'Saving record...';
-
-    // Save metadata to uploaded_documents table
-    var linkedAppId = document.getElementById('upload-link-app').value || null;
-    var linkedContactId = document.getElementById('upload-link-contact').value || null;
-    var payload = {
-      file_name: uploadFile.name,
-      file_type: uploadFile.type || 'application/octet-stream',
-      doc_type: document.getElementById('upload-doc-type').value,
-      storage_path: storagePath,
-      linked_application_id: linkedAppId,
-      linked_contact_id: linkedContactId,
-      company: document.getElementById('upload-company').value.trim() || null,
-      role: document.getElementById('upload-role').value.trim() || null,
-      notes: document.getElementById('upload-notes').value.trim() || null,
-      file_size: uploadFile.size,
-    };
-
-    var dbRes = await fetch(WORKER_URL + '/db/uploaded_documents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body: JSON.stringify(payload)
-    });
-    if (!dbRes.ok) throw new Error('Failed to save document record');
-
-    document.getElementById('upload-progress-bar').style.width = '100%';
-    document.getElementById('upload-progress-text').textContent = 'Upload complete.';
-
-    await new Promise(function(r){ setTimeout(r, 600); });
-    closeModal('modal-upload-doc');
-    toast(uploadFile.name + ' uploaded successfully.', 'success');
-    uploadFile = null;
-    allDocs = [];
-    loadUploadedDocs();
-
-  } catch(e) {
-    document.getElementById('upload-progress-text').textContent = 'Error: ' + e.message;
-    toast('Upload failed: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '⬆ Upload';
   }
+  const contactSel = document.getElementById('upload-link-contact');
+  if (contactSel) {
+    contactSel.innerHTML = "<option value=''>— Don't link —</option>";
+    allContacts.slice(0, 200).forEach(function(c) {
+      if (!c.name) return;
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+      contactSel.appendChild(opt);
+    });
+  }
+  await refreshDocs();
 }
 
-async function loadUploadedDocs() {
-  var data = await dbGet('uploaded_documents', 'select=*&order=created_at.desc&limit=500');
+async function refreshDocs() {
+  const data = await dbGet('uploaded_documents', 'select=*,applications(company,job_title),contacts(name)&order=created_at.desc&limit=500');
   allDocs = Array.isArray(data) ? data : [];
   filteredDocs = allDocs;
   renderDocsTable();
@@ -5254,15 +5234,15 @@ async function loadUploadedDocs() {
 }
 
 function updateDocsCount() {
-  var el = document.getElementById('docs-count');
+  const el = document.getElementById('docs-count');
   if (el) el.textContent = filteredDocs.length + ' of ' + allDocs.length + ' documents';
 }
 
 function filterDocs() {
-  var q = (document.getElementById('docs-search').value || '').toLowerCase();
-  var type = document.getElementById('docs-type-filter').value;
+  const q = (document.getElementById('docs-search').value || '').toLowerCase();
+  const type = document.getElementById('docs-type-filter').value;
   filteredDocs = allDocs.filter(function(d) {
-    var text = ((d.file_name||'') + ' ' + (d.company||'') + ' ' + (d.role||'') + ' ' + (d.notes||'')).toLowerCase();
+    const text = ((d.file_name||'') + ' ' + (d.company||'') + ' ' + (d.role||'') + ' ' + (d.notes||'')).toLowerCase();
     if (q && !text.includes(q)) return false;
     if (type && d.doc_type !== type) return false;
     return true;
@@ -5273,51 +5253,51 @@ function filterDocs() {
 
 function sortDocs(field) {
   if (docSortField === field) docSortDir = docSortDir === 'asc' ? 'desc' : 'asc';
-  else { docSortField = field; docSortDir = 'asc'; }
+  else { docSortField = field; docSortDir = 'desc'; }
   filteredDocs.sort(function(a, b) {
-    var av = (a[field]||'').toString().toLowerCase();
-    var bv = (b[field]||'').toString().toLowerCase();
-    if (!av && bv) return 1;
-    if (av && !bv) return -1;
-    return docSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    const av = (a[field] || '').toLowerCase();
+    const bv = (b[field] || '').toLowerCase();
+    if (!av && bv) return 1; if (av && !bv) return -1;
+    const cmp = av.localeCompare(bv);
+    return docSortDir === 'asc' ? cmp : -cmp;
   });
   renderDocsTable();
 }
 
+const DOC_TYPE_BADGE = {
+  'Resume': 'badge-inprogress',
+  'Cover Letter': 'badge-outreach',
+  'Job Description': 'badge-applied',
+  'Other': 'badge-other',
+};
+
 function renderDocsTable() {
-  var tbody = document.getElementById('docs-tbody');
+  const tbody = document.getElementById('docs-tbody');
   if (!tbody) return;
   if (filteredDocs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🗂</div><h3>No documents uploaded yet</h3><p>Upload your final resumes and cover letters to track them here.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📁</div><h3>No documents yet</h3><p>Upload resumes, cover letters, and job descriptions to track them here.</p></div></td></tr>';
     return;
   }
-
-  var typeBadge = {
-    'Resume': 'badge-inprogress',
-    'Cover Letter': 'badge-outreach',
-    'Other': 'badge-other'
-  };
-
   tbody.innerHTML = filteredDocs.map(function(d) {
-    // Find linked contact name
-    var contact = d.linked_contact_id ? allContacts.find(function(c){ return c.id === d.linked_contact_id; }) : null;
-    var contactName = contact ? contact.name : '—';
-    var badge = typeBadge[d.doc_type] || 'badge-other';
-    var size = d.file_size ? (d.file_size / 1024).toFixed(0) + ' KB' : '';
-    var dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '—';
-
+    const badgeCls = DOC_TYPE_BADGE[d.doc_type] || 'badge-other';
+    const appName = d.applications ? (d.applications.company || '') : '';
+    const contactName = d.contacts ? (d.contacts.name || '') : '';
+    const fileSizeStr = d.file_size ? (d.file_size > 1024*1024 ? (d.file_size/1024/1024).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
+    const ext = (d.file_name || '').split('.').pop().toLowerCase();
+    const icon = ext === 'pdf' ? '📕' : '📘';
     return '<tr>' +
-      '<td><strong>' + (d.file_name||'—') + '</strong>' + (size ? '<br><span style="font-size:11px;color:var(--text-light)">' + size + '</span>' : '') + '</td>' +
-      '<td><span class="badge ' + badge + '">' + (d.doc_type||'—') + '</span></td>' +
+      '<td>' + icon + ' <strong>' + (d.file_name||'—') + '</strong>' +
+        (fileSizeStr ? '<div style="font-size:11px;color:var(--text-light)">' + fileSizeStr + '</div>' : '') + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + (d.doc_type||'—') + '</span></td>' +
       '<td>' + (d.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role||'—') + '</td>' +
-      '<td style="font-size:12px">' + contactName + '</td>' +
-      '<td style="font-size:12px">' + dateStr + '</td>' +
-      '<td style="font-size:12px;color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (d.notes||'—') + '</td>' +
+      '<td style="font-size:12px">' + (appName || '—') + '</td>' +
+      '<td style="font-size:12px">' + (contactName || '—') + '</td>' +
+      '<td style="font-size:12px">' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</td>' +
       '<td><div class="table-actions">' +
-        '<button class="action-btn" onclick="downloadDoc(\"' + d.id + '\",\"' + d.storage_path + '\")" title="Download">⬇</button>' +
-        '<button class="action-btn" onclick="editDocRecord(\"' + d.id + '\")" title="Edit">✏️</button>' +
-        '<button class="action-btn danger" onclick="deleteDoc(\"' + d.id + '\",\"' + d.storage_path + '\")" title="Delete">🗑</button>' +
+        '<button class="action-btn" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>' +
+        '<button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
+        '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -5326,104 +5306,227 @@ function renderDocsTable() {
 async function downloadDoc(id, storagePath) {
   try {
     toast('Preparing download...', '');
-    var res = await fetch(WORKER_URL + '/storage/url/' + storagePath, {
+    const r = await fetch(WORKER_URL + '/storage/url/' + encodeURIComponent(storagePath), {
       method: 'POST',
       headers: { 'Origin': location.origin }
     });
-    var data = await res.json();
-    if (data.signedURL || data.signedUrl) {
-      var url = data.signedURL || data.signedUrl;
-      var a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.click();
+    const data = await r.json();
+    if (data.signedURL) {
+      window.open(data.signedURL, '_blank');
     } else {
-      throw new Error(data.message || 'Could not get download link');
+      toast('Could not generate download link.', 'error');
     }
-  } catch(e) {
-    toast('Download error: ' + e.message, 'error');
-  }
+  } catch(e) { toast('Download error: ' + e.message, 'error'); }
 }
 
 async function deleteDoc(id, storagePath) {
   if (!confirm('Delete this document? This cannot be undone.')) return;
-  try {
-    await dbDelete('uploaded_documents', id);
-    allDocs = allDocs.filter(function(d){ return d.id !== id; });
-    filteredDocs = filteredDocs.filter(function(d){ return d.id !== id; });
-    renderDocsTable();
-    updateDocsCount();
-    toast('Document deleted.', 'success');
-  } catch(e) {
-    toast('Error: ' + e.message, 'error');
-  }
+  await dbDelete('uploaded_documents', id);
+  allDocs = allDocs.filter(function(d) { return d.id !== id; });
+  filteredDocs = filteredDocs.filter(function(d) { return d.id !== id; });
+  renderDocsTable();
+  updateDocsCount();
+  toast('Document deleted.', 'success');
 }
 
 function editDocRecord(id) {
-  var d = allDocs.find(function(x){ return x.id === id; });
+  const d = allDocs.find(function(x) { return x.id === id; });
   if (!d) return;
+  openUploadModal();
+  setTimeout(function() {
+    document.getElementById('upload-company').value = d.company || '';
+    document.getElementById('upload-role').value = d.role || '';
+    document.getElementById('upload-doc-type').value = d.doc_type || 'Resume';
+    document.getElementById('upload-notes').value = d.notes || '';
+    if (d.linked_application_id) document.getElementById('upload-link-app').value = d.linked_application_id;
+    if (d.linked_contact_id) document.getElementById('upload-link-contact').value = d.linked_contact_id;
+    // Mark as edit mode
+    document.getElementById('upload-submit-btn').textContent = 'Save Changes';
+    document.getElementById('upload-submit-btn').onclick = function() { saveDocEdits(id); };
+    document.getElementById('upload-dropzone').style.display = 'none';
+    document.getElementById('upload-file-info').style.display = 'none';
+  }, 100);
+}
 
-  // Re-use upload modal in edit mode — no file needed
-  document.getElementById('upload-file-name').textContent = d.file_name;
-  document.getElementById('upload-file-name').style.display = 'block';
-  document.getElementById('upload-dropzone').style.display = 'none';
-  document.getElementById('upload-doc-type').value = d.doc_type || 'Resume';
-  document.getElementById('upload-company').value = d.company || '';
-  document.getElementById('upload-role').value = d.role || '';
-  document.getElementById('upload-notes').value = d.notes || '';
-  document.getElementById('upload-modal-title').textContent = 'Edit Document Record';
+async function saveDocEdits(id) {
+  const payload = {
+    company: (document.getElementById('upload-company').value||'').trim() || null,
+    role: (document.getElementById('upload-role').value||'').trim() || null,
+    doc_type: document.getElementById('upload-doc-type').value,
+    notes: (document.getElementById('upload-notes').value||'').trim() || null,
+    linked_application_id: document.getElementById('upload-link-app').value || null,
+    linked_contact_id: document.getElementById('upload-link-contact').value || null,
+  };
+  await dbPatch('uploaded_documents', id, payload);
+  closeModal('modal-upload');
+  await refreshDocs();
+  toast('Document updated.', 'success');
+}
+
+// ── UPLOAD MODAL ─────────────────────────────────────────────────────────
+function openUploadModal() {
+  uploadFile = null;
+  clearUploadFile();
+  document.getElementById('upload-doc-type').value = 'Resume';
+  document.getElementById('upload-company').value = '';
+  document.getElementById('upload-role').value = '';
+  document.getElementById('upload-notes').value = '';
+  document.getElementById('upload-progress').style.display = 'none';
+  document.getElementById('upload-progress-bar').style.width = '0%';
+  document.getElementById('upload-dropzone').style.display = 'block';
+  document.getElementById('upload-submit-btn').textContent = 'Upload Document';
+  document.getElementById('upload-submit-btn').onclick = submitUpload;
 
   // Populate dropdowns
-  var appSel = document.getElementById('upload-link-app');
+  const appSel = document.getElementById('upload-link-app');
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0,150).forEach(function(a) {
+  allApps.slice(0, 200).forEach(function(a) {
     if (!a.company) return;
-    var opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    const opt = document.createElement('option');
+    opt.value = a.id; opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     appSel.appendChild(opt);
   });
-  if (d.linked_application_id) appSel.value = d.linked_application_id;
 
-  var conSel = document.getElementById('upload-link-contact');
-  conSel.innerHTML = "<option value=''>— No contact —</option>";
-  allContacts.slice(0,150).forEach(function(c) {
+  const contactSel = document.getElementById('upload-link-contact');
+  contactSel.innerHTML = "<option value=''>— Don't link —</option>";
+  allContacts.slice(0, 200).forEach(function(c) {
     if (!c.name) return;
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (c.company ? ' (' + c.company + ')' : '');
-    conSel.appendChild(opt);
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    contactSel.appendChild(opt);
   });
-  if (d.linked_contact_id) conSel.value = d.linked_contact_id;
 
-  // Override submit to update instead of upload
-  var btn = document.getElementById('upload-submit-btn');
-  btn.textContent = 'Save Changes';
-  btn.onclick = async function() {
-    var payload = {
-      doc_type: document.getElementById('upload-doc-type').value,
-      company: document.getElementById('upload-company').value.trim() || null,
-      role: document.getElementById('upload-role').value.trim() || null,
-      notes: document.getElementById('upload-notes').value.trim() || null,
-      linked_application_id: document.getElementById('upload-link-app').value || null,
-      linked_contact_id: document.getElementById('upload-link-contact').value || null,
+  openModal('modal-upload');
+}
+
+function handleFileDrop(event) {
+  event.preventDefault();
+  document.getElementById('upload-dropzone').style.borderColor = 'var(--border-strong)';
+  const file = event.dataTransfer.files[0];
+  if (file) setUploadFile(file);
+}
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) setUploadFile(file);
+}
+
+function setUploadFile(file) {
+  const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
+  if (!allowed.includes(file.type) && !file.name.match(/\.(pdf|docx|doc)$/i)) {
+    toast('Only .pdf, .docx, and .doc files are accepted.', 'error'); return;
+  }
+  if (file.size > 10 * 1024 * 1024) { toast('File must be under 10MB.', 'error'); return; }
+  uploadFile = file;
+  document.getElementById('upload-file-name').textContent = file.name + ' (' + (file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+'MB' : Math.round(file.size/1024)+'KB') + ')';
+  document.getElementById('upload-file-info').style.display = 'flex';
+  // Auto-detect type from filename
+  const lower = file.name.toLowerCase();
+  if (lower.includes('resume') || lower.includes('cv')) document.getElementById('upload-doc-type').value = 'Resume';
+  else if (lower.includes('cover') || lower.includes('cl_')) document.getElementById('upload-doc-type').value = 'Cover Letter';
+  else if (lower.includes('job') || lower.includes('jd') || lower.includes('description')) document.getElementById('upload-doc-type').value = 'Job Description';
+}
+
+function clearUploadFile() {
+  uploadFile = null;
+  document.getElementById('upload-file-info').style.display = 'none';
+  document.getElementById('upload-file-name').textContent = '';
+  const input = document.getElementById('upload-file-input');
+  if (input) input.value = '';
+}
+
+function autoFillFromApp() {
+  const appId = document.getElementById('upload-link-app').value;
+  if (!appId) return;
+  const app = allApps.find(function(a) { return a.id === appId; });
+  if (!app) return;
+  if (app.company) document.getElementById('upload-company').value = app.company;
+  if (app.job_title) document.getElementById('upload-role').value = app.job_title;
+}
+
+function autoFillUploadType() {
+  // Nothing needed — type is set manually
+}
+
+async function submitUpload() {
+  if (!uploadFile) { toast('Select a file first.', 'error'); return; }
+
+  const company = (document.getElementById('upload-company').value||'').trim();
+  const role = (document.getElementById('upload-role').value||'').trim();
+  const docType = document.getElementById('upload-doc-type').value;
+  const notes = (document.getElementById('upload-notes').value||'').trim();
+  const linkedAppId = document.getElementById('upload-link-app').value || null;
+  const linkedContactId = document.getElementById('upload-link-contact').value || null;
+
+  const btn = document.getElementById('upload-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+  document.getElementById('upload-progress').style.display = 'block';
+  document.getElementById('upload-progress-bar').style.width = '30%';
+  document.getElementById('upload-progress-text').textContent = 'Uploading file...';
+
+  try {
+    // Build a clean storage path: doctype/timestamp_filename
+    const timestamp = Date.now();
+    const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = docType.replace(/ /g,'_') + '/' + timestamp + '_' + safeName;
+
+    // Upload to Supabase Storage via Worker
+    const uploadRes = await fetch(WORKER_URL + '/storage/upload/' + encodeURIComponent(storagePath), {
+      method: 'POST',
+      headers: {
+        'Content-Type': uploadFile.type || 'application/octet-stream',
+        'Origin': location.origin,
+      },
+      body: uploadFile,
+    });
+
+    document.getElementById('upload-progress-bar').style.width = '70%';
+    document.getElementById('upload-progress-text').textContent = 'Saving record...';
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(function() { return {}; });
+      throw new Error(err.message || err.error || 'Upload failed');
+    }
+
+    // Save record to database
+    const record = {
+      file_name: uploadFile.name,
+      file_type: uploadFile.type,
+      doc_type: docType,
+      storage_path: storagePath,
+      company: company || null,
+      role: role || null,
+      notes: notes || null,
+      file_size: uploadFile.size,
+      linked_application_id: linkedAppId,
+      linked_contact_id: linkedContactId,
     };
-    try {
-      await dbPatch('uploaded_documents', id, payload);
-      var idx = allDocs.findIndex(function(x){ return x.id === id; });
-      if (idx >= 0) allDocs[idx] = Object.assign({}, allDocs[idx], payload);
-      closeModal('modal-upload-doc');
-      filterDocs();
-      toast('Document record updated.', 'success');
-    } catch(e) { toast('Error: ' + e.message, 'error'); }
 
-    // Restore modal to upload mode
-    btn.textContent = '⬆ Upload';
-    btn.onclick = submitUpload;
-    document.getElementById('upload-dropzone').style.display = '';
-  };
+    await dbPost('uploaded_documents', record);
 
-  openModal('modal-upload-doc');
+    document.getElementById('upload-progress-bar').style.width = '100%';
+    document.getElementById('upload-progress-text').textContent = 'Upload complete.';
+
+    closeModal('modal-upload');
+    await refreshDocs();
+
+    // If we're not on the uploads page, switch to it
+    const uploadsPage = document.getElementById('page-uploads');
+    if (uploadsPage && !uploadsPage.classList.contains('active')) {
+      document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
+      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+      document.querySelector('[data-page="uploads"]').classList.add('active');
+      uploadsPage.classList.add('active');
+    }
+
+    toast(uploadFile.name + ' uploaded successfully.', 'success');
+  } catch(e) {
+    document.getElementById('upload-progress-text').textContent = 'Error: ' + e.message;
+    toast('Upload failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Upload Document';
+  }
 }
 
 // ── QUICK FIRE AI ──────────────────────────────────────────────────────
