@@ -4725,53 +4725,216 @@ async function exportFromTemplate(templateFile, replacements, downloadName) {
   }
 }
 
-// Cover letter export — uses base-coverletter.docx template
+// Convert Claude text to Word XML paragraphs for cover letter body
+function textToWordXml(text) {
+  if (!text) return '';
+  const CAL = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
+  const lines = text.split('\n');
+  let xml = '';
+
+  for (var i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+
+    // Empty line = blank paragraph for spacing
+    if (!t) {
+      xml += '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>';
+      continue;
+    }
+
+    // Bullet point
+    if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('• ')) {
+      const bulletText = t.slice(2).replace(/\*\*([^*]+)\*\*/g, '$1');
+      xml += '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' +
+             '<w:spacing w:after="0"/></w:pPr>' +
+             '<w:r><w:rPr>' + CAL + '</w:rPr><w:t xml:space="preserve">' +
+             bulletText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') +
+             '</w:t></w:r></w:p>';
+      continue;
+    }
+
+    // Regular paragraph — handle inline **bold**
+    var parts = t.split(/(\*\*[^*]+\*\*)/g);
+    var runs = '';
+    for (var j = 0; j < parts.length; j++) {
+      var part = parts[j];
+      if (part.startsWith('**') && part.endsWith('**')) {
+        var boldText = part.slice(2, -2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        runs += '<w:r><w:rPr>' + CAL + '<w:b/><w:bCs/></w:rPr>' +
+                '<w:t xml:space="preserve">' + boldText + '</w:t></w:r>';
+      } else if (part) {
+        var plainText = part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        runs += '<w:r><w:rPr>' + CAL + '</w:rPr>' +
+                '<w:t xml:space="preserve">' + plainText + '</w:t></w:r>';
+      }
+    }
+    xml += '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr>' + runs + '</w:p>';
+  }
+  return xml;
+}
+
+// Cover letter export — injects proper XML paragraphs into base-coverletter.docx
 async function exportCoverLetterDocx(text, company, role, contactName) {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const dateStr = new Date().toISOString().split('T')[0];
-  await exportFromTemplate('base-coverletter.docx', {
-    '[TODAY&#x2019;S DATE]': today,
-    '[TODAY\'S DATE]': today,
-    '[NAME, JOB TITLE]': contactName ? contactName : '[Name, Job Title]',
-    '[COMPANY NAME]': company || '[Company Name]',
-    '[JOB TITLE]': role || '[Job Title]',
-    '[BODY COPY]': text || '',
-  }, 'Jay_Wadhwa_CoverLetter_' + (company || 'Company').replace(/\s+/g,'_') + '_' + dateStr);
+
+  try {
+    toast('Preparing cover letter...', '');
+    const response = await fetch(BASE_URL + '/base-coverletter.docx');
+    if (!response.ok) throw new Error('Could not load cover letter template from GitHub.');
+    const arrayBuffer = await response.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    let docXml = await zip.file('word/document.xml').async('string');
+
+    // Simple text replacements for header fields
+    const esc = function(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    docXml = docXml.replace(/\[TODAY&#x2019;S DATE\]/g, esc(today));
+    docXml = docXml.replace(/\[TODAY'S DATE\]/g, esc(today));
+    docXml = docXml.replace(/\[NAME, JOB TITLE\]/g, esc(contactName || ''));
+    docXml = docXml.replace(/\[COMPANY NAME\]/g, esc(company || ''));
+    docXml = docXml.replace(/\[JOB TITLE\]/g, esc(role || ''));
+
+    // Replace [BODY COPY] paragraph with proper XML paragraphs
+    const bodyXml = textToWordXml(text);
+    // Find the paragraph containing [BODY COPY] and replace the whole <w:p>...</w:p>
+    docXml = docXml.replace(/<w:p[^>]*>(?:[^<]|<(?!\/w:p>))*\[BODY COPY\](?:[^<]|<(?!\/w:p>))*<\/w:p>/s,
+      bodyXml);
+
+    // Fallback: simple text replacement if regex didn't match
+    if (docXml.includes('[BODY COPY]')) {
+      docXml = docXml.replace('[BODY COPY]', esc(text || ''));
+    }
+
+    zip.file('word/document.xml', docXml);
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Jay_Wadhwa_CoverLetter_' + (company || 'Company').replace(/\s+/g,'_') + '_' + dateStr + '.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Cover letter downloaded — open in Word to review.', 'success');
+  } catch(e) {
+    toast('Export error: ' + e.message, 'error');
+  }
 }
 
 // Generic export for resume tailor, interview prep, outreach — clean Word format
+function mdToHtml(line) {
+  // Convert inline markdown bold/italic to HTML tags
+  // Handle **bold** mid-sentence
+  line = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Handle *italic* mid-sentence
+  line = line.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  return line;
+}
+
+function textToHtmlLines(text) {
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+  let listType = '';
+
+  for (var i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+
+    // Blank line — close any open list, add spacing
+    if (!t) {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<p style="margin:0;font-size:6pt">&nbsp;</p>';
+      continue;
+    }
+
+    // Markdown headers
+    if (t.startsWith('### ')) {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<h3>' + mdToHtml(t.slice(4)) + '</h3>';
+    } else if (t.startsWith('## ')) {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<h2>' + mdToHtml(t.slice(3)) + '</h2>';
+    } else if (t.startsWith('# ')) {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<h1>' + mdToHtml(t.slice(2)) + '</h1>';
+    }
+    // ALL CAPS section header (e.g. PROFESSIONAL EXPERIENCE)
+    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]{3}/.test(t) && !/[.!?,]$/.test(t) && !t.includes('|')) {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<h1>' + t + '</h1>';
+    }
+    // Bullet list items
+    else if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('• ')) {
+      if (!inList || listType !== 'ul') {
+        if (inList) html += '</' + listType + '>';
+        html += '<ul>'; inList = true; listType = 'ul';
+      }
+      html += '<li>' + mdToHtml(t.slice(2)) + '</li>';
+    }
+    // Numbered list
+    else if (/^\d+[.)\s]/.test(t)) {
+      if (!inList || listType !== 'ol') {
+        if (inList) html += '</' + listType + '>';
+        html += '<ol>'; inList = true; listType = 'ol';
+      }
+      html += '<li>' + mdToHtml(t.replace(/^\d+[.)\s]+/, '')) + '</li>';
+    }
+    // Regular paragraph
+    else {
+      if (inList) { html += '</' + listType + '>'; inList = false; listType = ''; }
+      html += '<p>' + mdToHtml(t) + '</p>';
+    }
+  }
+  if (inList) html += '</' + listType + '>';
+  return html;
+}
+
 function exportGenericDocx(text, filename) {
   if (!text) { toast('No output to export.', 'error'); return; }
   const dateStr = new Date().toISOString().split('T')[0];
-  const styles = 'body{font-family:Calibri,sans-serif;font-size:11pt;margin:1in;line-height:1.2;color:#000}' +
-    'h1,h2,h3{color:#972b32;font-family:Calibri,sans-serif}' +
-    'h1{font-size:13pt;border-bottom:2px solid #972b32;padding-bottom:3px;margin-bottom:6px;margin-top:14px}' +
-    'h2{font-size:11pt;font-weight:bold;margin-top:10px;margin-bottom:2px}' +
-    'p{margin:3px 0}ul,ol{margin:3px 0 3px 18px}li{margin:1px 0}strong,b{font-weight:bold}';
-  const lines = text.split('\n');
-  let html = '';
-  for (var i=0; i<lines.length; i++) {
-    var t = lines[i].trim();
-    if (!t) { html += '<p style="margin:2px 0">&nbsp;</p>'; continue; }
-    if (t.startsWith('# ')) html += '<h1>'+t.slice(2)+'</h1>';
-    else if (t.startsWith('## ')) html += '<h2>'+t.slice(3)+'</h2>';
-    else if (t.startsWith('### ')) html += '<h2>'+t.slice(4)+'</h2>';
-    else if (t === t.toUpperCase() && t.length > 4 && t.length < 80 && /[A-Z]/.test(t) && !/[.!?]$/.test(t)) html += '<h1>'+t+'</h1>';
-    else if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('• ')) html += '<ul><li>'+t.slice(2)+'</li></ul>';
-    else if (/^\d+\.\s/.test(t)) html += '<ol><li>'+t.replace(/^\d+\.\s/,'')+'</li></ol>';
-    else if (t.startsWith('**') && t.endsWith('**')) html += '<p><strong>'+t.slice(2,-2)+'</strong></p>';
-    else html += '<p>'+t+'</p>';
-  }
-  var fullHtml = '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">' +
-    '<style>'+styles+'</style></head><body>' +
-    '<p style="font-size:9pt;color:#999;margin-bottom:12px">Jay Wadhwa &nbsp;·&nbsp; '+
-    new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+
-    '</p>'+html+'</body></html>';
-  var blob = new Blob([fullHtml], { type: 'application/msword' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
+
+  // Word-optimized CSS — margin:0 on body because Word adds its own 1in margins
+  // Setting margin here causes double-indenting
+  const styles =
+    '@page { margin: 1in; }' +
+    'body { font-family: Calibri, sans-serif; font-size: 11pt; margin: 0; line-height: 1.15; color: #000; }' +
+    'h1 { font-family: Calibri, sans-serif; font-size: 12pt; font-weight: bold; color: #972b32; ' +
+         'border-bottom: 1.5pt solid #972b32; margin: 12pt 0 4pt 0; padding-bottom: 2pt; }' +
+    'h2 { font-family: Calibri, sans-serif; font-size: 11pt; font-weight: bold; color: #000; margin: 8pt 0 2pt 0; }' +
+    'h3 { font-family: Calibri, sans-serif; font-size: 11pt; font-style: italic; color: #000; margin: 6pt 0 2pt 0; }' +
+    'p { font-family: Calibri, sans-serif; font-size: 11pt; margin: 0 0 4pt 0; }' +
+    'ul { margin: 2pt 0 4pt 0; padding-left: 18pt; }' +
+    'ol { margin: 2pt 0 4pt 0; padding-left: 18pt; }' +
+    'li { font-family: Calibri, sans-serif; font-size: 11pt; margin: 1pt 0; }' +
+    'strong, b { font-weight: bold; }' +
+    'em, i { font-style: italic; }';
+
+  const html = textToHtmlLines(text);
+
+  const fullHtml =
+    '<!DOCTYPE html>' +
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+          'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+          'xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="utf-8">' +
+    '<!--[if gte mso 9]><xml><w:WordDocument>' +
+    '<w:View>Print</w:View><w:Zoom>100</w:Zoom>' +
+    '<w:DoNotOptimizeForBrowser/>' +
+    '</w:WordDocument></xml><![endif]-->' +
+    '<style>' + styles + '</style>' +
+    '</head><body>' +
+    '<p style="font-size:8pt;color:#999;margin-bottom:10pt">' +
+    'Jay Wadhwa &nbsp;·&nbsp; ' +
+    new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) +
+    '</p>' +
+    html +
+    '</body></html>';
+
+  const blob = new Blob([fullHtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url;
-  a.download = 'Jay_Wadhwa_'+filename+'_'+dateStr+'.doc';
+  a.download = 'Jay_Wadhwa_' + filename + '_' + dateStr + '.doc';
   a.click();
   URL.revokeObjectURL(url);
   toast('Downloaded — open in Word to review.', 'success');
