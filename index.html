@@ -953,13 +953,13 @@ a { color: var(--burgundy); text-decoration: none; }
         <table class="data-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Company</th>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Last Contact</th>
-              <th>Next Action</th>
-              <th>Next Date</th>
+              <th onclick="sortContacts('name')" id="ch-name">Name ↕</th>
+              <th onclick="sortContacts('company')" id="ch-company">Company ↕</th>
+              <th onclick="sortContacts('title')" id="ch-title">Title ↕</th>
+              <th onclick="sortContacts('contact_type')" id="ch-contact_type">Type ↕</th>
+              <th onclick="sortContacts('last_contact_date')" id="ch-last_contact_date">Last Contact ↕</th>
+              <th onclick="sortContacts('next_action')" id="ch-next_action">Next Action ↕</th>
+              <th onclick="sortContacts('next_action_date')" id="ch-next_action_date">Next Date ↕</th>
               <th></th>
             </tr>
           </thead>
@@ -2340,6 +2340,44 @@ function viewApp(id) {
 }
 
 // ── CONTACTS ───────────────────────────────────────────────────────────
+let contactSortField = 'name';
+let contactSortDir = 'asc';
+
+function sortContacts(field) {
+  if (contactSortField === field) {
+    contactSortDir = contactSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    contactSortField = field;
+    contactSortDir = 'asc';
+  }
+
+  // Update header indicators
+  document.querySelectorAll('[id^="ch-"]').forEach(th => {
+    const thField = th.id.replace('ch-', '');
+    const label = th.textContent.replace(' ↑', '').replace(' ↓', '').replace(' ↕', '');
+    if (thField === field) {
+      th.textContent = label + (contactSortDir === 'asc' ? ' ↑' : ' ↓');
+      th.style.color = 'var(--burgundy)';
+    } else {
+      th.textContent = label + ' ↕';
+      th.style.color = '';
+    }
+  });
+
+  filteredContacts.sort((a, b) => {
+    let av = a[field] || '';
+    let bv = b[field] || '';
+    // Treat nulls/blanks as last when ascending
+    if (!av && bv) return 1;
+    if (av && !bv) return -1;
+    if (!av && !bv) return 0;
+    const cmp = String(av).toLowerCase().localeCompare(String(bv).toLowerCase());
+    return contactSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  renderContactsTable();
+}
+
 const CONTACT_TYPE_BADGE = {
   'Recruiter': 'badge-interview-recruiter',
   'Hiring Manager': 'badge-inprogress',
