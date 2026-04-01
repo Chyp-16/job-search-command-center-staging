@@ -1372,6 +1372,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <button class="btn btn-secondary btn-sm" onclick="copyIPOutput()">Copy All</button>
               <button class="btn btn-secondary btn-sm" onclick="exportIPDocx()">⬇ Export .docx</button>
               <button class="btn btn-secondary btn-sm" onclick="exportIPZip()">⬇ Export All as .zip</button>
+              <button class="btn btn-secondary btn-sm" onclick="debugIPSections()">🔍 Debug Sections</button>
               <button class="btn btn-primary btn-sm" onclick="saveIPOutput()">Save to App</button>
             </div>
           </div>
@@ -4773,6 +4774,41 @@ function parseIPSections(text, company, role) {
   return sections;
 }
 
+function debugIPSections() {
+  if (!ipOutput) { alert('No output yet. Generate the prep pack first.'); return; }
+  var upper = ipOutput.toUpperCase();
+  var kws = [
+    ['## DOC 01', 'DOC 01:', 'COMPANY OVERVIEW'],
+    ['## DOC 02', 'DOC 02:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
+    ['## DOC 03', 'DOC 03:', 'TARGET NICHE'],
+    ['## DOC 04', 'DOC 04:', '30-60-90 DAY'],
+    ['## DOC 05', 'DOC 05:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
+    ['## DOC 06', 'DOC 06:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
+    ['## DOC 07', 'DOC 07:', 'STRATEGIC QUESTIONS FOR'],
+    ['## DOC 08', 'DOC 08:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
+  ];
+  var report = 'SECTION DETECTION REPORT\n';
+  report += '========================\n';
+  report += 'Total output length: ' + ipOutput.length + ' chars\n\n';
+  report += 'First 300 chars:\n' + ipOutput.slice(0, 300) + '\n\n';
+  report += '--- Searching for section headers ---\n';
+  kws.forEach(function(pats, idx) {
+    var found = false;
+    pats.forEach(function(pat) {
+      var pos = upper.indexOf(pat);
+      if (pos >= 0) {
+        report += 'DOC 0' + (idx+1) + ': FOUND "' + pat + '" at position ' + pos + '\n';
+        report += '  Context: ' + ipOutput.slice(Math.max(0, pos-10), pos+60).replace(/\n/g,' ') + '\n';
+        found = true;
+      }
+    });
+    if (!found) report += 'DOC 0' + (idx+1) + ': NOT FOUND (tried: ' + pats.join(', ') + ')\n';
+  });
+  report += '\nParsed sections: ' + Object.keys(ipSections).join(', ');
+  console.log(report);
+  alert(report);
+}
+
 function clearInterviewPrep() {
   ['ip-company','ip-role','ip-jd','ip-url','ip-interviewer-name','ip-interviewer-title'].forEach(function(id) {
     const el = document.getElementById(id); if (el) el.value = '';
@@ -6039,16 +6075,16 @@ function renderActivityFeed(activities) {
     const dateRaw = eng.createdAt || eng.lastUpdated || props.hs_timestamp || props.createdate || a.createdAt;
     const date = dateRaw ? new Date(dateRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
-    return '<div class="followup-item">' +
-      '<div style="font-size:15px;flex-shrink:0">' + icon + '</div>' +
-      '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:13px;font-weight:500;color:var(--text)">' + shortTitle + '</div>' +
+    return '<div class="followup-item" style="display:flex;align-items:flex-start;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);width:100%;box-sizing:border-box">' +
+      '<div style="font-size:15px;flex-shrink:0;margin-top:1px">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0;overflow:hidden">' +
+        '<div style="font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + shortTitle + '</div>' +
         '<div style="font-size:11px;color:var(--text-secondary)">' + label + '</div>' +
       '</div>' +
-      (date ? '<div style="font-size:11px;color:var(--text-light);white-space:nowrap">' + date + '</div>' : '') +
+      (date ? '<div style="font-size:11px;color:var(--text-light);white-space:nowrap;flex-shrink:0;padding-left:8px">' + date + '</div>' : '') +
     '</div>';
   }).join('');
-  feedEl.innerHTML = '<div>' + items + '</div>';
+  feedEl.innerHTML = '<div style="display:block;width:100%">' + items + '</div>';
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────
