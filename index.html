@@ -4041,7 +4041,10 @@ function exportToDocx() {
     const co = (document.getElementById('ai-gen-company') ? document.getElementById('ai-gen-company').value : '').trim();
     const ro = (document.getElementById('ai-gen-role') ? document.getElementById('ai-gen-role').value : '').trim();
     const ct = (document.getElementById('ai-gen-contact') ? document.getElementById('ai-gen-contact').value : '').trim();
-    exportCoverLetterDocx(lastAIOutput, co, ro, ct);
+    var co_ai = (document.getElementById('ai-gen-company') ? document.getElementById('ai-gen-company').value : '').trim();
+    var ro_ai = (document.getElementById('ai-gen-role') ? document.getElementById('ai-gen-role').value : '').trim();
+    var ct_ai = (document.getElementById('ai-gen-contact') ? document.getElementById('ai-gen-contact').value : '').trim();
+    exportCoverLetterDocx(lastAIOutput, co_ai, ro_ai, ct_ai);
     return;
   }
   // Otherwise use generic export
@@ -4991,7 +4994,17 @@ function clearRT() {
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
-function exportRTDocx() { exportGenericDocx(rtOutput, 'Resume_Tailoring'); }
+function exportRTDocx() {
+  var coRaw = (document.getElementById('rt-link-app').selectedOptions[0] && document.getElementById('rt-link-app').selectedOptions[0].text || '').split('\u2014')[0];
+  var roRaw = (document.getElementById('rt-jd').value || '').slice(0, 60); // use first part of JD as role hint if no separate field
+  // Better: pull company and role from the linked app
+  var linkedAppId = document.getElementById('rt-link-app').value;
+  var app = allApps.find(function(a) { return a.id === linkedAppId; });
+  var co = cleanForFilename(app ? app.company : coRaw) || 'Company';
+  var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
+  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
+  exportGenericDocx(rtOutput, fname);
+}
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
 let clgOutput = '';
@@ -5050,7 +5063,7 @@ function clearCLG() {
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
-function exportCLGDocx() { const co=(document.getElementById('clg-company').value||'').trim(); const ro=(document.getElementById('clg-role').value||'').trim(); const ct=(document.getElementById('clg-contact').value||'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct); }
+function exportCLGDocx() { var co=(document.getElementById('clg-company').value||'').trim(); var ro=(document.getElementById('clg-role').value||'').trim(); var ct=(document.getElementById('clg-contact').value||'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct); }
 
 async function saveCLGOutput() {
   if (!clgOutput) return;
@@ -5497,7 +5510,9 @@ async function exportGenericDocx(text, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Jay_Wadhwa_' + filename + '_' + dateStr + '.docx';
+    // If filename already starts with JayWadhwa, use as-is; otherwise prefix
+    var finalName = filename.startsWith('JayWadhwa') ? filename : 'JayWadhwa_' + filename;
+    a.download = finalName + '.docx';
     a.click();
     URL.revokeObjectURL(url);
     toast('Downloaded — open in Word to review.', 'success');
@@ -5505,6 +5520,75 @@ async function exportGenericDocx(text, filename) {
 }
 
 function exportGenericDocxFile(text, filename) { exportGenericDocx(text, filename); }
+
+function cleanForFilename(s) {
+  return (s || '').trim().replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '');
+}
+
+// Naming convention: JayWadhwa_[Role]_[Company]_Resume
+async function exportCoverLetterDocx(text, company, role, contactName) {
+  const role_clean    = cleanForFilename(role)    || 'Role';
+  const company_clean = cleanForFilename(company) || 'Company';
+  const downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_Cover Letter';
+  try {
+    toast('Preparing cover letter...', '');
+    const response = await fetch(BASE_URL + '/base-coverletter.docx');
+    if (!response.ok) throw new Error('Could not load cover letter template from GitHub.');
+    const arrayBuffer = await response.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    let docXml = await zip.file('word/document.xml').async('string');
+    const today_str = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const esc = function(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    docXml = docXml.replace(/\[TODAY&#x2019;S DATE\]/g, esc(today_str));
+    docXml = docXml.replace(/\[TODAY'S DATE\]/g, esc(today_str));
+    docXml = docXml.replace(/\[NAME, JOB TITLE\]/g, esc(contactName || ''));
+    docXml = docXml.replace(/\[COMPANY NAME\]/g, esc(company || ''));
+    docXml = docXml.replace(/\[JOB TITLE\]/g, esc(role || ''));
+    const bodyXml = textToWordXml(text);
+    docXml = docXml.replace(/<w:p[^>]*>(?:[^<]|<(?!\/w:p>))*\[BODY COPY\](?:[^<]|<(?!\/w:p>))*<\/w:p>/s, bodyXml);
+    if (docXml.includes('[BODY COPY]')) {
+      docXml = docXml.replace('[BODY COPY]', esc(text || ''));
+    }
+    zip.file('word/document.xml', docXml);
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = downloadName + '.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded ' + downloadName + '.docx', 'success');
+  } catch(e) { toast('Export error: ' + e.message, 'error'); }
+}
+
+function textToWordXml(text) {
+  if (!text) return '';
+  const CAL = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
+  const lines = text.split('\n');
+  let xml = '';
+  for (var i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+    if (!t) { xml += '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>'; continue; }
+    if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('\u2022 ')) {
+      const bt = t.slice(2).replace(/\*\*([^*]+)\*\*/g, '$1');
+      xml += '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr>' + CAL + '</w:rPr><w:t xml:space="preserve">' + bt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</w:t></w:r></w:p>';
+      continue;
+    }
+    var parts = t.split(/(\*\*[^*]+\*\*)/g);
+    var runs = '';
+    for (var j = 0; j < parts.length; j++) {
+      var part = parts[j];
+      if (part.startsWith('**') && part.endsWith('**')) {
+        runs += '<w:r><w:rPr>' + CAL + '<w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">' + part.slice(2,-2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</w:t></w:r>';
+      } else if (part) {
+        runs += '<w:r><w:rPr>' + CAL + '</w:rPr><w:t xml:space="preserve">' + part.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</w:t></w:r>';
+      }
+    }
+    xml += '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr>' + runs + '</w:p>';
+  }
+  return xml;
+}
 
 // textToHtmlWithTables — browser UI display only (not for Word export)
 function textToHtmlWithTables(text) {
