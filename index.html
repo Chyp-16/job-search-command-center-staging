@@ -852,6 +852,31 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="stats-grid" id="stats-grid">
           <div class="stat-card loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div></div>
         </div>
+        <!-- Tasks + Activity Feed (above status) -->
+        <div class="dashboard-cols" style="margin-bottom:20px">
+          <div class="dash-card">
+            <div class="dash-card-header">
+              📋 Tasks
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>
+                <button class="btn btn-primary btn-sm" onclick="openAddTask()">+ Add</button>
+              </div>
+            </div>
+            <div class="dash-card-body" id="tasks-list">
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load your tasks.</div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-header">
+              🕐 Activity Feed
+              <button class="btn btn-secondary btn-sm" onclick="syncHubSpotActivity()" id="activity-sync-btn">⟳ Sync HubSpot</button>
+            </div>
+            <div class="dash-card-body" id="activity-feed">
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load recent activity.</div>
+            </div>
+          </div>
+        </div>
+
         <div class="dashboard-cols">
           <div class="dash-card">
             <div class="dash-card-header">
@@ -876,35 +901,13 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card" style="grid-column:1/-1">
             <div class="dash-card-header">
               ✦ AI Insights
-              <button class="btn btn-primary btn-sm" onclick="generateDashboardInsights()" id="insights-btn">Generate Insights</button>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="downloadInsightsDocx()">⬇ Export .docx</button>
+                <button class="btn btn-primary btn-sm" onclick="generateDashboardInsights()" id="insights-btn">Generate Insights</button>
+              </div>
             </div>
             <div class="dash-card-body" id="ai-insights-body">
               <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click Generate Insights to get Claude's analysis of your job search performance and recommendations.</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Activity Feed + Tasks Row -->
-        <div class="dashboard-cols" style="margin-top:20px">
-          <div class="dash-card">
-            <div class="dash-card-header">
-              📋 Tasks
-              <div style="display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>
-                <button class="btn btn-primary btn-sm" onclick="openAddTask()">+ Add</button>
-              </div>
-            </div>
-            <div class="dash-card-body" id="tasks-list">
-              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load your tasks.</div>
-            </div>
-          </div>
-          <div class="dash-card">
-            <div class="dash-card-header">
-              🕐 Activity Feed
-              <button class="btn btn-secondary btn-sm" onclick="syncHubSpotActivity()" id="activity-sync-btn">⟳ Sync HubSpot</button>
-            </div>
-            <div class="dash-card-body" id="activity-feed">
-              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load recent activity.</div>
             </div>
           </div>
         </div>
@@ -4532,6 +4535,14 @@ function renderStatusChart() {
 }
 
 // ── AI DASHBOARD INSIGHTS ──────────────────────────────────────────────
+function downloadInsightsDocx() {
+  const body = document.getElementById('ai-insights-body');
+  const raw = body ? body.dataset.raw : '';
+  if (!raw) { toast('Generate insights first.', 'error'); return; }
+  const dateStr = new Date().toISOString().split('T')[0];
+  exportGenericDocx(raw, 'AI_Insights_' + dateStr);
+}
+
 async function generateDashboardInsights() {
   const btn = document.getElementById('insights-btn');
   const body = document.getElementById('ai-insights-body');
@@ -4577,8 +4588,9 @@ Jay is a senior marketing executive (VP/CMO level) targeting roles in SaaS, Web3
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
-    body.innerHTML = '<div style="padding:20px;white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text)">' +
-      result.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+    const insightsHtml = textToHtmlWithTables(result);
+    body.innerHTML = '<div style="padding:20px;font-size:13px;line-height:1.8;color:var(--text)">' + insightsHtml + '</div>';
+    body.dataset.raw = result;
   } catch(e) {
     body.innerHTML = '<div style="padding:20px;color:var(--burgundy);font-size:13px">Error: ' + e.message + '</div>';
   } finally {
@@ -4740,30 +4752,51 @@ FORMATTING RULES:
 }
 
 function parseIPSections(text, company, role) {
-  // Split output into individual documents by ## DOCUMENT N header
-  const sections = {};
   const docNames = [
-    'Company Overview',
-    'SWOT + Competitive Analysis',
-    'Target Niche Analysis',
-    '30-60-90 Day Plan',
-    'Resume-to-Role Fit Analysis',
-    'One-Page Executive Summary',
-    'Strategic Questions',
-    'Interview Q&A Guide'
+    'Company_Overview',
+    'SWOT_Competitive_Analysis',
+    'Target_Niche_Analysis',
+    '30_60_90_Day_Plan',
+    'Resume_to_Role_Fit',
+    'Executive_Summary',
+    'Strategic_Questions',
+    'Interview_QA_Guide'
   ];
-  const parts = text.split(/(?=##\s+DOCUMENT\s+\d+:)/i);
-  parts.forEach(function(part) {
-    const match = part.match(/##\s+DOCUMENT\s+(\d+):\s*(.+?)(?:\n|$)/i);
-    if (match) {
-      const num = parseInt(match[1]) - 1;
-      const name = docNames[num] || ('Document ' + match[1]);
-      sections[name] = part.trim();
-    }
+
+  // Keyword signatures for each of the 8 sections
+  const keywords = [
+    { key: docNames[0], pats: ['COMPANY OVERVIEW', 'DOCUMENT 1:'] },
+    { key: docNames[1], pats: ['SWOT', 'COMPETITIVE ANALYSIS', 'DOCUMENT 2:'] },
+    { key: docNames[2], pats: ['TARGET NICHE', 'NICHE ANALYSIS', 'DOCUMENT 3:'] },
+    { key: docNames[3], pats: ['30-60-90', '30/60/90', 'DAY PLAN', 'DOCUMENT 4:'] },
+    { key: docNames[4], pats: ['RESUME-TO-ROLE', 'ROLE FIT', 'FIT ANALYSIS', 'DOCUMENT 5:'] },
+    { key: docNames[5], pats: ['EXECUTIVE SUMMARY', 'ONE-PAGE', 'DOCUMENT 6:'] },
+    { key: docNames[6], pats: ['STRATEGIC QUESTIONS', 'QUESTIONS FOR THE RECRUITER', 'DOCUMENT 7:'] },
+    { key: docNames[7], pats: ['Q&A GUIDE', 'INTERVIEW Q&A', 'DOCUMENT 8:'] },
+  ];
+
+  var upper = text.toUpperCase();
+  var positions = [];
+  keywords.forEach(function(kw) {
+    var bestPos = -1;
+    kw.pats.forEach(function(pat) {
+      var idx = upper.indexOf(pat);
+      if (idx >= 0 && (bestPos < 0 || idx < bestPos)) bestPos = idx;
+    });
+    if (bestPos >= 0) positions.push({ key: kw.key, pos: bestPos });
   });
-  // If parsing failed, put everything in one section
+
+  positions.sort(function(a, b) { return a.pos - b.pos; });
+
+  var sections = {};
+  positions.forEach(function(item, i) {
+    var start = item.pos;
+    var end = i < positions.length - 1 ? positions[i + 1].pos : text.length;
+    sections[item.key] = text.slice(start, end).trim();
+  });
+
   if (Object.keys(sections).length === 0) {
-    sections['Full Prep Pack'] = text;
+    sections['Full_Prep_Pack'] = text;
   }
   return sections;
 }
@@ -4787,7 +4820,7 @@ function exportIPDocx() {
   const company = (document.getElementById('ip-company').value || 'Company').trim();
   const role = (document.getElementById('ip-role').value || 'Role').trim();
   const dateStr = new Date().toISOString().split('T')[0];
-  exportGenericDocx(ipOutput, 'InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + role.replace(/\s+/g,'_') + '_' + dateStr);
+  exportGenericDocxFile(ipOutput, 'InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + role.replace(/\s+/g,'_') + '_' + dateStr);
 }
 
 async function exportIPZip() {
@@ -4806,10 +4839,10 @@ async function exportIPZip() {
   for (const [name, sectionText] of Object.entries(sections)) {
     const safeName = name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
     const html = buildWordHtml(sectionText, company + ' — ' + name);
-    zip.file('Jay_Wadhwa_' + safeName + '_' + company.replace(/\s+/g,'_') + '.doc', html);
+    zip.file('Jay_Wadhwa_' + safeName + '_' + company.replace(/\s+/g,'_') + '.docx', html);
   }
 
-  const blob = await zip.generateAsync({ type: 'blob' });
+  const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -5334,11 +5367,14 @@ function exportGenericDocx(text, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Jay_Wadhwa_' + filename + '_' + dateStr + '.doc';
+  a.download = 'Jay_Wadhwa_' + filename + '_' + dateStr + '.docx';
   a.click();
   URL.revokeObjectURL(url);
   toast('Downloaded — open in Word to review.', 'success');
 }
+
+// Alias — same as exportGenericDocx
+function exportGenericDocxFile(text, filename) { exportGenericDocx(text, filename); }
 
 // ── MY DOCUMENTS ────────────────────────────────────────────────────────
 let allDocs = [];
@@ -5769,44 +5805,49 @@ function renderTasksList() {
   }
 
   const now = new Date();
-  // Sort: overdue first, then by due date
   const sorted = [...hubspotTasks].sort(function(a, b) {
-    const da = a.properties?.hs_task_due_date ? new Date(a.properties.hs_task_due_date) : new Date('2099-01-01');
-    const db = b.properties?.hs_task_due_date ? new Date(b.properties.hs_task_due_date) : new Date('2099-01-01');
+    const props_a = a.properties || {};
+    const props_b = b.properties || {};
+    const da = (props_a.hs_task_due_date || props_a.hs_timestamp) ? new Date(props_a.hs_task_due_date || props_a.hs_timestamp) : new Date('2099-01-01');
+    const db = (props_b.hs_task_due_date || props_b.hs_timestamp) ? new Date(props_b.hs_task_due_date || props_b.hs_timestamp) : new Date('2099-01-01');
     return da - db;
   });
 
-  listEl.innerHTML = sorted.slice(0, 15).map(function(t) {
+  listEl.innerHTML = sorted.slice(0, 20).map(function(t) {
     const props = t.properties || {};
-    const title = props.hs_task_subject || props.subject || 'Untitled Task';
-    const dueDate = props.hs_task_due_date ? new Date(props.hs_task_due_date) : null;
-    const status = props.hs_task_status || 'NOT_STARTED';
-    const isOverdueTask = dueDate && dueDate < now && status !== 'COMPLETED';
+    // Try all possible HubSpot task field names
+    const title = props.hs_task_subject || props.subject || props.hs_note_body || props.title || t.subject || 'Untitled Task';
+    const dueDateRaw = props.hs_task_due_date || props.hs_timestamp || null;
+    const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
+    // HubSpot status can be COMPLETED, NOT_STARTED, IN_PROGRESS, WAITING, or DEFERRED
+    const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
     const isDone = status === 'COMPLETED';
-    const type = props.hs_task_type || '';
+    const isOverdue = dueDate && dueDate < now && !isDone;
+    const type = props.hs_task_type || props.type || t.type || '';
 
-    const icon = isDone ? '✅' : isOverdueTask ? '🔴' : '⬜';
+    const icon = isDone ? '✅' : isOverdue ? '🔴' : '⬜';
     const dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const color = isDone ? 'var(--text-light)' : isOverdueTask ? 'var(--burgundy)' : 'var(--text)';
+    const color = isDone ? 'var(--text-light)' : isOverdue ? 'var(--burgundy)' : 'var(--text)';
+    const opacity = isDone ? 'opacity:0.45;' : '';
 
-    return '<div class="followup-item" style="' + (isDone ? 'opacity:0.5' : '') + '">' +
+    return '<div class="followup-item" style="' + opacity + '">' +
       '<div style="font-size:16px;flex-shrink:0">' + icon + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-weight:600;font-size:13px;color:' + color + '">' + title + '</div>' +
-        (type ? '<div style="font-size:11px;color:var(--text-light)">' + type + '</div>' : '') +
+        (type ? '<div style="font-size:11px;color:var(--text-light);text-transform:capitalize">' + type.toLowerCase() + '</div>' : '') +
       '</div>' +
       (dateStr ? '<div style="font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + dateStr + '</div>' : '') +
     '</div>';
   }).join('');
 
-  if (hubspotTasks.length > 15) {
-    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">+ ' + (hubspotTasks.length - 15) + ' more tasks in HubSpot</div>';
+  if (hubspotTasks.length > 20) {
+    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + hubspotTasks.length + ' tasks — view all in HubSpot</div>';
   }
 }
 
 function openAddTask() {
-  // Open HubSpot tasks in a new tab
-  window.open('https://app.hubspot.com/tasks', '_blank');
+  // Open HubSpot create task page
+  window.open('https://app.hubspot.com/tasks/new', '_blank');
 }
 
 async function syncHubSpotActivity() {
@@ -5849,24 +5890,51 @@ function renderActivityFeed(activities) {
 
   const typeIcons = {
     'EMAIL': '📧', 'CALL': '📞', 'MEETING': '📅',
-    'NOTE': '📝', 'TASK': '✅', 'LINKEDIN_MESSAGE': '💼'
+    'NOTE': '📝', 'TASK': '✅', 'LINKEDIN_MESSAGE': '💼',
+    'INCOMING_EMAIL': '📨', 'FORWARDED_EMAIL': '📤'
+  };
+  const typeLabels = {
+    'EMAIL': 'Email', 'CALL': 'Call', 'MEETING': 'Meeting',
+    'NOTE': 'Note', 'TASK': 'Task', 'LINKEDIN_MESSAGE': 'LinkedIn',
+    'INCOMING_EMAIL': 'Incoming Email', 'FORWARDED_EMAIL': 'Forwarded Email'
   };
 
   feedEl.innerHTML = activities.slice(0, 20).map(function(a) {
+    // HubSpot engagements API returns engagement + metadata at top level
+    const eng = a.engagement || {};
+    const meta = a.metadata || {};
     const props = a.properties || {};
-    const type = (props.hs_activity_type || a.type || 'NOTE').toUpperCase();
+
+    // Determine type from multiple possible locations
+    const type = (eng.type || props.hs_activity_type || a.type || 'NOTE').toUpperCase();
     const icon = typeIcons[type] || '📌';
-    const title = props.hs_email_subject || props.hs_call_title || props.hs_meeting_title || props.hs_note_body || 'Activity';
-    const shortTitle = title.length > 60 ? title.slice(0, 57) + '...' : title;
-    const dateRaw = props.hs_timestamp || props.createdate || a.createdAt;
+    const label = typeLabels[type] || type;
+
+    // Title — check all possible field names per engagement type
+    const title = 
+      meta.subject ||          // EMAIL subject
+      meta.title ||            // MEETING/CALL title
+      meta.body ||             // NOTE body
+      props.hs_email_subject ||
+      props.hs_call_title ||
+      props.hs_meeting_title ||
+      props.hs_note_body ||
+      props.subject ||
+      props.body ||
+      eng.bodyText ||
+      (label + ' logged');
+
+    const shortTitle = title.length > 65 ? title.slice(0, 62) + '...' : title;
+
+    // Date
+    const dateRaw = eng.createdAt || eng.lastUpdated || props.hs_timestamp || props.createdate || a.createdAt;
     const date = dateRaw ? new Date(dateRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const contact = props.hs_contact_name || '';
 
     return '<div class="followup-item">' +
       '<div style="font-size:15px;flex-shrink:0">' + icon + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-size:13px;font-weight:500;color:var(--text)">' + shortTitle + '</div>' +
-        (contact ? '<div style="font-size:11px;color:var(--text-secondary)">' + contact + '</div>' : '') +
+        '<div style="font-size:11px;color:var(--text-secondary)">' + label + '</div>' +
       '</div>' +
       (date ? '<div style="font-size:11px;color:var(--text-light);white-space:nowrap">' + date + '</div>' : '') +
     '</div>';
