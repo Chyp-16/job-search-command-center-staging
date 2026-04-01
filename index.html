@@ -4723,50 +4723,49 @@ function parseIPSections(text, company, role) {
     'Interview_QA_Guide'
   ];
 
-  // Primary: split on ## DOC 0N: pattern (our enforced format)
-  // Also handles ## DOCUMENT N: and plain DOCUMENT N: as fallbacks
-  var splitRe = /(?=##\s+DOC\s+0?\d+:|(?=##\s+DOCUMENT\s+\d+:))/i;
-  var parts = text.split(splitRe).filter(function(p) { return p.trim().length > 50; });
+  // Strategy: find each DOC header in order, enforce strictly sequential positions
+  // This handles any header format Claude might use
+  var upper = text.toUpperCase();
+
+  // Ordered keyword groups — each MUST appear after the previous one
+  var kws = [
+    ['## DOC 01', '## DOC 1:', 'DOC 01:', 'DOC 1:', 'COMPANY OVERVIEW'],
+    ['## DOC 02', '## DOC 2:', 'DOC 02:', 'DOC 2:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
+    ['## DOC 03', '## DOC 3:', 'DOC 03:', 'DOC 3:', 'TARGET NICHE'],
+    ['## DOC 04', '## DOC 4:', 'DOC 04:', 'DOC 4:', '30-60-90 DAY', '30/60/90 DAY'],
+    ['## DOC 05', '## DOC 5:', 'DOC 05:', 'DOC 5:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
+    ['## DOC 06', '## DOC 6:', 'DOC 06:', 'DOC 6:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
+    ['## DOC 07', '## DOC 7:', 'DOC 07:', 'DOC 7:', 'STRATEGIC QUESTIONS FOR'],
+    ['## DOC 08', '## DOC 8:', 'DOC 08:', 'DOC 8:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
+  ];
+
+  var positions = [];
+  var searchFrom = 0; // Each keyword must be found AFTER the previous one
+
+  for (var ki = 0; ki < kws.length; ki++) {
+    var pats = kws[ki];
+    var best = -1;
+    for (var pi = 0; pi < pats.length; pi++) {
+      var idx = upper.indexOf(pats[pi], searchFrom);
+      if (idx >= 0 && (best < 0 || idx < best)) best = idx;
+    }
+    if (best >= 0) {
+      positions.push({ key: docNames[ki], pos: best });
+      searchFrom = best + 5; // next keyword must be after this one
+    }
+  }
 
   var sections = {};
-  if (parts.length >= 4) {
-    parts.forEach(function(part, idx) {
-      if (idx < docNames.length) {
-        sections[docNames[idx]] = part.trim();
-      }
-    });
-  }
-
-  // Fallback: keyword-based position finding
-  if (Object.keys(sections).length < 4) {
-    var kws = [
-      { key: docNames[0], pats: ['DOC 01', 'DOC 1', 'COMPANY OVERVIEW', 'DOCUMENT 1'] },
-      { key: docNames[1], pats: ['DOC 02', 'DOC 2', 'SWOT', 'DOCUMENT 2'] },
-      { key: docNames[2], pats: ['DOC 03', 'DOC 3', 'TARGET NICHE', 'DOCUMENT 3'] },
-      { key: docNames[3], pats: ['DOC 04', 'DOC 4', '30-60-90', '30/60/90', 'DOCUMENT 4'] },
-      { key: docNames[4], pats: ['DOC 05', 'DOC 5', 'RESUME-TO-ROLE', 'ROLE FIT', 'DOCUMENT 5'] },
-      { key: docNames[5], pats: ['DOC 06', 'DOC 6', 'EXECUTIVE SUMMARY', 'DOCUMENT 6'] },
-      { key: docNames[6], pats: ['DOC 07', 'DOC 7', 'STRATEGIC QUESTIONS', 'DOCUMENT 7'] },
-      { key: docNames[7], pats: ['DOC 08', 'DOC 8', 'Q&A GUIDE', 'INTERVIEW Q', 'DOCUMENT 8'] },
-    ];
-    var upper = text.toUpperCase();
-    var positions = [];
-    kws.forEach(function(kw) {
-      var best = -1;
-      kw.pats.forEach(function(pat) {
-        var idx = upper.indexOf(pat);
-        if (idx >= 0 && (best < 0 || idx < best)) best = idx;
-      });
-      if (best >= 0) positions.push({ key: kw.key, pos: best });
-    });
-    positions.sort(function(a, b) { return a.pos - b.pos; });
-    sections = {};
-    positions.forEach(function(item, i) {
-      var s = item.pos;
-      var e = i < positions.length - 1 ? positions[i+1].pos : text.length;
+  positions.forEach(function(item, i) {
+    var s = item.pos;
+    var e = i < positions.length - 1 ? positions[i + 1].pos : text.length;
+    if (e > s + 20) {
       sections[item.key] = text.slice(s, e).trim();
-    });
-  }
+    }
+  });
+
+  // Add debug info to console so we can see what's happening
+  console.log('[IP Parser] Found ' + positions.length + ' sections:', positions.map(function(p){ return p.key + ' @' + p.pos; }));
 
   if (Object.keys(sections).length === 0) {
     sections['Full_Prep_Pack'] = text;
@@ -5892,6 +5891,8 @@ async function syncHubSpotTasks() {
 
     const data = await r.json();
     hubspotTasks = Array.isArray(data.results) ? data.results : [];
+    // Try to extract portal ID from task data
+    if (data.portalId) window._hubspotPortalId = data.portalId;
     renderTasksList();
     toast('Tasks synced: ' + hubspotTasks.length + ' tasks loaded.', 'success');
   } catch(e) {
@@ -5951,8 +5952,11 @@ function renderTasksList() {
 }
 
 function openAddTask() {
-  // HubSpot tasks page — works for all portals
-  window.open('https://app.hubspot.com/tasks', '_blank');
+  // Use stored portal ID if available, otherwise fall back to contacts page
+  var url = window._hubspotPortalId
+    ? 'https://app.hubspot.com/tasks/' + window._hubspotPortalId
+    : 'https://app.hubspot.com/contacts/';
+  window.open(url, '_blank');
 }
 
 async function syncHubSpotActivity() {
@@ -6004,7 +6008,7 @@ function renderActivityFeed(activities) {
     'INCOMING_EMAIL': 'Incoming Email', 'FORWARDED_EMAIL': 'Forwarded Email'
   };
 
-  feedEl.innerHTML = activities.slice(0, 20).map(function(a) {
+  var items = activities.slice(0, 20).map(function(a) {
     // HubSpot engagements API returns engagement + metadata at top level
     const eng = a.engagement || {};
     const meta = a.metadata || {};
@@ -6044,6 +6048,7 @@ function renderActivityFeed(activities) {
       (date ? '<div style="font-size:11px;color:var(--text-light);white-space:nowrap">' + date + '</div>' : '') +
     '</div>';
   }).join('');
+  feedEl.innerHTML = '<div>' + items + '</div>';
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────
