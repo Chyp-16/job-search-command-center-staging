@@ -3534,7 +3534,8 @@ const SEED_PROMPTS = [
   {
     "name": "Interview Prep Pack",
     "category": "Interview Prep",
-    "system_prompt": "Use the attached resume and job description to create a full interview prep pack for a senior marketing executive role.\n\nDELIVERABLES \u2014 create content covering all 8 areas:\n\n1. COMPANY OVERVIEW: Founding year, HQ, employee count, revenue estimate, valuation/net worth (with sources). Products, services, target customers, market segments. Leadership and ownership structure. Key milestones, funding, major deals. Market position and brand perception. Positioning and core offerings. Top 3-5 competitors. Top 3-4 opportunities and risks. Recent news.\n\n2. SWOT + COMPETITIVE ANALYSIS: SWOT table. Competitor grid with 3-5 peers. Pros and cons versus the target company. Market share, growth, key differentiators.\n\n3. TARGET NICHE ANALYSIS: Core customer niches. Unmet needs and market gaps. Where the company can win. High-growth micro-segments.\n\n4. 30-60-90 DAY PLAN: Days 0-30 (learn and audit). Days 31-60 (test and build). Days 61-90 (scale and optimize). Cover brand, content, partnerships, demand gen. Senior-level, practical actions.\n\n5. RESUME-TO-ROLE FIT ANALYSIS: Side-by-side table of company needs vs. Jay's experience. Key overlap areas and strengths. Why a multi-industry background is an advantage. Short fit summary.\n\n6. ONE-PAGE EXECUTIVE SUMMARY (separate from the deep research \u2014 bullets only for company snapshot): Key strengths and risks. Primary growth paths. Role fit. Bottom-line takeaway.\n\n7. STRATEGIC QUESTIONS FOR THE RECRUITER (questions only, no answers): Team dynamics, strategic priorities, measurement and success, budget and resources, culture.\n\n8. INTERVIEW Q&A GUIDE: 12 common interview questions with prepared answers tied to real results and metrics. Concise, built for recall.\n\nWRITING RULES: Peer-to-peer, direct, confident. Sentences 15 words or fewer. Active voice. Lead with results and business impact. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, exploring, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful).\n\nCompany: {{company}}\nRole: {{role}}\nJob Description: {{job_description}}",
+    "system_prompt": "You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and resume provided.\n\n---\n\n## DELIVERABLES\n\nCreate 8 professional documents. Label each with its number and title exactly as shown. Separate each with ---.\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- Products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: company needs vs. Jay experience\n- Highlight overlaps and strengths\n- Explain how multi-industry background is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\n- Company snapshot as BULLET POINTS ONLY (no table)\n- Key strengths and risks\n- Primary growth paths\n- Role fit\n- Bottom-line takeaway\n\nIMPORTANT: Doc 01 and Doc 06 are intentionally separate. Doc 01 is a dense research reference. Doc 06 is a one-page pre-interview brief. Do NOT combine them. Doc 06 must use bullet points only, no table.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER\n- Pure questions only (no answers)\n- Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused, easy to memorize\n\n---\n\n## FORMATTING REQUIREMENTS\n- Use ## DOC 0N: TITLE format for each document header exactly\n- Use markdown tables for SWOT and competitor grids\n- Use bullet points for all lists\n- **Bold** all statistics and key metrics\n- Peer-to-peer, direct, confident tone\n- Sentences 15 words or fewer. Active voice. No em dashes.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description:\n{{job_description}}",
+
     "variable_fields": [
       "company",
       "role",
@@ -4651,8 +4652,8 @@ async function runInterviewPrep() {
   const role = (document.getElementById('ip-role').value || '').trim();
   const jd = (document.getElementById('ip-jd').value || '').trim();
   const url = (document.getElementById('ip-url').value || '').trim();
-  const interviewerName = (document.getElementById('ip-interviewer-name').value || '').trim();
-  const interviewerTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
+  const intName = (document.getElementById('ip-interviewer-name').value || '').trim();
+  const intTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
   if (!jd) { toast('Paste the job description to get the best results.', 'error'); return; }
@@ -4663,69 +4664,28 @@ async function runInterviewPrep() {
   contentEl.textContent = 'Generating your full interview prep pack... This takes 45-90 seconds.';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // Build the full prompt following the exact project instructions
-  const interviewerLine = interviewerName ? '\nInterviewer: ' + interviewerName + (interviewerTitle ? ', ' + interviewerTitle : '') : '';
-  const urlLine = url ? '\nCompany URL: ' + url : '';
+  // First try to load from saved prompts library
+  const promptsData = await dbGet('prompts', 'select=*&name=eq.Interview Prep Pack');
+  const promptRows = Array.isArray(promptsData) ? promptsData : [];
+  let basePrompt = promptRows.length > 0 ? (promptRows[0].system_prompt || '') : '';
 
-  const prompt = `You are creating a complete interview prep pack for Jay Wadhwa. Follow these instructions EXACTLY. Generate ALL 8 documents in full. Use proper markdown formatting — use ## for document headers, ### for sub-headers, **bold** for emphasis and stats, and | pipe characters for tables.
+  // Replace variables
+  let prompt = basePrompt
+    .replace(/\{\{company\}\}/g, company)
+    .replace(/\{\{role\}\}/g, role)
+    .replace(/\{\{job_description\}\}/g, jd);
 
-COMPANY: ${company}
-ROLE: ${role}${interviewerLine}${urlLine}
-JOB DESCRIPTION:
-${jd}
-
-Generate each of the following 8 documents in full, separated by a clear header:
-
-## DOCUMENT 1: COMPANY OVERVIEW
-Include: Founding year, HQ, employee count, revenue estimate, valuation/net worth (cite sources). Products, services, target customers, market segments. Leadership and ownership structure. Key milestones, funding, major deals. Market position and brand perception. Positioning and core offerings. Top 3-5 competitors. Top 3-4 opportunities and risks. Recent news (last 6 months).
-
-## DOCUMENT 2: SWOT + COMPETITIVE ANALYSIS
-Include a SWOT table using markdown table format (| Strengths | Weaknesses | etc). Include a competitor grid table comparing ${company} to 3-5 peers across key dimensions. Pros and cons vs target company. Market share, growth trajectory, key differentiators.
-
-## DOCUMENT 3: TARGET NICHE ANALYSIS
-Core customer niches. Unmet needs and market gaps. Where ${company} can win. High-growth micro-segments worth targeting.
-
-## DOCUMENT 4: 30-60-90 DAY PLAN
-Days 0-30: Learn and audit (specific actions for brand, team, data, stakeholders).
-Days 31-60: Test and build (campaigns, partnerships, content, quick wins).
-Days 61-90: Scale and optimize (full execution, measurement, roadmap).
-Senior-level, practical actions only.
-
-## DOCUMENT 5: RESUME-TO-ROLE FIT ANALYSIS
-Create a markdown table with columns: Company Need | Jay's Experience | Evidence/Metric.
-Key overlaps. Why Jay's cross-industry background is an advantage for ${company}. Short fit summary paragraph.
-
-## DOCUMENT 6: ONE-PAGE EXECUTIVE SUMMARY
-Company snapshot in bullets only (founding, size, revenue, market position, key product, top competitor).
-Key strengths and risks. Primary growth paths. Role fit. Bottom-line takeaway in 2-3 sentences.
-This must stand alone from Document 1.
-
-## DOCUMENT 7: STRATEGIC QUESTIONS FOR THE RECRUITER${interviewerName ? ' / ' + interviewerName : ''}
-Questions ONLY — no answers.
-Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture and Leadership
-At least 3 questions per category.${interviewerName ? `\nInclude 3-4 questions specifically tailored to ${interviewerName}` + (interviewerTitle ? ` as ${interviewerTitle}` : '') + '.' : ''}
-
-## DOCUMENT 8: INTERVIEW Q&A GUIDE
-12 common interview questions for a ${role} role.
-For each: write Jay's prepared answer in his voice — peer-to-peer, direct, results-first, sentences under 15 words.
-Lead every answer with a specific metric or result. Tie directly to ${company}'s known priorities.
-
-FORMATTING RULES:
-- Use **bold** for all statistics, metrics, and key achievements
-- Use markdown tables (| col | col |) for SWOT, competitor grids, and fit analysis
-- Use bullet points for lists
-- Keep headers clean with ##
-- No em dashes anywhere
-- Write every answer in Jay's voice`;
+  // Append optional fields
+  if (url) prompt += '\nCompany URL: ' + url;
+  if (intName) prompt += '\nInterviewer: ' + intName + (intTitle ? ', ' + intTitle : '');
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     ipOutput = result;
     contentEl.textContent = result;
-
-    // Parse sections for individual doc export
     ipSections = parseIPSections(result, company, role);
 
+    const sectionCount = Object.keys(ipSections).length;
     const linkedAppId = document.getElementById('ip-link-app').value || null;
     await dbPost('ai_outputs', {
       output_type: 'interview_prep',
@@ -4740,10 +4700,10 @@ FORMATTING RULES:
         await dbPatch('applications', linkedAppId, { ai_output: existing.concat([{ type: 'interview_prep', content: result, date: today() }]) });
         const idx = allApps.findIndex(function(a) { return a.id === linkedAppId; });
         if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'interview_prep', content: result, date: today() }]);
-        toast('Prep pack generated and saved to ' + app.company + '.', 'success');
+        toast('Prep pack generated (' + sectionCount + ' sections) and saved to ' + app.company + '.', 'success');
       }
     } else {
-      toast('Interview prep pack generated. Use Export buttons to download.', 'success');
+      toast('Prep pack generated — ' + sectionCount + ' sections found. Use Export buttons to download.', 'success');
     }
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
@@ -4752,7 +4712,7 @@ FORMATTING RULES:
 }
 
 function parseIPSections(text, company, role) {
-  const docNames = [
+  var docNames = [
     'Company_Overview',
     'SWOT_Competitive_Analysis',
     'Target_Niche_Analysis',
@@ -4763,37 +4723,50 @@ function parseIPSections(text, company, role) {
     'Interview_QA_Guide'
   ];
 
-  // Keyword signatures for each of the 8 sections
-  const keywords = [
-    { key: docNames[0], pats: ['COMPANY OVERVIEW', 'DOCUMENT 1:'] },
-    { key: docNames[1], pats: ['SWOT', 'COMPETITIVE ANALYSIS', 'DOCUMENT 2:'] },
-    { key: docNames[2], pats: ['TARGET NICHE', 'NICHE ANALYSIS', 'DOCUMENT 3:'] },
-    { key: docNames[3], pats: ['30-60-90', '30/60/90', 'DAY PLAN', 'DOCUMENT 4:'] },
-    { key: docNames[4], pats: ['RESUME-TO-ROLE', 'ROLE FIT', 'FIT ANALYSIS', 'DOCUMENT 5:'] },
-    { key: docNames[5], pats: ['EXECUTIVE SUMMARY', 'ONE-PAGE', 'DOCUMENT 6:'] },
-    { key: docNames[6], pats: ['STRATEGIC QUESTIONS', 'QUESTIONS FOR THE RECRUITER', 'DOCUMENT 7:'] },
-    { key: docNames[7], pats: ['Q&A GUIDE', 'INTERVIEW Q&A', 'DOCUMENT 8:'] },
-  ];
-
-  var upper = text.toUpperCase();
-  var positions = [];
-  keywords.forEach(function(kw) {
-    var bestPos = -1;
-    kw.pats.forEach(function(pat) {
-      var idx = upper.indexOf(pat);
-      if (idx >= 0 && (bestPos < 0 || idx < bestPos)) bestPos = idx;
-    });
-    if (bestPos >= 0) positions.push({ key: kw.key, pos: bestPos });
-  });
-
-  positions.sort(function(a, b) { return a.pos - b.pos; });
+  // Primary: split on ## DOC 0N: pattern (our enforced format)
+  // Also handles ## DOCUMENT N: and plain DOCUMENT N: as fallbacks
+  var splitRe = /(?=##\s+DOC\s+0?\d+:|(?=##\s+DOCUMENT\s+\d+:))/i;
+  var parts = text.split(splitRe).filter(function(p) { return p.trim().length > 50; });
 
   var sections = {};
-  positions.forEach(function(item, i) {
-    var start = item.pos;
-    var end = i < positions.length - 1 ? positions[i + 1].pos : text.length;
-    sections[item.key] = text.slice(start, end).trim();
-  });
+  if (parts.length >= 4) {
+    parts.forEach(function(part, idx) {
+      if (idx < docNames.length) {
+        sections[docNames[idx]] = part.trim();
+      }
+    });
+  }
+
+  // Fallback: keyword-based position finding
+  if (Object.keys(sections).length < 4) {
+    var kws = [
+      { key: docNames[0], pats: ['DOC 01', 'DOC 1', 'COMPANY OVERVIEW', 'DOCUMENT 1'] },
+      { key: docNames[1], pats: ['DOC 02', 'DOC 2', 'SWOT', 'DOCUMENT 2'] },
+      { key: docNames[2], pats: ['DOC 03', 'DOC 3', 'TARGET NICHE', 'DOCUMENT 3'] },
+      { key: docNames[3], pats: ['DOC 04', 'DOC 4', '30-60-90', '30/60/90', 'DOCUMENT 4'] },
+      { key: docNames[4], pats: ['DOC 05', 'DOC 5', 'RESUME-TO-ROLE', 'ROLE FIT', 'DOCUMENT 5'] },
+      { key: docNames[5], pats: ['DOC 06', 'DOC 6', 'EXECUTIVE SUMMARY', 'DOCUMENT 6'] },
+      { key: docNames[6], pats: ['DOC 07', 'DOC 7', 'STRATEGIC QUESTIONS', 'DOCUMENT 7'] },
+      { key: docNames[7], pats: ['DOC 08', 'DOC 8', 'Q&A GUIDE', 'INTERVIEW Q', 'DOCUMENT 8'] },
+    ];
+    var upper = text.toUpperCase();
+    var positions = [];
+    kws.forEach(function(kw) {
+      var best = -1;
+      kw.pats.forEach(function(pat) {
+        var idx = upper.indexOf(pat);
+        if (idx >= 0 && (best < 0 || idx < best)) best = idx;
+      });
+      if (best >= 0) positions.push({ key: kw.key, pos: best });
+    });
+    positions.sort(function(a, b) { return a.pos - b.pos; });
+    sections = {};
+    positions.forEach(function(item, i) {
+      var s = item.pos;
+      var e = i < positions.length - 1 ? positions[i+1].pos : text.length;
+      sections[item.key] = text.slice(s, e).trim();
+    });
+  }
 
   if (Object.keys(sections).length === 0) {
     sections['Full_Prep_Pack'] = text;
@@ -5096,234 +5069,316 @@ function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (do
 // ── SHARED DOCX EXPORT ───────────────────────────────────────────────────
 const BASE_URL = 'https://chyp-16.github.io/job-search-command-center';
 
-// ── REAL DOCX BUILDER (JSZip + Word XML) ─────────────────────────────────
-// Builds a genuine .docx file — no HTML, pure Office Open XML
-// Word opens these perfectly with correct fonts, margins, bold, tables
+// ─── Real .docx builder using JSZip + Office Open XML ───────────────────
+// Produces genuine Word documents — no HTML tricks
 
-function escXml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function _esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 }
 
-function mdInlineToXml(text) {
-  // Convert inline **bold** and *italic* to Word XML runs
-  // Returns array of <w:r> XML strings
-  var runs = [];
-  var remaining = text;
-  var boldRe = /\*\*([^*]+)\*\*/;
-  var italRe = /\*([^*]+)\*/;
-  while (remaining.length > 0) {
-    var bm = boldRe.exec(remaining);
-    var im = italRe.exec(remaining);
-    var next = null;
-    if (bm && (!im || bm.index <= im.index)) next = { idx: bm.index, len: bm[0].length, inner: bm[1], bold: true };
-    else if (im) next = { idx: im.index, len: im[0].length, inner: im[1], italic: true };
+function _rpr(opts) {
+  // opts: { bold, italic, color, sz, font }
+  var x = '';
+  if (opts && opts.bold)   x += '<w:b/><w:bCs/>';
+  if (opts && opts.italic) x += '<w:i/><w:iCs/>';
+  if (opts && opts.color)  x += '<w:color w:val="' + opts.color + '"/>';
+  if (opts && opts.sz)     x += '<w:sz w:val="' + opts.sz + '"/><w:szCs w:val="' + opts.sz + '"/>';
+  if (opts && opts.font)   x += '<w:rFonts w:ascii="' + opts.font + '" w:hAnsi="' + opts.font + '" w:cs="' + opts.font + '"/>';
+  return x ? '<w:rPr>' + x + '</w:rPr>' : '';
+}
 
+function _run(text, opts) {
+  return '<w:r>' + _rpr(opts) + '<w:t xml:space="preserve">' + _esc(text) + '</w:t></w:r>';
+}
+
+function _inlineRuns(text) {
+  // Parse **bold**, *italic* inline markdown into Word runs
+  if (!text) return _run('');
+  var parts = [];
+  var remaining = text;
+  while (remaining.length > 0) {
+    // Check for **bold**
+    var bm = /\*\*([^*]+)\*\*/.exec(remaining);
+    // Check for *italic* (not **)
+    var im = /(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)/.exec(remaining);
+    var next = null;
+    if (bm && (!im || bm.index <= im.index)) {
+      next = { idx: bm.index, len: bm[0].length, inner: bm[1], bold: true };
+    } else if (im) {
+      next = { idx: im.index, len: im[0].length, inner: im[1], italic: true };
+    }
     if (next) {
-      if (next.idx > 0) {
-        runs.push('<w:r><w:t xml:space="preserve">' + escXml(remaining.slice(0, next.idx)) + '</w:t></w:r>');
-      }
-      var rpr = '<w:rPr>' + (next.bold ? '<w:b/><w:bCs/>' : '') + (next.italic ? '<w:i/><w:iCs/>' : '') + '</w:rPr>';
-      runs.push('<w:r>' + rpr + '<w:t xml:space="preserve">' + escXml(next.inner) + '</w:t></w:r>');
+      if (next.idx > 0) parts.push(_run(remaining.slice(0, next.idx), { sz: 22, font: 'Calibri' }));
+      parts.push(_run(next.inner, { bold: next.bold, italic: next.italic, sz: 22, font: 'Calibri' }));
       remaining = remaining.slice(next.idx + next.len);
     } else {
-      runs.push('<w:r><w:t xml:space="preserve">' + escXml(remaining) + '</w:t></w:r>');
+      parts.push(_run(remaining, { sz: 22, font: 'Calibri' }));
       break;
     }
   }
-  return runs.join('');
+  return parts.join('');
 }
 
-function makeParaXml(text, styleId, color, szVal, bold) {
-  // Single-style paragraph — no inline markdown
-  var rpr = '<w:rPr>';
-  if (bold) rpr += '<w:b/><w:bCs/>';
-  if (color) rpr += '<w:color w:val="' + color + '"/>';
-  if (szVal) rpr += '<w:sz w:val="' + szVal + '"/><w:szCs w:val="' + szVal + '"/>';
-  rpr += '</w:rPr>';
-  var ppr = styleId ? '<w:pPr><w:pStyle w:val="' + styleId + '"/></w:pPr>' : '<w:pPr><w:spacing w:after="80"/></w:pPr>';
-  return '<w:p>' + ppr + '<w:r>' + rpr + '<w:t xml:space="preserve">' + escXml(text) + '</w:t></w:r></w:p>';
+function _para(runs, pprXml) {
+  return '<w:p>' + (pprXml || '') + runs + '</w:p>';
 }
 
-function makeBodyPara(text) {
-  // Body paragraph with inline markdown support
-  var ppr = '<w:pPr><w:spacing w:after="80"/></w:pPr>';
-  return '<w:p>' + ppr + mdInlineToXml(text) + '</w:p>';
+function _ppr(opts) {
+  // opts: { spacing_before, spacing_after, numId, ilvl, jc, border_bottom, ind_left, ind_hanging }
+  var x = '';
+  if (opts.numId !== undefined) {
+    x += '<w:numPr><w:ilvl w:val="' + (opts.ilvl||0) + '"/><w:numId w:val="' + opts.numId + '"/></w:numPr>';
+  }
+  var before = opts.spacing_before !== undefined ? opts.spacing_before : 0;
+  var after  = opts.spacing_after  !== undefined ? opts.spacing_after  : 80;
+  x += '<w:spacing w:before="' + before + '" w:after="' + after + '" w:line="240" w:lineRule="auto"/>';
+  if (opts.jc) x += '<w:jc w:val="' + opts.jc + '"/>';
+  if (opts.border_bottom) {
+    x += '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="972B32"/></w:pBdr>';
+  }
+  if (opts.ind_left !== undefined) {
+    x += '<w:ind w:left="' + opts.ind_left + '"' + (opts.ind_hanging ? ' w:hanging="' + opts.ind_hanging + '"' : '') + '/>';
+  }
+  return x ? '<w:pPr>' + x + '</w:pPr>' : '';
 }
 
-function makeBullet(text, numId) {
-  var ppr = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="' + numId + '"/></w:numPr><w:spacing w:after="60"/></w:pPr>';
-  return '<w:p>' + ppr + mdInlineToXml(text) + '</w:p>';
+function _h1(text) {
+  // Burgundy, bold, 14pt, with bottom border, Calibri
+  var ppr = _ppr({ spacing_before: 160, spacing_after: 80, border_bottom: true });
+  var runs = _run(text.replace(/\*\*/g,''), { bold: true, color: '972B32', sz: 28, font: 'Calibri' });
+  return _para(runs, ppr);
 }
 
-function makeTableXml(rows) {
-  // rows: array of arrays of strings; first row = header
+function _h2(text) {
+  // Burgundy, bold, 12pt, Calibri
+  var ppr = _ppr({ spacing_before: 120, spacing_after: 60 });
+  var runs = _run(text.replace(/\*\*/g,''), { bold: true, color: '972B32', sz: 24, font: 'Calibri' });
+  return _para(runs, ppr);
+}
+
+function _h3(text) {
+  // Dark, bold, 11pt, Calibri
+  var ppr = _ppr({ spacing_before: 80, spacing_after: 40 });
+  var runs = _run(text.replace(/\*\*/g,''), { bold: true, sz: 22, font: 'Calibri' });
+  return _para(runs, ppr);
+}
+
+function _body(text) {
+  var ppr = _ppr({ spacing_before: 0, spacing_after: 80 });
+  return _para(_inlineRuns(text), ppr);
+}
+
+function _bullet(text, numId) {
+  var ppr = _ppr({ numId: numId, ilvl: 0, spacing_before: 0, spacing_after: 40 });
+  return _para(_inlineRuns(text), ppr);
+}
+
+function _tableXml(rows) {
   if (!rows || rows.length === 0) return '';
   var colCount = rows[0].length;
-  var colWidth = Math.floor(8640 / colCount); // 6 inches total in DXA
-  var tblXml = '<w:tbl>';
-  tblXml += '<w:tblPr><w:tblW w:w="8640" w:type="dxa"/><w:tblBorders>';
-  var borderAttrs = 'w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"';
-  ['top','left','bottom','right','insideH','insideV'].forEach(function(side) {
-    tblXml += '<w:' + side + ' ' + borderAttrs + '/>';
-  });
-  tblXml += '</w:tblBorders></w:tblPr>';
+  var totalW = 9360; // content width at 1in margins
+  var colW = Math.floor(totalW / colCount);
+  var leftover = totalW - colW * colCount;
+
+  var bdr = '<w:top w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>' +
+            '<w:left w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>' +
+            '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>' +
+            '<w:right w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>' +
+            '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>' +
+            '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="CCCCCC"/>';
+
+  var colWidths = rows[0].map(function(_, ci) { return colW + (ci === 0 ? leftover : 0); });
+
+  var tbl = '<w:tbl>';
+  tbl += '<w:tblPr>';
+  tbl += '<w:tblW w:w="' + totalW + '" w:type="dxa"/>';
+  tbl += '<w:tblBorders>' + bdr + '</w:tblBorders>';
+  tbl += '<w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tblCellMar>';
+  tbl += '</w:tblPr>';
+
+  // Column widths declaration
+  tbl += '<w:tblGrid>';
+  colWidths.forEach(function(w) { tbl += '<w:gridCol w:w="' + w + '"/>'; });
+  tbl += '</w:tblGrid>';
 
   rows.forEach(function(row, ri) {
-    tblXml += '<w:tr>';
-    row.forEach(function(cell) {
-      var isHeader = ri === 0;
-      var cellShade = isHeader ? '<w:shd w:val="clear" w:color="auto" w:fill="972B32"/>' : (ri % 2 === 0 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '');
-      var rpr = isHeader ? '<w:rPr><w:b/><w:bCs/><w:color w:val="FFFFFF"/></w:rPr>' : '<w:rPr/>';
-      tblXml += '<w:tc><w:tcPr><w:tcW w:w="' + colWidth + '" w:type="dxa"/>' + cellShade + '</w:tcPr>';
-      tblXml += '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r>' + rpr + '<w:t xml:space="preserve">' + escXml(cell.trim()) + '</w:t></w:r></w:p>';
-      tblXml += '</w:tc>';
+    var isHeader = ri === 0;
+    tbl += '<w:tr>';
+    if (isHeader) tbl += '<w:trPr><w:tblHeader/></w:trPr>';
+
+    row.forEach(function(cell, ci) {
+      var w = colWidths[ci];
+      var shading = isHeader
+        ? '<w:shd w:val="clear" w:color="auto" w:fill="972B32"/>'
+        : (ri % 2 === 1 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
+
+      var cellTxt = cell.trim().replace(/\*\*([^*]+)\*\*/g, '$1');
+      var rprOpts = isHeader
+        ? { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' }
+        : { sz: 20, font: 'Calibri' };
+
+      tbl += '<w:tc>';
+      tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
+      tbl += '<w:vAlign w:val="center"/>';
+      tbl += '</w:tcPr>';
+      tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
+      tbl += _run(cellTxt, rprOpts);
+      tbl += '</w:p></w:tc>';
     });
-    tblXml += '</w:tr>';
+    tbl += '</w:tr>';
   });
-  tblXml += '</w:tbl>';
-  return tblXml;
+  tbl += '</w:tbl>';
+  // Add empty paragraph after table (required by Word spec)
+  tbl += '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr></w:p>';
+  return tbl;
 }
 
-function parseMarkdownToDocxXml(text, bulletNumId) {
-  var bodyParts = [];
-  var lines = text.split('\n');
-  var inTable = false;
-  var tableRows = [];
-  var i = 0;
+function _mdToDocxXml(text, bulletNumId, numberedNumId) {
+  var parts = [];
+  var rawLines = text.split('\n');
+  var tableBuffer = [];
 
   function flushTable() {
-    if (tableRows.length > 0) {
-      bodyParts.push(makeTableXml(tableRows));
-      tableRows = [];
-      inTable = false;
+    if (tableBuffer.length > 0) {
+      parts.push(_tableXml(tableBuffer));
+      tableBuffer = [];
     }
   }
 
-  while (i < lines.length) {
-    var raw = lines[i];
+  for (var i = 0; i < rawLines.length; i++) {
+    var raw = rawLines[i];
     var t = raw.trim();
 
-    // Table row
+    // Table row detection
     if (t.startsWith('|') && t.endsWith('|')) {
-      // Skip separator rows like |---|---|
-      if (/^\|[\s\-:|]+\|$/.test(t)) { i++; continue; }
+      if (/^\|[\s\-:|]+\|$/.test(t)) { i++; continue; } // separator
       var cells = t.slice(1, -1).split('|');
-      tableRows.push(cells);
-      inTable = true;
-      i++; continue;
-    } else if (inTable) {
+      tableBuffer.push(cells);
+      continue;
+    } else {
       flushTable();
     }
 
-    // Blank line
     if (!t) {
-      bodyParts.push('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>');
-      i++; continue;
+      parts.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>');
+      continue;
     }
 
-    // H1 — big section header with burgundy + underline
-    if (t.startsWith('# ')) {
-      var txt = t.slice(2).replace(/\*\*/g,'');
-      bodyParts.push('<w:p><w:pPr><w:spacing w:before="160" w:after="80"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="972B32"/></w:pBdr></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:color w:val="972B32"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t>' + escXml(txt) + '</w:t></w:r></w:p>');
-      i++; continue;
+    // Headings
+    if (t.startsWith('# '))   { parts.push(_h1(t.slice(2)));  continue; }
+    if (t.startsWith('## '))  { parts.push(_h2(t.slice(3)));  continue; }
+    if (t.startsWith('### ')) { parts.push(_h3(t.slice(4)));  continue; }
+
+    // ALL CAPS section header
+    if (t === t.toUpperCase() && t.length > 4 && t.length < 90 && /[A-Z]{3}/.test(t) && !/[.!?]$/.test(t) && !t.includes('|')) {
+      parts.push(_h1(t)); continue;
     }
-    // H2
-    if (t.startsWith('## ')) {
-      var txt = t.slice(3).replace(/\*\*/g,'');
-      bodyParts.push('<w:p><w:pPr><w:spacing w:before="120" w:after="60"/></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:color w:val="972B32"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>' + escXml(txt) + '</w:t></w:r></w:p>');
-      i++; continue;
-    }
-    // H3
-    if (t.startsWith('### ')) {
-      var txt = t.slice(4).replace(/\*\*/g,'');
-      bodyParts.push('<w:p><w:pPr><w:spacing w:before="80" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>' + escXml(txt) + '</w:t></w:r></w:p>');
-      i++; continue;
-    }
-    // ALL CAPS header (e.g. PROFESSIONAL EXPERIENCE)
-    if (t === t.toUpperCase() && t.length > 4 && t.length < 90 && /[A-Z]{3}/.test(t) && !/[.!?,]$/.test(t) && !t.startsWith('|')) {
-      bodyParts.push('<w:p><w:pPr><w:spacing w:before="120" w:after="60"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="972B32"/></w:pBdr></w:pPr><w:r><w:rPr><w:b/><w:bCs/><w:color w:val="972B32"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t>' + escXml(t) + '</w:t></w:r></w:p>');
-      i++; continue;
-    }
+
     // Bullet
     if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('\u2022 ')) {
-      bodyParts.push(makeBullet(t.slice(2), bulletNumId));
-      i++; continue;
+      parts.push(_bullet(t.slice(2), bulletNumId)); continue;
     }
+
     // Numbered list
     if (/^\d+[.)]\s/.test(t)) {
-      bodyParts.push(makeBullet(t.replace(/^\d+[.)]\s+/, ''), bulletNumId + 1));
-      i++; continue;
+      parts.push(_bullet(t.replace(/^\d+[.)]\s+/, ''), numberedNumId)); continue;
     }
-    // Body paragraph
-    bodyParts.push(makeBodyPara(t));
-    i++;
-  }
 
+    // Bold-only line
+    if (t.startsWith('**') && t.endsWith('**') && t.length > 4) {
+      parts.push(_h3(t.slice(2, -2))); continue;
+    }
+
+    // Normal body
+    parts.push(_body(t));
+  }
   flushTable();
-  return bodyParts.join('\n');
+  return parts.join('\n');
 }
 
 async function makeDocxBlob(text, title) {
-  // Build a real .docx from scratch using JSZip + Office Open XML
-  var BULLET_NUM_ID = 1;
-  var NUMBERED_NUM_ID = 2;
-  var bodyXml = parseMarkdownToDocxXml(text, BULLET_NUM_ID);
+  var BULLET_ID = 1;
+  var NUMBERED_ID = 2;
 
-  var headerXml = '<w:p><w:pPr><w:spacing w:after="40"/></w:pPr>' +
-    '<w:r><w:rPr><w:b/><w:bCs/><w:color w:val="972B32"/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t>' + escXml(title) + '</w:t></w:r></w:p>' +
-    '<w:p><w:pPr><w:spacing w:after="160"/></w:pPr>' +
-    '<w:r><w:rPr><w:color w:val="999999"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>Jay Wadhwa \u00b7 ' + new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) + '</w:t></w:r></w:p>';
+  // Document header (title + dateline)
+  var headerXml =
+    _para(
+      _run(title || '', { bold: true, color: '972B32', sz: 28, font: 'Calibri' }),
+      _ppr({ spacing_before: 0, spacing_after: 40, border_bottom: true })
+    ) +
+    _para(
+      _run('Jay Wadhwa  \u00b7  ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }), { color: '999999', sz: 18, font: 'Calibri' }),
+      _ppr({ spacing_before: 0, spacing_after: 200 })
+    );
 
-  var documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  var bodyXml = _mdToDocxXml(text, BULLET_ID, NUMBERED_ID);
+
+  var sectPr =
+    '<w:sectPr>' +
+    '<w:pgSz w:w="12240" w:h="15840"/>' +
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>' +
+    '</w:sectPr>';
+
+  var documentXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"' +
-    ' xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"' +
     ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"' +
     ' xmlns:o="urn:schemas-microsoft-com:office:office"' +
     ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
     ' xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"' +
     ' xmlns:v="urn:schemas-microsoft-com:vml"' +
-    ' xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"' +
     ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"' +
     ' xmlns:w10="urn:schemas-microsoft-com:office:word"' +
     ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
     ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
     ' xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"' +
-    ' mc:Ignorable="w14 w15 wp14">' +
+    ' mc:Ignorable="w14 w15">' +
     '<w:body>' +
-    '<w:sectPr>' +
-    '<w:pgSz w:w="12240" w:h="15840"/>' +
-    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>' +
-    '</w:sectPr>' +
+    headerXml +
+    bodyXml +
+    '<w:p/>' +
+    sectPr +
     '</w:body></w:document>';
 
-  // Insert content before </w:body>
-  documentXml = documentXml.replace('<w:body>', '<w:body>' + headerXml + bodyXml + '<w:p/>');
-
-  var numberingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  var numberingXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>' +
-    '<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="0">' +
+      '<w:lvl w:ilvl="0">' +
+        '<w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/>' +
+        '<w:lvlJc w:val="left"/>' +
+        '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>' +
+        '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:cs="Symbol"/></w:rPr>' +
+      '</w:lvl>' +
+    '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="1">' +
+      '<w:lvl w:ilvl="0">' +
+        '<w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/>' +
+        '<w:lvlJc w:val="left"/>' +
+        '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>' +
+      '</w:lvl>' +
+    '</w:abstractNum>' +
     '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
     '<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>' +
     '</w:numbering>';
 
-  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>' +
+  var stylesXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+      '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/>' +
+      '<w:sz w:val="22"/><w:szCs w:val="22"/>' +
+    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/>' +
+      '<w:pPr><w:spacing w:after="80" w:line="240" w:lineRule="auto"/></w:pPr>' +
+      '<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>' +
+    '</w:style>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Default"><w:name w:val="Default Paragraph Style"/></w:style>' +
     '</w:styles>';
 
-  var relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
-    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
-    '</Relationships>';
-
-  var appRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
-    '</Relationships>';
-
-  var contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  var contentTypesXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
@@ -5332,15 +5387,31 @@ async function makeDocxBlob(text, title) {
     '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
     '</Types>';
 
+  var appRelsXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+
+  var wordRelsXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
+    '</Relationships>';
+
   var zip = new JSZip();
   zip.file('[Content_Types].xml', contentTypesXml);
   zip.file('_rels/.rels', appRelsXml);
   zip.file('word/document.xml', documentXml);
   zip.file('word/styles.xml', stylesXml);
   zip.file('word/numbering.xml', numberingXml);
-  zip.file('word/_rels/document.xml.rels', relsXml);
+  zip.file('word/_rels/document.xml.rels', wordRelsXml);
 
-  return await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  return await zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  });
 }
 
 async function exportGenericDocx(text, filename) {
@@ -5355,34 +5426,34 @@ async function exportGenericDocx(text, filename) {
     a.click();
     URL.revokeObjectURL(url);
     toast('Downloaded — open in Word to review.', 'success');
-  } catch(e) { toast('Export error: ' + e.message, 'error'); }
+  } catch(e) { toast('Export error: ' + e.message, 'error'); console.error(e); }
 }
 
 function exportGenericDocxFile(text, filename) { exportGenericDocx(text, filename); }
 
-// textToHtmlWithTables — kept for AI Insights display rendering in the browser UI only
+// textToHtmlWithTables — browser UI display only (not for Word export)
 function textToHtmlWithTables(text) {
   if (!text) return '';
   var tableRegex = /(\|.+\|\n)+/g;
   text = text.replace(tableRegex, function(tableBlock) {
-    var rows = tableBlock.trim().split('\n').filter(function(r) { return r.trim() && !/^\|[\s\-:|]+\|$/.test(r.trim()); });
+    var rows = tableBlock.trim().split('\n').filter(function(r) {
+      return r.trim() && !/^\|[\s\-:|]+\|$/.test(r.trim());
+    });
     if (rows.length < 1) return tableBlock;
     var html = '<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:12px">';
     rows.forEach(function(row, idx) {
-      var cells = row.split('|').filter(function(c,i,a) { return i > 0 && i < a.length-1; });
-      var tag = idx === 0 ? 'th' : 'td';
-      var style = idx === 0 ? 'background:#972b32;color:#fff;padding:4px 8px;text-align:left' : 'border:1px solid #ddd;padding:4px 8px;' + (idx%2===0?'background:#f5eaeb':'');
-      html += '<tr>' + cells.map(function(c){ return '<'+tag+' style="'+style+'">' + c.trim().replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>') + '</'+tag+'>'; }).join('') + '</tr>';
+      var cells = row.split('|').filter(function(c,i,a){ return i>0 && i<a.length-1; });
+      var tag = idx===0?'th':'td';
+      var style = idx===0
+        ? 'background:#972b32;color:#fff;padding:4px 8px;text-align:left'
+        : 'border:1px solid #ddd;padding:4px 8px;' + (idx%2===0?'background:#f5eaeb':'');
+      html += '<tr>' + cells.map(function(c){
+        return '<'+tag+' style="'+style+'">' + c.trim().replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>') + '</'+tag+'>';
+      }).join('') + '</tr>';
     });
     return html + '</table>';
   });
   return textToHtmlLines(text);
-}
-
-// buildWordHtml — now uses makeDocxBlob instead of HTML
-function buildWordHtml(text, title) {
-  // Legacy — returns a promise that resolves to blob URL
-  return makeDocxBlob(text, title);
 }
 
 // exportFromTemplate — cover letter template injection
@@ -5390,24 +5461,22 @@ async function exportFromTemplate(templateFile, replacements, downloadName) {
   try {
     toast('Preparing document...', '');
     const response = await fetch(BASE_URL + '/' + templateFile);
-    if (!response.ok) throw new Error('Could not load template. Make sure ' + templateFile + ' is in your GitHub repo.');
+    if (!response.ok) throw new Error('Could not load template from GitHub.');
     const arrayBuffer = await response.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
     const docXml = await zip.file('word/document.xml').async('string');
     let modified = docXml;
     for (const [placeholder, value] of Object.entries(replacements)) {
-      const xmlValue = (value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const xmlValue = (value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       modified = modified.split(placeholder).join(xmlValue);
     }
     zip.file('word/document.xml', modified);
-    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = downloadName + '.docx';
-    a.click();
+    a.href = url; a.download = downloadName + '.docx'; a.click();
     URL.revokeObjectURL(url);
-    toast('Downloaded ' + downloadName + '.docx — open in Word to review.', 'success');
+    toast('Downloaded ' + downloadName + '.docx', 'success');
   } catch(e) { toast('Export error: ' + e.message, 'error'); }
 }
 
