@@ -4775,7 +4775,7 @@ function parseIPSections(text, company, role) {
 }
 
 function debugIPSections() {
-  if (!ipOutput) { alert('No output yet. Generate the prep pack first.'); return; }
+  if (!ipOutput) { toast('Generate the prep pack first.', 'error'); return; }
   var upper = ipOutput.toUpperCase();
   var kws = [
     ['## DOC 01', 'DOC 01:', 'COMPANY OVERVIEW'],
@@ -4787,26 +4787,46 @@ function debugIPSections() {
     ['## DOC 07', 'DOC 07:', 'STRATEGIC QUESTIONS FOR'],
     ['## DOC 08', 'DOC 08:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
   ];
-  var report = 'SECTION DETECTION REPORT\n';
-  report += '========================\n';
-  report += 'Total output length: ' + ipOutput.length + ' chars\n\n';
-  report += 'First 300 chars:\n' + ipOutput.slice(0, 300) + '\n\n';
-  report += '--- Searching for section headers ---\n';
+
+  var lines = [];
+  lines.push('OUTPUT LENGTH: ' + ipOutput.length + ' chars');
+  lines.push('');
+  lines.push('FIRST 400 CHARS OF OUTPUT:');
+  lines.push(ipOutput.slice(0, 400));
+  lines.push('');
+  lines.push('--- HEADER SEARCH RESULTS ---');
   kws.forEach(function(pats, idx) {
+    var docNum = 'DOC 0' + (idx + 1);
     var found = false;
     pats.forEach(function(pat) {
       var pos = upper.indexOf(pat);
-      if (pos >= 0) {
-        report += 'DOC 0' + (idx+1) + ': FOUND "' + pat + '" at position ' + pos + '\n';
-        report += '  Context: ' + ipOutput.slice(Math.max(0, pos-10), pos+60).replace(/\n/g,' ') + '\n';
+      if (pos >= 0 && !found) {
         found = true;
+        var ctx = ipOutput.slice(Math.max(0, pos - 5), pos + 80).replace(/\n/g, ' ↵ ');
+        lines.push(docNum + ': FOUND "' + pat + '" @ pos ' + pos);
+        lines.push('  → ' + ctx);
       }
     });
-    if (!found) report += 'DOC 0' + (idx+1) + ': NOT FOUND (tried: ' + pats.join(', ') + ')\n';
+    if (!found) lines.push(docNum + ': ✗ NOT FOUND  (searched: ' + pats.join(' | ') + ')');
   });
-  report += '\nParsed sections: ' + Object.keys(ipSections).join(', ');
+  lines.push('');
+  lines.push('PARSED SECTION KEYS: ' + Object.keys(ipSections).join(', '));
+  lines.push('SECTION COUNT: ' + Object.keys(ipSections).length);
+
+  var report = lines.join('\n');
+
+  // Display in the output content area so it is scrollable and copyable
+  var contentEl = document.getElementById('ip-output-content');
+  if (contentEl) {
+    contentEl.textContent = report;
+    contentEl.style.maxHeight = 'none';
+    contentEl.style.background = 'var(--bg-secondary)';
+    contentEl.style.padding = '16px';
+    contentEl.style.borderRadius = '6px';
+  }
+  // Also log to console
   console.log(report);
-  alert(report);
+  toast('Debug info shown in output panel — select all and copy.', 'success');
 }
 
 function clearInterviewPrep() {
