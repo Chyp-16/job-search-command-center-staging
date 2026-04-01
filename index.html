@@ -4662,54 +4662,68 @@ async function runInterviewPrep() {
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
   panel.style.display = 'block';
-  contentEl.textContent = 'Generating your full interview prep pack... This takes 45-90 seconds.';
+  contentEl.style.maxHeight = '600px';
+  contentEl.style.background = '';
+  contentEl.style.padding = '';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // First try to load from saved prompts library
-  const promptsData = await dbGet('prompts', 'select=*&name=eq.Interview Prep Pack');
-  const promptRows = Array.isArray(promptsData) ? promptsData : [];
-  let basePrompt = promptRows.length > 0 ? (promptRows[0].system_prompt || '') : '';
+  const intLine = intName ? ('\nInterviewer: ' + intName + (intTitle ? ', ' + intTitle : '')) : '';
+  const urlLine = url ? ('\nCompany URL: ' + url) : '';
 
-  // Replace variables
-  let prompt = basePrompt
-    .replace(/\{\{company\}\}/g, company)
-    .replace(/\{\{role\}\}/g, role)
-    .replace(/\{\{job_description\}\}/g, jd);
+  const context = 'Company: ' + company + '\nRole: ' + role + intLine + urlLine + '\n\nJob Description:\n' + jd;
+  const sysPrompt = getSystemPromptWithResume();
 
-  // Append optional fields
-  if (url) prompt += '\nCompany URL: ' + url;
-  if (intName) prompt += '\nInterviewer: ' + intName + (intTitle ? ', ' + intTitle : '');
+  // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
+  contentEl.textContent = 'Step 1 of 2 — Generating Company Research, SWOT, Niche Analysis, and 30-60-90 Day Plan...';
 
+  const prompt1 = 'You are a strategy and career-docs expert creating an interview prep pack for a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\nFounded, HQ, employees, revenue estimates, valuation with sources. Products, services, target customers. Leadership structure. Key milestones, funding, deals. Market position. Positioning and core products. Top 3-5 competitors. 3-4 biggest opportunities and risks. Key recent news.\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\nSWOT table (markdown table format). Competitor grid comparing 3-5 peers. Pros/cons vs target company. Market share, growth, differentiators.\n\n## DOC 03: TARGET NICHE ANALYSIS\nCore customer niches. Unmet needs and market gaps. Where company can win. High-growth micro-segments.\n\n## DOC 04: 30-60-90 DAY PLAN\nDays 0-30: Learn and audit. Days 31-60: Test and build. Days 61-90: Scale and optimize. Cover brand, content, partnerships, demand generation. Senior-level, practical, actionable.\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes.';
+
+  let result1 = '';
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
-    ipOutput = result;
-    contentEl.textContent = result;
-    ipSections = parseIPSections(result, company, role);
-
-    const sectionCount = Object.keys(ipSections).length;
-    const linkedAppId = document.getElementById('ip-link-app').value || null;
-    await dbPost('ai_outputs', {
-      output_type: 'interview_prep',
-      linked_application_id: linkedAppId || null,
-      prompt_used: 'Interview Prep Pack',
-      content: result,
-    });
-    if (linkedAppId) {
-      const app = allApps.find(function(a) { return a.id === linkedAppId; });
-      if (app) {
-        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
-        await dbPatch('applications', linkedAppId, { ai_output: existing.concat([{ type: 'interview_prep', content: result, date: today() }]) });
-        const idx = allApps.findIndex(function(a) { return a.id === linkedAppId; });
-        if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'interview_prep', content: result, date: today() }]);
-        toast('Prep pack generated (' + sectionCount + ' sections) and saved to ' + app.company + '.', 'success');
-      }
-    } else {
-      toast('Prep pack generated — ' + sectionCount + ' sections found. Use Export buttons to download.', 'success');
-    }
+    result1 = await callAI([{ role: 'user', content: prompt1 }], sysPrompt);
   } catch(e) {
-    contentEl.textContent = 'Error: ' + e.message;
+    contentEl.textContent = 'Error on Step 1: ' + e.message;
     toast('Generation failed: ' + e.message, 'error');
+    return;
   }
+
+  contentEl.textContent = 'Step 1 complete. Step 2 of 2 — Generating Fit Analysis, Executive Summary, Strategic Questions, and Q&A Guide...';
+
+  // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
+  const prompt2 = 'You are a strategy and career-docs expert creating an interview prep pack for Jay Wadhwa, a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\nSide-by-side markdown table: Company Need | Jay Experience | Evidence/Metric. At least 8 rows. Below the table: key overlap narrative, how multi-industry background (ESPN, NBCUniversal, Web3, SaaS, nonprofits) is an advantage, short fit summary paragraph.\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\nBULLET POINTS ONLY — no tables. Company snapshot bullets (founded, size, revenue, market position, top competitor). Key strengths and risks bullets. Primary growth paths bullets. Role fit bullets. Bottom-line takeaway (2-3 sentences). This doc must stand alone — do not reference Doc 01.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER' + (intName ? ' / ' + intName : '') + '\nQUESTIONS ONLY — no answers. Minimum 3 questions per category:\nTeam Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture' + (intName ? '\nAlso include 3 questions specifically for ' + intName + (intTitle ? ' as ' + intTitle : '') + '.' : '') + '\n\n## DOC 08: INTERVIEW Q&A GUIDE\n12 common interview questions with prepared answers for Jay. Each answer: lead with a specific metric or result, tie to this company and role, 3-5 sentences, peer-to-peer tone, no banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager).\n\nFORMAT: Use **bold** for stats. Use markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes.';
+
+  let result2 = '';
+  try {
+    result2 = await callAI([{ role: 'user', content: prompt2 }], sysPrompt);
+  } catch(e) {
+    contentEl.textContent = result1 + '\n\n[Error on Step 2: ' + e.message + ']';
+    toast('Step 2 failed: ' + e.message, 'error');
+    return;
+  }
+
+  // Combine both results
+  ipOutput = result1 + '\n\n' + result2;
+  contentEl.textContent = ipOutput;
+  ipSections = parseIPSections(ipOutput, company, role);
+
+  const sectionCount = Object.keys(ipSections).length;
+  const linkedAppId = document.getElementById('ip-link-app').value || null;
+  await dbPost('ai_outputs', {
+    output_type: 'interview_prep',
+    linked_application_id: linkedAppId || null,
+    prompt_used: 'Interview Prep Pack',
+    content: ipOutput,
+  });
+  if (linkedAppId) {
+    const app = allApps.find(function(a) { return a.id === linkedAppId; });
+    if (app) {
+      const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+      await dbPatch('applications', linkedAppId, { ai_output: existing.concat([{ type: 'interview_prep', content: ipOutput, date: today() }]) });
+      const idx = allApps.findIndex(function(a) { return a.id === linkedAppId; });
+      if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'interview_prep', content: ipOutput, date: today() }]);
+    }
+  }
+  toast('Prep pack complete — ' + sectionCount + ' of 8 sections generated. Use Export buttons to download.', 'success');
 }
 
 function parseIPSections(text, company, role) {
