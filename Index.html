@@ -2584,28 +2584,34 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
 }
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    const page = item.dataset.page;
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById('page-' + page).classList.add('active');
-    if (page === 'dashboard') refreshDashboard();
-    if (page === 'applications') loadApps();
-    if (page === 'contacts') loadContacts();
-    if (page === 'resumes') loadResumes();
-    if (page === 'coverletters') loadCoverLetters();
-    if (page === 'prompts') loadPrompts();
-    if (page === 'resources') loadResources();
-    if (page === 'jobsearch') loadJobSearchPage();
-    if (page === 'interviewprep') loadInterviewPrepPage();
-    if (page === 'resumetailor') loadRTPage();
-    if (page === 'coverlettergenerator') loadCLGPage();
-    if (page === 'outreachbuilder') loadOBPage();
-    if (page === 'uploads') loadDocsPage();
-    if (page === 'uploaddocs') loadUploadedDocs();
-  });
+function navigateTo(page) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const navItem = document.querySelector('[data-page="' + page + '"]');
+  if (navItem) navItem.classList.add('active');
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  if (page === 'dashboard') refreshDashboard();
+  if (page === 'applications') loadApps();
+  if (page === 'contacts') loadContacts();
+  if (page === 'resumes') loadResumes();
+  if (page === 'coverletters') loadCoverLetters();
+  if (page === 'prompts') loadPrompts();
+  if (page === 'resources') loadResources();
+  if (page === 'jobsearch') loadJobSearchPage();
+  if (page === 'interviewprep') loadInterviewPrepPage();
+  if (page === 'resumetailor') loadRTPage();
+  if (page === 'coverlettergenerator') loadCLGPage();
+  if (page === 'outreachbuilder') loadOBPage();
+  if (page === 'uploads') loadDocsPage();
+}
+
+// Use event delegation on the sidebar so all nav items work regardless of when they were added
+document.querySelector('.sidebar-nav').addEventListener('click', function(e) {
+  const item = e.target.closest('.nav-item');
+  if (!item) return;
+  const page = item.dataset.page;
+  if (page) navigateTo(page);
 });
 
 // ── THEME ──────────────────────────────────────────────────────────────
