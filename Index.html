@@ -827,6 +827,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="prompts">
         <span class="nav-icon">💬</span><span>Prompts</span>
       </div>
+      <div class="nav-item" data-page="jobsearch">
+        <span class="nav-icon">🔍</span><span>Job Search</span>
+      </div>
       <div class="nav-section-label">Library</div>
       <div class="nav-item" data-page="resources">
         <span class="nav-icon">🔖</span><span>Resources</span>
@@ -1231,6 +1234,112 @@ a { color: var(--burgundy); text-decoration: none; }
             <div id="ai-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text);max-height:500px;overflow-y:auto;"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+
+    <!-- ── JOB SEARCH ──────────────────────────────────────────────── -->
+    <div class="page" id="page-jobsearch">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Job Search</h2>
+          <p>AI-powered role discovery built around your criteria</p>
+        </div>
+      </div>
+      <div style="padding:28px 32px;flex:1;overflow-y:auto">
+
+        <!-- Criteria Panel -->
+        <div class="dash-card" style="margin-bottom:20px">
+          <div class="dash-card-header">
+            🎯 Search Criteria
+            <button class="btn btn-secondary btn-sm" onclick="resetJobSearchCriteria()">Reset to Defaults</button>
+          </div>
+          <div style="padding:20px">
+            <div class="form-grid">
+
+              <div class="form-group">
+                <label class="form-label">Role Titles <span style="font-weight:400;color:var(--text-light)">(comma separated)</span></label>
+                <input class="form-input" id="js-roles" type="text" value="VP of Marketing, VP Brand Marketing, VP Growth Marketing, CMO, Director of Marketing, Head of Marketing, Chief Brand Officer, Chief Growth Officer">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Location</label>
+                <input class="form-input" id="js-location" type="text" value="Chicago metro area">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Work Type</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="js-worktype-wrap"></div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Industries</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="js-industries-wrap">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Company Size</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="js-sizes-wrap">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Salary Floor (Base)</label>
+                <select class="form-select" id="js-salary-floor">
+                  <option value="125000">$125,000</option>
+                  <option value="150000" selected>$150,000</option>
+                  <option value="175000">$175,000</option>
+                  <option value="200000">$200,000</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Target Total Comp</label>
+                <select class="form-select" id="js-total-comp">
+                  <option value="200000">$200,000+</option>
+                  <option value="225000" selected>$225,000+</option>
+                  <option value="250000">$250,000+</option>
+                  <option value="300000">$300,000+</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Min Years Experience Required</label>
+                <select class="form-select" id="js-exp">
+                  <option value="5">5+ years</option>
+                  <option value="10" selected>10+ years</option>
+                  <option value="15">15+ years</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Additional Criteria / Notes</label>
+                <input class="form-input" id="js-notes" type="text" placeholder="e.g. Series B or later, must have brand + growth experience">
+              </div>
+
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runJobSearch()">✦ Find Matching Roles</button>
+              <button class="btn btn-secondary" onclick="clearJobSearchOutput()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Output Panel -->
+        <div class="dash-card" id="js-output-panel" style="display:none">
+          <div class="dash-card-header">
+            ✦ Role Results
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="copyJobSearchOutput()">Copy All</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportJobSearchDocx()">⬇ Export .docx</button>
+            </div>
+          </div>
+          <div style="padding:20px">
+            <div id="js-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:700px;overflow-y:auto"></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -2459,9 +2568,11 @@ async function dbDelete(table, id) {
   return r.ok;
 }
 
-async function callAI(messages, systemPrompt = '') {
+async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
+  // Increase max_tokens for web search calls since results are longer
+  if (useWebSearch) body.max_tokens = 4096;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
@@ -2487,6 +2598,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (page === 'coverletters') loadCoverLetters();
     if (page === 'prompts') loadPrompts();
     if (page === 'resources') loadResources();
+    if (page === 'jobsearch') loadJobSearchPage();
     if (page === 'interviewprep') loadInterviewPrepPage();
     if (page === 'resumetailor') loadRTPage();
     if (page === 'coverlettergenerator') loadCLGPage();
@@ -6209,6 +6321,189 @@ function renderActivityFeed(activities) {
     '</div>';
   }).join('');
   feedEl.innerHTML = '<div style="display:block;width:100%">' + items + '</div>';
+}
+
+// ── JOB SEARCH ──────────────────────────────────────────────────────────
+const JS_WORK_TYPES = [
+  { label: 'Remote', selected: true },
+  { label: 'Hybrid', selected: true },
+  { label: 'On-Site', selected: false },
+];
+
+const JS_INDUSTRIES = [
+  { label: 'SaaS', selected: true },
+  { label: 'B2B Tech', selected: true },
+  { label: 'Web3 / Blockchain', selected: true },
+  { label: 'FinTech', selected: true },
+  { label: 'Media & Entertainment', selected: true },
+  { label: 'Nonprofit', selected: true },
+  { label: 'Sports & Entertainment', selected: true },
+  { label: 'AI / Emerging Tech', selected: true },
+  { label: 'Digital Health', selected: false },
+  { label: 'PE-Backed Startups', selected: true },
+  { label: 'Agency / Consultancy', selected: false },
+  { label: 'Retail / E-Commerce', selected: false },
+];
+
+const JS_SIZES = [
+  { label: 'Startup (1-50)', value: '1-50', selected: true },
+  { label: 'Growth Stage (51-500)', value: '51-500', selected: true },
+  { label: 'Mid-Market (501-2000)', value: '501-2000', selected: true },
+  { label: 'Enterprise (2000+)', value: '2000+', selected: false },
+];
+
+let jsOutput = '';
+
+function loadJobSearchPage() {
+  renderWorkTypeChips();
+  renderIndustryChips();
+  renderSizeChips();
+}
+
+function renderWorkTypeChips() {
+  const wrap = document.getElementById('js-worktype-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = JS_WORK_TYPES.map(function(wt, i) {
+    const sel = wt.selected;
+    return '<button onclick="toggleWorkType(' + i + ')" style="' +
+      'padding:5px 16px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ' +
+      (sel ? 'var(--burgundy);background:var(--burgundy);color:#fff' : 'var(--border);background:var(--bg);color:var(--text-secondary)') +
+      '">' + wt.label + '</button>';
+  }).join('');
+}
+
+function toggleWorkType(i) {
+  JS_WORK_TYPES[i].selected = !JS_WORK_TYPES[i].selected;
+  renderWorkTypeChips();
+}
+
+function renderIndustryChips() {
+  const wrap = document.getElementById('js-industries-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = JS_INDUSTRIES.map(function(ind, i) {
+    const sel = ind.selected;
+    return '<button onclick="toggleIndustry(' + i + ')" style="' +
+      'padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ' +
+      (sel ? 'var(--burgundy);background:var(--burgundy);color:#fff' : 'var(--border);background:var(--bg);color:var(--text-secondary)') +
+      '" data-idx="' + i + '">' + ind.label + '</button>';
+  }).join('');
+}
+
+function renderSizeChips() {
+  const wrap = document.getElementById('js-sizes-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = JS_SIZES.map(function(sz, i) {
+    const sel = sz.selected;
+    return '<button onclick="toggleSize(' + i + ')" style="' +
+      'padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ' +
+      (sel ? 'var(--burgundy);background:var(--burgundy);color:#fff' : 'var(--border);background:var(--bg);color:var(--text-secondary)') +
+      '" data-idx="' + i + '">' + sz.label + '</button>';
+  }).join('');
+}
+
+function toggleIndustry(i) {
+  JS_INDUSTRIES[i].selected = !JS_INDUSTRIES[i].selected;
+  renderIndustryChips();
+}
+
+function toggleSize(i) {
+  JS_SIZES[i].selected = !JS_SIZES[i].selected;
+  renderSizeChips();
+}
+
+function resetJobSearchCriteria() {
+  JS_INDUSTRIES.forEach(function(ind) { ind.selected = ['SaaS','B2B Tech','Web3 / Blockchain','FinTech','Media & Entertainment','Nonprofit','Sports & Entertainment','AI / Emerging Tech','PE-Backed Startups'].includes(ind.label); });
+  JS_SIZES.forEach(function(sz, i) { sz.selected = i < 3; });
+  document.getElementById('js-roles').value = 'VP of Marketing, VP Brand Marketing, VP Growth Marketing, CMO, Director of Marketing, Head of Marketing, Chief Brand Officer, Chief Growth Officer';
+  document.getElementById('js-location').value = 'Chicago metro area';
+  JS_WORK_TYPES.forEach(function(wt) { wt.selected = wt.label !== 'On-Site'; });
+  renderWorkTypeChips();
+  document.getElementById('js-salary-floor').value = '150000';
+  document.getElementById('js-total-comp').value = '225000';
+  document.getElementById('js-exp').value = '10';
+  document.getElementById('js-notes').value = '';
+  renderIndustryChips();
+  renderSizeChips();
+}
+
+function clearJobSearchOutput() {
+  const panel = document.getElementById('js-output-panel');
+  if (panel) panel.style.display = 'none';
+  jsOutput = '';
+}
+
+function copyJobSearchOutput() {
+  if (jsOutput) navigator.clipboard.writeText(jsOutput).then(function() { toast('Copied.', 'success'); });
+}
+
+function exportJobSearchDocx() {
+  if (!jsOutput) { toast('Run a search first.', 'error'); return; }
+  var dateStr = new Date().toISOString().split('T')[0];
+  exportGenericDocx(jsOutput, 'JayWadhwa_JobSearch_Results_' + dateStr);
+}
+
+async function runJobSearch() {
+  const roles    = document.getElementById('js-roles').value.trim();
+  const location = document.getElementById('js-location').value.trim();
+  const salaryFloor = parseInt(document.getElementById('js-salary-floor').value);
+  const totalComp   = parseInt(document.getElementById('js-total-comp').value);
+  const exp      = document.getElementById('js-exp').value;
+  const notes    = document.getElementById('js-notes').value.trim();
+
+  const selectedIndustries = JS_INDUSTRIES.filter(function(i) { return i.selected; }).map(function(i) { return i.label; });
+  const selectedSizes      = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label + ' (' + s.value + ' employees)'; });
+
+  if (selectedIndustries.length === 0) { toast('Select at least one industry.', 'error'); return; }
+
+  const panel = document.getElementById('js-output-panel');
+  const contentEl = document.getElementById('js-output-content');
+  panel.style.display = 'block';
+  contentEl.textContent = 'Searching for matching roles... This may take 30-60 seconds.';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const fmt = function(n) { return '$' + n.toLocaleString(); };
+
+  const prompt = 'Search the web for current VP, Director, and CMO-level marketing job openings that match the criteria below. Return 8-12 specific, real roles posted in the last 60 days.' +
+    '\n\nSEARCH CRITERIA' +
+    '\nRole Titles: ' + roles +
+    '\nLocation: ' + location +
+    '\nWork Type: ' + JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ') +
+    '\nIndustries: ' + selectedIndustries.join(', ') +
+    '\nCompany Size: ' + selectedSizes.join(', ') +
+    '\nBase Salary Floor: ' + fmt(salaryFloor) +
+    '\nTarget Total Comp: ' + fmt(totalComp) + '+' +
+    '\nMin Experience Required: ' + exp + '+ years of marketing leadership' +
+    (notes ? '\nAdditional Criteria: ' + notes : '') +
+    '\n\nBackground: Jay Wadhwa is a senior marketing executive with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. He targets VP/CMO/Director-level roles. Key credentials: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months (Secret Network), 588% social growth (NBC Sports), $5M VC funding secured, 6 Emmy Awards.' +
+    '\n\nFor EACH role, return these fields in this exact format:' +
+    '\n\n---' +
+    '\n**[NUMBER]. [ROLE TITLE] — [COMPANY NAME]**' +
+    '\nPosting URL: [direct link to job posting]' +
+    '\nCompany Website: [url]' +
+    '\nIndustry: [industry]' +
+    '\nCompany Size: [headcount range]' +
+    '\nSalary: [range if listed, or "Not listed"]' +
+    '\nHiring Manager: [name, title] | LinkedIn: [linkedin.com/in/... or "Not found"]' +
+    '\nRecruiter / TA Contact: [name, email if findable, or "Not found"]' +
+    '\nCompany Email Format: [e.g. first.last@company.com or "Unknown"]' +
+    '\nFit Summary: [1 sentence on why this role fits Jay specifically — reference his background]' +
+    '\nRed Flags: [any concerns — leadership turnover, funding gaps, suspicious posting — or "None identified"]' +
+    '\n---' +
+    '\n\nIf you cannot find a real current posting in a given industry, say so and skip it. Do not fabricate roles or URLs. If hiring manager or recruiter info is not publicly findable, say "Not found" — do not guess.';
+
+  try {
+    const result = await callAI(
+      [{ role: 'user', content: prompt }],
+      getSystemPromptWithResume(),
+      true // use web search
+    );
+    jsOutput = result;
+    contentEl.textContent = result;
+    toast('Search complete.', 'success');
+  } catch(e) {
+    contentEl.textContent = 'Error: ' + e.message;
+    toast('Search failed: ' + e.message, 'error');
+  }
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────
