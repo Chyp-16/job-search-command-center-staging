@@ -6497,10 +6497,13 @@ async function runJobSearch() {
     '\n---' +
     '\n\nIf you cannot find a real current posting in a given industry, say so and skip it. Do not fabricate roles or URLs. If hiring manager or recruiter info is not publicly findable, say "Not found" — do not guess.';
 
+  // Use a lean system prompt for job search — full resume causes token rate limit errors
+  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+
   try {
     const result = await callAI(
       [{ role: 'user', content: prompt }],
-      getSystemPromptWithResume(),
+      jsSystemPrompt,
       true // use web search
     );
     jsOutput = result;
