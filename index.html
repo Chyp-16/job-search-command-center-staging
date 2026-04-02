@@ -2571,8 +2571,8 @@ async function dbDelete(table, id) {
 async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
-  // Increase max_tokens for web search calls since results are longer
-  if (useWebSearch) body.max_tokens = 4096;
+  // Keep max_tokens low to stay under rate limits
+  body.max_tokens = 1024;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
