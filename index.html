@@ -6484,11 +6484,16 @@ async function runJobSearch() {
   const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
 
   try {
-    const result = await callAI(
-      [{ role: 'user', content: prompt }],
-      jsSystemPrompt,
-      true // use web search
-    );
+    // Send use_web_search flag so Worker enables the web search tool
+    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
+    const r = await fetch(WORKER_URL + '/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify(jsBody)
+    });
+    const data = await r.json();
+    const result = (data.content && data.content[0]) ? data.content[0].text : null;
+    if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
     contentEl.textContent = result;
     toast('Search complete.', 'success');
