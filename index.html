@@ -5538,7 +5538,8 @@ async function makeDocxBlob(text, title) {
     ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
     ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
     ' xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"' +
-    ' mc:Ignorable="w14 w15">' +
+    ' mc:Ignorable="w14 w15"' +
+    ' w:rsidR="00000000" w:rsidRDefault="00000000">' +
     '<w:body>' +
     headerXml +
     bodyXml +
@@ -5583,6 +5584,16 @@ async function makeDocxBlob(text, title) {
     '<w:style w:type="paragraph" w:default="1" w:styleId="Default"><w:name w:val="Default Paragraph Style"/></w:style>' +
     '</w:styles>';
 
+  var settingsXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<w:zoom w:percent="100"/>' +
+    '<w:defaultTabStop w:val="720"/>' +
+    '<w:characterSpacingControl w:val="doNotCompress"/>' +
+    '<w:rsids><w:rsidDel w:val="00000000"/></w:rsids>' +
+    '</w:settings>';
+
   var contentTypesXml =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -5591,6 +5602,7 @@ async function makeDocxBlob(text, title) {
     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
     '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
     '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
+    '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>' +
     '</Types>';
 
   var appRelsXml =
@@ -5604,6 +5616,7 @@ async function makeDocxBlob(text, title) {
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
     '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
+    '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>' +
     '</Relationships>';
 
   var zip = new JSZip();
@@ -5612,6 +5625,7 @@ async function makeDocxBlob(text, title) {
   zip.file('word/document.xml', documentXml);
   zip.file('word/styles.xml', stylesXml);
   zip.file('word/numbering.xml', numberingXml);
+  zip.file('word/settings.xml', settingsXml);
   zip.file('word/_rels/document.xml.rels', wordRelsXml);
 
   return await zip.generateAsync({
