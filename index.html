@@ -2201,6 +2201,7 @@ a { color: var(--burgundy); text-decoration: none; }
     <div class="modal-body" id="detail-body"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="detail-edit-btn">Edit</button>
+      <button class="btn btn-secondary btn-sm" id="detail-upload-btn" style="display:none" onclick="openUploadFromDetail()">⬆ Upload Resume</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Close</button>
     </div>
   </div>
@@ -2996,22 +2997,69 @@ async function saveApp() {
   };
 
   try {
+    let savedApp;
     if (editingId) {
       await dbPatch('applications', editingId, payload);
       const idx = allApps.findIndex(x => x.id === editingId);
       if (idx >= 0) allApps[idx] = { ...allApps[idx], ...payload };
+      savedApp = allApps.find(x => x.id === editingId);
       toast('Application updated.', 'success');
     } else {
       const result = await dbPost('applications', payload);
-      const newApp = Array.isArray(result) ? result[0] : result;
-      allApps.unshift(newApp);
+      savedApp = Array.isArray(result) ? result[0] : result;
+      allApps.unshift(savedApp);
       toast('Application added.', 'success');
     }
     closeModal('modal-app');
     filterApps();
+
+    // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
+    if (savedApp) syncOutreachToHubSpot(savedApp);
+
   } catch (e) {
     toast('Error saving application: ' + e.message, 'error');
   }
+}
+
+async function syncOutreachToHubSpot(app) {
+  // Build a task for each outreach step that is Scheduled with a date
+  const steps = [
+    { label: 'Initial Outreach', status: app.initial_outreach_status, date: app.initial_outreach_date },
+    { label: '3-Day Follow-Up', status: app.followup_3day_status, date: app.followup_3day_date },
+    { label: '1-Week Follow-Up', status: app.followup_1week_status, date: app.followup_1week_date },
+    { label: '2-Week Follow-Up', status: app.followup_2week_status, date: app.followup_2week_date },
+    { label: 'Rejection Follow-Up', status: app.rejection_followup_status, date: app.rejection_followup_date },
+  ];
+
+  const toSync = steps.filter(function(s) { return s.status === 'Scheduled' && s.date; });
+  if (toSync.length === 0) return;
+
+  let created = 0;
+  for (const step of toSync) {
+    try {
+      // Convert date to milliseconds for HubSpot
+      const dueMsUtc = new Date(step.date + 'T12:00:00Z').getTime();
+      const taskBody = {
+        properties: {
+          hs_task_subject: step.label + ' — ' + app.company + ' (' + app.job_title + ')',
+          hs_task_status: 'NOT_STARTED',
+          hs_task_type: 'EMAIL',
+          hs_task_due_date: String(dueMsUtc),
+          hs_task_body: 'Job Search Command Center: ' + step.label + ' for ' + app.company + ' — ' + app.job_title,
+        }
+      };
+      const r = await fetch(WORKER_URL + '/hubspot/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        body: JSON.stringify(taskBody)
+      });
+      if (r.ok) created++;
+    } catch(e) {
+      // Silent fail — HubSpot sync is best-effort
+      console.warn('HubSpot task sync failed:', e.message);
+    }
+  }
+  if (created > 0) toast(created + ' follow-up task' + (created > 1 ? 's' : '') + ' synced to HubSpot.', 'success');
 }
 
 async function deleteApp(id) {
@@ -3071,7 +3119,75 @@ function viewApp(id) {
     </div>` : ''}
   `;
   document.getElementById('detail-edit-btn').onclick = () => { closeModal('modal-detail'); editApp(id); };
+
+  // Show upload button and wire it for this application
+  const uploadBtn = document.getElementById('detail-upload-btn');
+  if (uploadBtn) {
+    uploadBtn.style.display = '';
+    window._detailAppId = id;
+    window._detailAppCompany = a.company;
+    window._detailAppRole = a.job_title;
+  }
+
+  // Load linked uploaded documents
+  loadDetailDocs(id);
   openModal('modal-detail');
+}
+
+async function loadDetailDocs(appId) {
+  try {
+    const data = await dbGet('uploaded_documents', 'select=*&linked_application_id=eq.' + appId + '&order=created_at.desc');
+    const docs = Array.isArray(data) ? data : [];
+    if (docs.length === 0) return;
+
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+
+    const docSection = document.createElement('div');
+    docSection.className = 'detail-section';
+    docSection.innerHTML =
+      '<div class="detail-section-title">Uploaded Documents (' + docs.length + ')</div>' +
+      docs.map(function(d) {
+        const ext = (d.file_name || '').split('.').pop().toLowerCase();
+        const icon = ext === 'pdf' ? '📕' : '📘';
+        const size = d.file_size ? (d.file_size > 1024*1024 ? (d.file_size/1024/1024).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:20px">' + icon + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (d.file_name || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + (d.doc_type || '') + (size ? ' · ' + size : '') + ' · ' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</div>' +
+          '</div>' +
+          '<button class="btn btn-secondary btn-sm" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(null, this.dataset.path)">⬇</button>' +
+        '</div>';
+      }).join('');
+    detailBody.appendChild(docSection);
+  } catch(e) {
+    console.warn('Could not load docs for application:', e.message);
+  }
+}
+
+function openUploadFromDetail() {
+  const appId = window._detailAppId;
+  const company = window._detailAppCompany || '';
+  const role = window._detailAppRole || '';
+  closeModal('modal-detail');
+
+  // Open upload modal pre-filled for this application
+  openUploadModal();
+  setTimeout(function() {
+    // Pre-select doc type and link to this application
+    const docType = document.getElementById('upload-doc-type');
+    if (docType) docType.value = 'Resume';
+
+    const appSel = document.getElementById('upload-link-app');
+    if (appSel && appId) appSel.value = appId;
+
+    const companyEl = document.getElementById('upload-company');
+    if (companyEl && company) companyEl.value = company;
+
+    const roleEl = document.getElementById('upload-role');
+    if (roleEl && role) roleEl.value = role;
+  }, 150);
 }
 
 // ── CONTACTS ───────────────────────────────────────────────────────────
@@ -3228,6 +3344,8 @@ function viewContact(id) {
     '</div>';
   document.getElementById('detail-edit-btn').style.display = '';
   document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
+  const uploadBtnC = document.getElementById('detail-upload-btn');
+  if (uploadBtnC) uploadBtnC.style.display = 'none';
   openModal('modal-detail');
 }
 
@@ -6203,7 +6321,21 @@ function renderTasksList() {
   }
 
   const now = new Date();
-  const sorted = [...hubspotTasks].sort(function(a, b) {
+
+  // Filter to active tasks only — exclude COMPLETED and DEFERRED
+  const activeTasks = hubspotTasks.filter(function(t) {
+    const props = t.properties || {};
+    const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
+    return status !== 'COMPLETED' && status !== 'DEFERRED';
+  });
+
+  if (activeTasks.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--text-secondary)"><div style="font-size:28px;margin-bottom:8px">✓</div>All caught up — no open tasks.</div>';
+    return;
+  }
+
+  // Sort by due date ascending (soonest first)
+  const sorted = [...activeTasks].sort(function(a, b) {
     const props_a = a.properties || {};
     const props_b = b.properties || {};
     const da = (props_a.hs_task_due_date || props_a.hs_timestamp) ? new Date(props_a.hs_task_due_date || props_a.hs_timestamp) : new Date('2099-01-01');
@@ -6213,22 +6345,19 @@ function renderTasksList() {
 
   listEl.innerHTML = sorted.slice(0, 20).map(function(t) {
     const props = t.properties || {};
-    // Try all possible HubSpot task field names
     const title = props.hs_task_subject || props.subject || props.hs_note_body || props.title || t.subject || 'Untitled Task';
     const dueDateRaw = props.hs_task_due_date || props.hs_timestamp || null;
     const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
-    // HubSpot status can be COMPLETED, NOT_STARTED, IN_PROGRESS, WAITING, or DEFERRED
     const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
-    const isDone = status === 'COMPLETED';
-    const isOverdue = dueDate && dueDate < now && !isDone;
+    const isOverdue = dueDate && dueDate < now;
+    const isDueToday = dueDate && dueDate.toDateString() === now.toDateString();
     const type = props.hs_task_type || props.type || t.type || '';
 
-    const icon = isDone ? '✅' : isOverdue ? '🔴' : '⬜';
+    const icon = isOverdue ? '🔴' : isDueToday ? '🟡' : '⬜';
     const dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const color = isDone ? 'var(--text-light)' : isOverdue ? 'var(--burgundy)' : 'var(--text)';
-    const opacity = isDone ? 'opacity:0.45;' : '';
+    const color = isOverdue ? 'var(--burgundy)' : isDueToday ? '#b45309' : 'var(--text)';
 
-    return '<div class="followup-item" style="' + opacity + '">' +
+    return '<div class="followup-item">' +
       '<div style="font-size:16px;flex-shrink:0">' + icon + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-weight:600;font-size:13px;color:' + color + '">' + title + '</div>' +
@@ -6238,8 +6367,8 @@ function renderTasksList() {
     '</div>';
   }).join('');
 
-  if (hubspotTasks.length > 20) {
-    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + hubspotTasks.length + ' tasks — view all in HubSpot</div>';
+  if (activeTasks.length > 20) {
+    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + activeTasks.length + ' open tasks — view all in HubSpot</div>';
   }
 }
 
