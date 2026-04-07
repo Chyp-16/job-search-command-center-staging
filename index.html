@@ -5903,7 +5903,7 @@ async function downloadDoc(id, storagePath) {
     var signedUrl = data.signedURL || data.signedUrl || '';
     if (signedUrl) {
       if (!signedUrl.startsWith('http')) {
-        signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co' + signedUrl;
+        signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co/storage/v1' + signedUrl;
       }
       window.open(signedUrl, '_blank');
     } else {
