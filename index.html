@@ -817,7 +817,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="uploads">
         <span class="nav-icon">📁</span><span>My Documents</span>
       </div>
-      <div class="nav-item" data-page="uploaddocs">
+      <div class="nav-item" data-page="uploads">
         <span class="nav-icon">🗂</span><span>Uploaded Docs</span>
       </div>
       <div class="nav-section-label">Intelligence</div>
@@ -1688,51 +1688,7 @@ a { color: var(--burgundy); text-decoration: none; }
 
 
     <!-- ── UPLOADED DOCUMENTS PAGE ───────────────────────────────── -->
-    <div class="page" id="page-uploaddocs">
-      <div class="page-header">
-        <div class="page-header-left">
-          <h2>Uploaded Documents</h2>
-          <p>Final resumes and cover letters linked to applications and contacts</p>
-        </div>
-        <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Resume')">⬆ Upload Resume</button>
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Cover Letter')">⬆ Upload Cover Letter</button>
-          <button class="btn btn-primary" onclick="openUploadDoc('Other')">⬆ Upload Document</button>
-        </div>
-      </div>
-      <div class="filter-bar">
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search by file name, company, role..." id="docs-search" oninput="filterDocs()">
-        </div>
-        <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
-          <option value="">All Types</option>
-          <option value="Resume">Resumes</option>
-          <option value="Cover Letter">Cover Letters</option>
-          <option value="Other">Other</option>
-        </select>
-        <span class="filter-count" id="docs-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th onclick="sortDocs('file_name')">File Name ↕</th>
-              <th onclick="sortDocs('doc_type')">Type ↕</th>
-              <th onclick="sortDocs('company')">Company ↕</th>
-              <th onclick="sortDocs('role')">Role ↕</th>
-              <th>Contact</th>
-              <th onclick="sortDocs('created_at')">Uploaded ↕</th>
-              <th>Notes</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="docs-tbody">
-            <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+
 
 
     <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
@@ -6080,7 +6036,7 @@ async function openUploadDoc(docType) {
   }, 200);
 }
 
-function openUploadModal() {
+async function openUploadModal() {
   uploadFile = null;
   clearUploadFile();
   document.getElementById('upload-doc-type').value = 'Resume';
@@ -6093,10 +6049,20 @@ function openUploadModal() {
   document.getElementById('upload-submit-btn').textContent = 'Upload Document';
   document.getElementById('upload-submit-btn').onclick = submitUpload;
 
+  // Load apps and contacts if not already loaded
+  if (!allApps.length) {
+    const d = await dbGet('applications', 'select=id,company,job_title&order=date_applied.desc&limit=1000');
+    allApps = Array.isArray(d) ? d : [];
+  }
+  if (!allContacts.length) {
+    const d = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
+    allContacts = Array.isArray(d) ? d : [];
+  }
+
   // Populate dropdowns
   const appSel = document.getElementById('upload-link-app');
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0, 200).forEach(function(a) {
+  allApps.slice(0, 500).forEach(function(a) {
     if (!a.company) return;
     const opt = document.createElement('option');
     opt.value = a.id; opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
@@ -6105,7 +6071,7 @@ function openUploadModal() {
 
   const contactSel = document.getElementById('upload-link-contact');
   contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allContacts.slice(0, 200).forEach(function(c) {
+  allContacts.slice(0, 500).forEach(function(c) {
     if (!c.name) return;
     const opt = document.createElement('option');
     opt.value = c.id; opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
