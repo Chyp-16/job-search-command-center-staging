@@ -5969,8 +5969,13 @@ async function downloadDoc(id, storagePath) {
       headers: { 'Origin': location.origin }
     });
     const data = await r.json();
-    if (data.signedURL) {
-      window.open(data.signedURL, '_blank');
+    var signedUrl = data.signedURL || data.signedUrl || '';
+    if (signedUrl) {
+      // If relative URL, prepend Supabase base
+      if (!signedUrl.startsWith('http')) {
+        signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co' + signedUrl;
+      }
+      window.open(signedUrl, '_blank');
     } else {
       toast('Could not generate download link.', 'error');
     }
