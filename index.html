@@ -6028,7 +6028,11 @@ async function openUploadModal() {
     if (!a.company) return;
     var opt = document.createElement('option');
     opt.value = a.id;
-    var dateStr = a.date_applied ? ' (' + a.date_applied.slice(0,10) + ')' : '';
+    var dateStr = '';
+    if (a.date_applied) {
+      var dp = a.date_applied.slice(0,10).split('-');
+      dateStr = ' (' + parseInt(dp[1]) + '/' + parseInt(dp[2]) + '/' + dp[0] + ')';
+    }
     opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '') + dateStr;
     appSel.appendChild(opt);
   });
