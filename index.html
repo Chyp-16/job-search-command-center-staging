@@ -6217,16 +6217,10 @@ async function submitUpload() {
     document.getElementById('upload-progress-text').textContent = 'Upload complete.';
 
     closeModal('modal-upload');
-    await refreshDocs();
 
-    // If we're not on the uploads page, switch to it
-    const uploadsPage = document.getElementById('page-uploads');
-    if (uploadsPage && !uploadsPage.classList.contains('active')) {
-      document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
-      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-      document.querySelector('[data-page="uploads"]').classList.add('active');
-      uploadsPage.classList.add('active');
-    }
+    // Navigate to My Documents and reload
+    navigateTo('uploads');
+    await loadDocsPage();
 
     toast(uploadFile.name + ' uploaded successfully.', 'success');
   } catch(e) {
