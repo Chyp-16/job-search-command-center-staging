@@ -5881,7 +5881,7 @@ async function loadDocsPage() {
 }
 
 async function refreshDocs() {
-  const data = await dbGet('uploaded_documents', 'select=*,applications(company,job_title),contacts(name)&order=created_at.desc&limit=500');
+  const data = await dbGet('uploaded_documents', 'select=*,applications!uploaded_documents_linked_application_id_fkey(company,job_title),contacts!uploaded_documents_linked_contact_id_fkey(name)&order=created_at.desc&limit=500');
   allDocs = Array.isArray(data) ? data : [];
   filteredDocs = allDocs;
   renderDocsTable();
@@ -5935,23 +5935,26 @@ function renderDocsTable() {
   }
   tbody.innerHTML = filteredDocs.map(function(d) {
     const badgeCls = DOC_TYPE_BADGE[d.doc_type] || 'badge-other';
-    const appName = d.applications ? (d.applications.company || '') : '';
-    const contactName = d.contacts ? (d.contacts.name || '') : '';
+    const appName = (d.applications && d.applications.company) ? d.applications.company : (d.linked_application_id ? '(linked)' : '');
+    const contactName = (d.contacts && d.contacts.name) ? d.contacts.name : (d.linked_contact_id ? '(linked)' : '');
     const fileSizeStr = d.file_size ? (d.file_size > 1024*1024 ? (d.file_size/1024/1024).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
     const ext = (d.file_name || '').split('.').pop().toLowerCase();
     const icon = ext === 'pdf' ? '📕' : '📘';
+    var hasPath = !!(d.storage_path);
     return '<tr>' +
       '<td>' + icon + ' <strong>' + (d.file_name||'—') + '</strong>' +
         (fileSizeStr ? '<div style="font-size:11px;color:var(--text-light)">' + fileSizeStr + '</div>' : '') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (d.doc_type||'—') + '</span></td>' +
-      '<td>' + (d.company||'—') + '</td>' +
-      '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role||'—') + '</td>' +
+      '<td>' + (d.company || '—') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role || '—') + '</td>' +
       '<td style="font-size:12px">' + (appName || '—') + '</td>' +
       '<td style="font-size:12px">' + (contactName || '—') + '</td>' +
       '<td style="font-size:12px">' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</td>' +
       '<td><div class="table-actions">' +
-        '<button class="action-btn" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>' +
-        '<button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
+        (hasPath
+          ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
+          : '<span style="font-size:11px;color:var(--text-light)">No file</span>') +
+        ' <button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
