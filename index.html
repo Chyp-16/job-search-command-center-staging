@@ -6057,36 +6057,39 @@ async function openUploadModal() {
   document.getElementById('upload-submit-btn').textContent = 'Upload Document';
   document.getElementById('upload-submit-btn').onclick = submitUpload;
 
-  // Load apps and contacts if not already loaded
-  if (!allApps.length) {
-    const d = await dbGet('applications', 'select=id,company,job_title&order=date_applied.desc&limit=1000');
-    allApps = Array.isArray(d) ? d : [];
-  }
-  if (!allContacts.length) {
-    const d = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
-    allContacts = Array.isArray(d) ? d : [];
-  }
+  // Show modal immediately with loading state in dropdowns
+  var appSel = document.getElementById('upload-link-app');
+  var contactSel = document.getElementById('upload-link-contact');
+  appSel.innerHTML = "<option value=''>Loading applications...</option>";
+  contactSel.innerHTML = "<option value=''>Loading contacts...</option>";
+  openModal('modal-upload');
 
-  // Populate dropdowns
-  const appSel = document.getElementById('upload-link-app');
+  // Always fetch fresh from DB to guarantee full lists
+  var appsData = await dbGet('applications', 'select=id,company,job_title&order=company.asc&limit=1000');
+  if (Array.isArray(appsData) && appsData.length > 0) allApps = appsData;
+
+  var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
+  if (Array.isArray(contactsData) && contactsData.length > 0) allContacts = contactsData;
+
+  // Populate application dropdown
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0, 500).forEach(function(a) {
+  allApps.forEach(function(a) {
     if (!a.company) return;
-    const opt = document.createElement('option');
-    opt.value = a.id; opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     appSel.appendChild(opt);
   });
 
-  const contactSel = document.getElementById('upload-link-contact');
+  // Populate contact dropdown
   contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allContacts.slice(0, 500).forEach(function(c) {
+  allContacts.forEach(function(c) {
     if (!c.name) return;
-    const opt = document.createElement('option');
-    opt.value = c.id; opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
     contactSel.appendChild(opt);
   });
-
-  openModal('modal-upload');
 }
 
 function handleFileDrop(event) {
