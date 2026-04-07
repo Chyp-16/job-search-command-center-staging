@@ -961,13 +961,13 @@ a { color: var(--burgundy); text-decoration: none; }
         <table class="data-table">
           <thead>
             <tr>
-              <th onclick="sortApps('date_applied')">Date ↕</th>
-              <th onclick="sortApps('company')">Company ↕</th>
-              <th>Title</th>
-              <th onclick="sortApps('status')">Status ↕</th>
-              <th>Source</th>
-              <th>Salary</th>
-              <th>Outreach</th>
+              <th onclick="sortApps('date_applied')" id="sh-date_applied">Date ↕</th>
+              <th onclick="sortApps('company')" id="sh-company">Company ↕</th>
+              <th onclick="sortApps('job_title')" id="sh-job_title">Title ↕</th>
+              <th onclick="sortApps('status')" id="sh-status">Status ↕</th>
+              <th onclick="sortApps('source')" id="sh-source">Source ↕</th>
+              <th onclick="sortApps('salary')" id="sh-salary">Salary ↕</th>
+              <th onclick="sortApps('outreach_count')" id="sh-outreach_count">Outreach ↕</th>
               <th></th>
             </tr>
           </thead>
@@ -2688,6 +2688,7 @@ async function loadApps() {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
+  populateDropdowns();
   filterApps();
 }
 
@@ -2708,19 +2709,53 @@ function filterApps() {
     return true;
   });
 
-  currentPage = 1;
-  document.getElementById('app-count-label').textContent = `${allApps.length} total applications`;
-  document.getElementById('app-filter-count').textContent = filteredApps.length !== allApps.length ? `${filteredApps.length} shown` : '';
+  // Only reset to page 1 when filter values actually changed (not on edit save)
+  if (typeof arguments[0] === 'undefined' || arguments[0] !== 'keep-page') currentPage = 1;
+  document.getElementById('app-count-label').textContent = allApps.length + ' total applications';
+  document.getElementById('app-filter-count').textContent = filteredApps.length !== allApps.length ? filteredApps.length + ' shown' : '';
   renderAppsTable();
 }
 
 function sortApps(field) {
   if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
   else { sortField = field; sortDir = 'desc'; }
-  filteredApps.sort((a, b) => {
-    const av = a[field] || '', bv = b[field] || '';
-    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+
+  filteredApps.sort(function(a, b) {
+    var av, bv;
+    if (field === 'outreach_count') {
+      var countSent = function(x) {
+        return [x.initial_outreach_status, x.followup_3day_status, x.followup_1week_status, x.followup_2week_status]
+          .filter(function(s) { return s === 'Sent' || s === 'Opened' || s === 'Responded'; }).length;
+      };
+      av = countSent(a); bv = countSent(b);
+      return sortDir === 'asc' ? av - bv : bv - av;
+    } else if (field === 'salary') {
+      // Extract first number from salary string
+      av = parseFloat((a.salary || '0').replace(/[^0-9.]/g, '')) || 0;
+      bv = parseFloat((b.salary || '0').replace(/[^0-9.]/g, '')) || 0;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    } else if (field === 'date_applied') {
+      av = a.date_applied || ''; bv = b.date_applied || '';
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    } else {
+      av = (a[field] || '').toLowerCase(); bv = (b[field] || '').toLowerCase();
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
   });
+
+  // Update header indicators
+  document.querySelectorAll('[id^="sh-"]').forEach(function(th) {
+    var thField = th.id.replace('sh-', '');
+    var label = th.textContent.replace(' ↑','').replace(' ↓','').replace(' ↕','');
+    if (thField === field) {
+      th.textContent = label + (sortDir === 'asc' ? ' ↑' : ' ↓');
+      th.style.color = 'var(--burgundy)';
+    } else {
+      th.textContent = label + ' ↕';
+      th.style.color = '';
+    }
+  });
+
   renderAppsTable();
 }
 
@@ -2813,7 +2848,15 @@ function editApp(id) {
   editingId = id;
   document.getElementById('modal-app-title').textContent = 'Edit Application';
 
-  const setVal = (fid, val) => { const el = document.getElementById(fid); if (el) el.value = val || ''; };
+  // Ensure form dropdowns are populated before setting values
+  populateDropdowns();
+
+  const setVal = (fid, val) => {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    el.value = val || '';
+  };
+
   setVal('f-date', a.date_applied);
   setVal('f-company', a.company);
   setVal('f-title', a.job_title);
@@ -2822,10 +2865,23 @@ function editApp(id) {
   setVal('f-resume', a.resume_version);
   setVal('f-coverletter', a.cover_letter_version);
   setVal('f-notes', a.notes);
-  setVal('f-status', a.status);
-  setVal('f-source', a.source);
-  setVal('f-jobtype', a.job_type);
-  setVal('f-industry', a.industry);
+
+  // Set select values after ensuring options are populated
+  ['f-status', 'f-source', 'f-jobtype', 'f-industry'].forEach(function(fid) {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    const fieldMap = { 'f-status': 'status', 'f-source': 'source', 'f-jobtype': 'job_type', 'f-industry': 'industry' };
+    const val = a[fieldMap[fid]] || '';
+    // Check if option exists, if not add it temporarily
+    const exists = Array.from(el.options).some(function(o) { return o.value === val; });
+    if (!exists && val) {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      el.appendChild(opt);
+    }
+    el.value = val;
+  });
+
   setVal('f-io-status', a.initial_outreach_status);
   setVal('f-io-date', a.initial_outreach_date);
   setVal('f-io-notes', a.initial_outreach_notes);
@@ -2906,7 +2962,7 @@ async function saveApp() {
       toast('Application added.', 'success');
     }
     closeModal('modal-app');
-    filterApps();
+    filterApps('keep-page');
 
     // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
     if (savedApp) syncOutreachToHubSpot(savedApp);
@@ -3024,9 +3080,45 @@ function viewApp(id) {
     window._detailAppRole = a.job_title;
   }
 
-  // Load linked uploaded documents
+  // Load linked uploaded documents and related contacts
   loadDetailDocs(id);
+  loadDetailContacts(a.company);
   openModal('modal-detail');
+}
+
+async function loadDetailContacts(company) {
+  if (!company) return;
+  try {
+    // Find contacts at the same company
+    const companyLower = company.toLowerCase().trim();
+    const related = allContacts.filter(function(c) {
+      return c.company && c.company.toLowerCase().includes(companyLower);
+    });
+    if (related.length === 0) return;
+
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+
+    const section = document.createElement('div');
+    section.className = 'detail-section';
+    section.innerHTML =
+      '<div class="detail-section-title">Related Contacts at ' + company + ' (' + related.length + ')</div>' +
+      related.map(function(c) {
+        const badgeCls = c.contact_type === 'Recruiter' ? 'badge-interview-recruiter' :
+                         c.contact_type === 'Hiring Manager' ? 'badge-inprogress' : 'badge-outreach';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="flex:1">' +
+            '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title || '') + '</div>' +
+          '</div>' +
+          '<span class="badge ' + badgeCls + '">' + (c.contact_type || '—') + '</span>' +
+          '<button class="btn btn-secondary btn-sm" onclick="closeModal(&quot;modal-detail&quot;);editContact(&quot;' + c.id + '&quot;)">View</button>' +
+        '</div>';
+      }).join('');
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load contacts:', e.message);
+  }
 }
 
 async function loadDetailDocs(appId) {
