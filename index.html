@@ -2278,7 +2278,7 @@ a { color: var(--burgundy); text-decoration: none; }
 <!-- Upload Document Modal -->
 <!-- Upload Document Modal -->
 <div class="modal-overlay" id="modal-upload">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3>⬆ Upload Document</h3>
       <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
@@ -2342,7 +2342,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="upload-progress-text">Uploading...</p>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
       <button class="btn btn-secondary" onclick="closeModal('modal-upload')">Cancel</button>
       <button class="btn btn-primary" id="upload-submit-btn" onclick="submitUpload()">Upload Document</button>
     </div>
@@ -5891,21 +5891,23 @@ function renderDocsTable() {
 
 async function downloadDoc(id, storagePath) {
   try {
+    if (!storagePath) { toast('No file path found.', 'error'); return; }
     toast('Preparing download...', '');
-    const r = await fetch(WORKER_URL + '/storage/url/' + encodeURIComponent(storagePath), {
+    // storagePath may already be encoded — decode first then re-encode for the Worker URL
+    var decodedPath = decodeURIComponent(storagePath);
+    const r = await fetch(WORKER_URL + '/storage/url/' + encodeURIComponent(decodedPath), {
       method: 'POST',
       headers: { 'Origin': location.origin }
     });
     const data = await r.json();
     var signedUrl = data.signedURL || data.signedUrl || '';
     if (signedUrl) {
-      // If relative URL, prepend Supabase base
       if (!signedUrl.startsWith('http')) {
         signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co' + signedUrl;
       }
       window.open(signedUrl, '_blank');
     } else {
-      toast('Could not generate download link.', 'error');
+      toast('Download error: ' + (data.error || data.message || 'Could not generate link'), 'error');
     }
   } catch(e) { toast('Download error: ' + e.message, 'error'); }
 }
@@ -5992,16 +5994,27 @@ async function openUploadModal() {
   contactSel.innerHTML = "<option value=''>Loading contacts...</option>";
   openModal('modal-upload');
 
-  // Always replace (never append) to avoid duplicates
+  // Always reset arrays before fetching to prevent duplicates
+  allApps = [];
+  allContacts = [];
+
   var appsData = await dbGet('applications', 'select=id,company,job_title&order=company.asc&limit=1000');
-  allApps = Array.isArray(appsData) ? appsData : allApps;
+  allApps = Array.isArray(appsData) ? appsData : [];
 
   var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
-  allContacts = Array.isArray(contactsData) ? contactsData : allContacts;
+  allContacts = Array.isArray(contactsData) ? contactsData : [];
+
+  // Deduplicate by ID
+  var seen = {};
+  allApps = allApps.filter(function(a) { if (!a.id || seen[a.id]) return false; seen[a.id]=1; return true; });
+  var seenC = {};
+  allContacts = allContacts.filter(function(c) { if (!c.id || seenC[c.id]) return false; seenC[c.id]=1; return true; });
+  var uniqueApps = {}; allApps.forEach(function(a) { uniqueApps[a.id] = a; });
+  var uniqueContacts = {}; allContacts.forEach(function(c) { uniqueContacts[c.id] = c; });
 
   // Populate application dropdown
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.forEach(function(a) {
+  Object.values(uniqueApps).forEach(function(a) {
     if (!a.company) return;
     var opt = document.createElement('option');
     opt.value = a.id;
@@ -6011,7 +6024,7 @@ async function openUploadModal() {
 
   // Populate contact dropdown
   contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allContacts.forEach(function(c) {
+  Object.values(uniqueContacts).forEach(function(c) {
     if (!c.name) return;
     var opt = document.createElement('option');
     opt.value = c.id;
