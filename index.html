@@ -3110,13 +3110,13 @@ async function loadDetailContacts(company) {
 
     const section = document.createElement('div');
     section.className = 'detail-section';
+    // Show compact summary cards — click View to open full contact detail
     section.innerHTML =
       '<div class="detail-section-title">Related Contacts at ' + company + ' (' + related.length + ')</div>' +
       related.map(function(c) {
-        const badgeCls = c.contact_type === 'Recruiter' ? 'badge-interview-recruiter' :
-                         c.contact_type === 'Hiring Manager' ? 'badge-inprogress' : 'badge-outreach';
+        const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
         var linkedInHtml = c.linkedin_url
-          ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)">LinkedIn ↗</a>'
+          ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>'
           : '';
         return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
           '<div style="flex:1">' +
@@ -3125,7 +3125,7 @@ async function loadDetailContacts(company) {
             (linkedInHtml ? '<div style="margin-top:2px">' + linkedInHtml + '</div>' : '') +
           '</div>' +
           '<span class="badge ' + badgeCls + '">' + (c.contact_type || '—') + '</span>' +
-          '<button class="btn btn-secondary btn-sm" onclick="closeModal(&quot;modal-detail&quot;);editContact(&quot;' + c.id + '&quot;)">View</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="viewContactFromApp(' + JSON.stringify(c.id) + ')">View</button>' +
         '</div>';
       }).join('');
     detailBody.appendChild(section);
@@ -3296,7 +3296,7 @@ function renderContactsTable() {
       '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.next_action||'—') + '</td>' +
       '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
       '<td><div class="table-actions">' +
-        '<button class="action-btn" onclick="viewContact(\'' + c.id + '\')" title="View">👁</button>' +
+
         '<button class="action-btn" onclick="editContact(\'' + c.id + '\')" title="Edit">✏️</button>' +
         '<button class="action-btn danger" onclick="deleteContact(\'' + c.id + '\')" title="Delete">🗑</button>' +
       '</div></td>' +
@@ -3304,50 +3304,52 @@ function renderContactsTable() {
   }).join('');
 }
 
-function viewContact(id) {
-  const c = allContacts.find(x => x.id === id);
-  if (!c) return;
+function buildContactDetailHTML(c) {
+  // Shared HTML builder used by both viewContact and related contacts popup
   const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
-  document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
   const touches = [
     {l:'Touch 1', s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
     {l:'Touch 2', s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
     {l:'Touch 3', s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
   ];
-  document.getElementById('detail-body').innerHTML =
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Contact Info</div>' +
-      '<div class="detail-grid">' +
-        '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
-        (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
-        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
-        (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
-        (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
-      '</div>' +
+  return '<div class="detail-section">' +
+    '<div class="detail-section-title">Contact Info</div>' +
+    '<div class="detail-grid">' +
+      '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
+      (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
+      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+      (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
+      (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
     '</div>' +
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Outreach Log</div>' +
-      '<div class="outreach-track" style="grid-template-columns:repeat(3,1fr)">' +
-        touches.map(t =>
-          '<div class="outreach-touch">' +
-            '<div class="touch-label">' + t.l + '</div>' +
-            '<div class="touch-status">' + (t.s||'—') + '</div>' +
-            '<div class="touch-date">' + fmt(t.d) + '</div>' +
-            (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
-          '</div>'
-        ).join('') +
-      '</div>' +
-    '</div>';
-  document.getElementById('detail-edit-btn').style.display = '';
-  document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
-  const uploadBtnC = document.getElementById('detail-upload-btn');
-  if (uploadBtnC) uploadBtnC.style.display = 'none';
-  openModal('modal-detail');
+  '</div>' +
+  '<div class="detail-section">' +
+    '<div class="detail-section-title">Outreach Log</div>' +
+    '<div class="outreach-track" style="grid-template-columns:repeat(3,1fr)">' +
+      touches.map(function(t) {
+        return '<div class="outreach-touch">' +
+          '<div class="touch-label">' + t.l + '</div>' +
+          '<div class="touch-status">' + (t.s||'—') + '</div>' +
+          '<div class="touch-date">' + fmt(t.d) + '</div>' +
+          (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
+        '</div>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+function viewContact(id) {
+  // Just open the edit modal directly — no separate view modal
+  editContact(id);
+}
+
+function viewContactFromApp(contactId) {
+  closeModal('modal-detail');
+  setTimeout(function() { editContact(contactId); }, 200);
 }
 
 function openAddContact(defaultType) {
@@ -3505,6 +3507,13 @@ async function syncHubSpot() {
       const name = ((hc.properties?.firstname || '') + ' ' + (hc.properties?.lastname || '')).trim();
       if (!name) continue;
       const hsId = String(hc.id);
+      // Extract LinkedIn URL from multiple possible HubSpot property names
+      // HubSpot stores LinkedIn as hs_linkedinbio (no underscore before bio)
+      const linkedInUrl = hc.properties?.hs_linkedinbio ||
+                          hc.properties?.hs_linkedin_bio ||
+                          hc.properties?.linkedin_bio ||
+                          hc.properties?.linkedinbio || null;
+
       const payload = {
         name,
         company: hc.properties?.company || null,
@@ -3512,6 +3521,7 @@ async function syncHubSpot() {
         contact_type: 'Recruiter',
         connection_source: 'HubSpot',
         hubspot_contact_id: hsId,
+        linkedin_url: linkedInUrl,
         notes: hc.properties?.email ? 'Email: ' + hc.properties.email : null,
         last_contact_date: hc.properties?.lastmodifieddate
           ? hc.properties.lastmodifieddate.split('T')[0] : null,
