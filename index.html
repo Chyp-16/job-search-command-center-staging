@@ -5992,12 +5992,12 @@ async function openUploadModal() {
   contactSel.innerHTML = "<option value=''>Loading contacts...</option>";
   openModal('modal-upload');
 
-  // Always fetch fresh from DB to guarantee full lists
+  // Always replace (never append) to avoid duplicates
   var appsData = await dbGet('applications', 'select=id,company,job_title&order=company.asc&limit=1000');
-  if (Array.isArray(appsData) && appsData.length > 0) allApps = appsData;
+  allApps = Array.isArray(appsData) ? appsData : allApps;
 
   var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
-  if (Array.isArray(contactsData) && contactsData.length > 0) allContacts = contactsData;
+  allContacts = Array.isArray(contactsData) ? contactsData : allContacts;
 
   // Populate application dropdown
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
