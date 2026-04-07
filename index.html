@@ -6063,6 +6063,15 @@ async function saveDocEdits(id) {
 }
 
 // ── UPLOAD MODAL ─────────────────────────────────────────────────────────
+function openUploadDoc(docType) {
+  // Opens the upload modal pre-set to the given document type
+  openUploadModal();
+  setTimeout(function() {
+    const el = document.getElementById('upload-doc-type');
+    if (el && docType) el.value = docType;
+  }, 150);
+}
+
 function openUploadModal() {
   uploadFile = null;
   clearUploadFile();
