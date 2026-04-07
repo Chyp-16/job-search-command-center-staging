@@ -1944,6 +1944,10 @@ a { color: var(--burgundy); text-decoration: none; }
           <input class="form-input" type="date" id="cf-next-date">
         </div>
         <div class="form-group full">
+          <label class="form-label">LinkedIn URL</label>
+          <input class="form-input" type="url" id="cf-linkedin" placeholder="https://linkedin.com/in/...">
+        </div>
+        <div class="form-group full">
           <label class="form-label">Notes</label>
           <textarea class="form-textarea" id="cf-notes" placeholder="Context, conversation notes..."></textarea>
         </div>
@@ -3089,6 +3093,11 @@ function viewApp(id) {
 async function loadDetailContacts(company) {
   if (!company) return;
   try {
+    // Load contacts from DB if not yet loaded
+    if (!allContacts.length) {
+      const data = await dbGet('contacts', 'select=*&order=name.asc&limit=2000');
+      allContacts = Array.isArray(data) ? data : [];
+    }
     // Find contacts at the same company
     const companyLower = company.toLowerCase().trim();
     const related = allContacts.filter(function(c) {
@@ -3106,10 +3115,14 @@ async function loadDetailContacts(company) {
       related.map(function(c) {
         const badgeCls = c.contact_type === 'Recruiter' ? 'badge-interview-recruiter' :
                          c.contact_type === 'Hiring Manager' ? 'badge-inprogress' : 'badge-outreach';
+        var linkedInHtml = c.linkedin_url
+          ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)">LinkedIn ↗</a>'
+          : '';
         return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
           '<div style="flex:1">' +
             '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
             '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title || '') + '</div>' +
+            (linkedInHtml ? '<div style="margin-top:2px">' + linkedInHtml + '</div>' : '') +
           '</div>' +
           '<span class="badge ' + badgeCls + '">' + (c.contact_type || '—') + '</span>' +
           '<button class="btn btn-secondary btn-sm" onclick="closeModal(&quot;modal-detail&quot;);editContact(&quot;' + c.id + '&quot;)">View</button>' +
@@ -3275,7 +3288,7 @@ function renderContactsTable() {
     const overdueStyle = isOverdue(c.next_action_date) && c.next_action_date ? 'color:var(--burgundy);font-weight:600' : '';
     const hubspotLinked = c.hubspot_contact_id ? '<span title="Linked to HubSpot" style="color:#f97316;font-size:11px;margin-left:4px">● HS</span>' : '';
     return '<tr>' +
-      '<td><strong>' + c.name + '</strong>' + hubspotLinked + '</td>' +
+      '<td><strong>' + c.name + '</strong>' + hubspotLinked + (c.linkedin_url ? ' <a href="' + c.linkedin_url + '" target="_blank" title="LinkedIn" style="color:var(--burgundy);font-size:11px">in</a>' : '') + '</td>' +
       '<td>' + (c.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></td>' +
@@ -3312,6 +3325,7 @@ function viewContact(id) {
         '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
         '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
         (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
+        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
         (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
         (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
       '</div>' +
@@ -3339,7 +3353,7 @@ function viewContact(id) {
 function openAddContact(defaultType) {
   editingId = null;
   document.getElementById('modal-contact-title').textContent = 'Add Contact';
-  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action','cf-linkedin','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-o1s','cf-o2s','cf-o3s'].forEach(function(id) { var e=document.getElementById(id); if(e) e.selectedIndex=0; });
   if (defaultType) { var el=document.getElementById('cf-type'); if(el) el.value=defaultType; }
@@ -3355,7 +3369,7 @@ function editContact(id) {
   sv('cf-name', c.name); sv('cf-company', c.company); sv('cf-title', c.title);
   sv('cf-type', c.contact_type); sv('cf-source', c.connection_source);
   sv('cf-last-date', c.last_contact_date); sv('cf-next-action', c.next_action);
-  sv('cf-next-date', c.next_action_date); sv('cf-notes', c.notes);
+  sv('cf-next-date', c.next_action_date); sv('cf-linkedin', c.linkedin_url); sv('cf-notes', c.notes);
   sv('cf-o1s', c.outreach_1_status); sv('cf-o1d', c.outreach_1_date); sv('cf-o1n', c.outreach_1_notes);
   sv('cf-o2s', c.outreach_2_status); sv('cf-o2d', c.outreach_2_date); sv('cf-o2n', c.outreach_2_notes);
   sv('cf-o3s', c.outreach_3_status); sv('cf-o3d', c.outreach_3_date); sv('cf-o3n', c.outreach_3_notes);
@@ -3371,6 +3385,7 @@ async function saveContact() {
     last_contact_date: getVal('cf-last-date') || null,
     next_action: getVal('cf-next-action'),
     next_action_date: getVal('cf-next-date') || null,
+    linkedin_url: getVal('cf-linkedin'),
     notes: getVal('cf-notes'),
     outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
     outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d') || null, outreach_2_notes: getVal('cf-o2n'),
