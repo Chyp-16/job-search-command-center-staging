@@ -2889,6 +2889,16 @@ async function saveApp() {
       savedApp = allApps.find(x => x.id === editingId);
       toast('Application updated.', 'success');
     } else {
+      // Check for duplicate before saving
+      const duplicate = allApps.find(function(a) {
+        return a.company && payload.company &&
+          a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
+          a.job_title && payload.job_title &&
+          a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
+      });
+      if (duplicate) {
+        if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
+      }
       const result = await dbPost('applications', payload);
       savedApp = Array.isArray(result) ? result[0] : result;
       allApps.unshift(savedApp);
