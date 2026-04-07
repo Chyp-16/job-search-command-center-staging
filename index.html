@@ -2342,7 +2342,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="upload-progress-text">Uploading...</p>
       </div>
     </div>
-    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px;min-height:56px">
       <button class="btn btn-secondary" onclick="closeModal('modal-upload')">Cancel</button>
       <button class="btn btn-primary" id="upload-submit-btn" onclick="submitUpload()">Upload Document</button>
     </div>
@@ -5893,11 +5893,11 @@ async function downloadDoc(id, storagePath) {
   try {
     if (!storagePath) { toast('No file path found.', 'error'); return; }
     toast('Preparing download...', '');
-    // storagePath may already be encoded — decode first then re-encode for the Worker URL
-    var decodedPath = decodeURIComponent(storagePath);
-    const r = await fetch(WORKER_URL + '/storage/url/' + encodeURIComponent(decodedPath), {
+    // Send path as a POST body to avoid URL encoding issues
+    const r = await fetch(WORKER_URL + '/storage/url', {
       method: 'POST',
-      headers: { 'Origin': location.origin }
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
     });
     const data = await r.json();
     var signedUrl = data.signedURL || data.signedUrl || '';
