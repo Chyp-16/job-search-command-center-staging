@@ -2283,7 +2283,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <h3>⬆ Upload Document</h3>
       <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" style="overflow-x:hidden">
       <!-- Drop zone -->
       <div id="upload-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px;background:var(--bg)"
            onclick="document.getElementById('upload-file-input').click()"
@@ -2300,7 +2300,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <button onclick="clearUploadFile()" style="margin-left:auto;background:none;border:none;color:var(--burgundy);cursor:pointer;font-size:16px">✕</button>
       </div>
 
-      <div class="form-grid">
+      <div class="form-grid" style="width:100%;box-sizing:border-box">
         <div class="form-group">
           <label class="form-label">Document Type</label>
           <select class="form-select" id="upload-doc-type" onchange="autoFillUploadType()">
