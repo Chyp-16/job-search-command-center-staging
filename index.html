@@ -6008,7 +6008,7 @@ async function openUploadModal() {
   allApps = [];
   allContacts = [];
 
-  var appsData = await dbGet('applications', 'select=id,company,job_title&order=company.asc&limit=1000');
+  var appsData = await dbGet('applications', 'select=id,company,job_title,date_applied&order=company.asc&limit=1000');
   allApps = Array.isArray(appsData) ? appsData : [];
 
   var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
