@@ -6063,13 +6063,21 @@ async function saveDocEdits(id) {
 }
 
 // ── UPLOAD MODAL ─────────────────────────────────────────────────────────
-function openUploadDoc(docType) {
-  // Opens the upload modal pre-set to the given document type
+async function openUploadDoc(docType) {
+  // Ensure apps and contacts are loaded for the dropdowns
+  if (!allApps.length) {
+    const data = await dbGet('applications', 'select=id,company,job_title&order=date_applied.desc&limit=500');
+    allApps = Array.isArray(data) ? data : [];
+  }
+  if (!allContacts.length) {
+    const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=500');
+    allContacts = Array.isArray(data) ? data : [];
+  }
   openUploadModal();
   setTimeout(function() {
     const el = document.getElementById('upload-doc-type');
     if (el && docType) el.value = docType;
-  }, 150);
+  }, 200);
 }
 
 function openUploadModal() {
@@ -6217,12 +6225,16 @@ async function submitUpload() {
     document.getElementById('upload-progress-text').textContent = 'Upload complete.';
 
     closeModal('modal-upload');
-
-    // Navigate to My Documents and reload
-    navigateTo('uploads');
-    await loadDocsPage();
-
     toast(uploadFile.name + ' uploaded successfully.', 'success');
+
+    // Refresh docs table if already on uploads page, otherwise navigate there
+    const uploadsPage = document.getElementById('page-uploads');
+    if (uploadsPage && uploadsPage.classList.contains('active')) {
+      await loadDocsPage();
+    } else {
+      navigateTo('uploads');
+      await loadDocsPage();
+    }
   } catch(e) {
     document.getElementById('upload-progress-text').textContent = 'Error: ' + e.message;
     toast('Upload failed: ' + e.message, 'error');
