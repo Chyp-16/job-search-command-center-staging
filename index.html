@@ -1035,7 +1035,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">📄 Base Documents</button>
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Resume')">⬆ Upload Resume</button>
+          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Resume');})()">⬆ Upload Resume</button>
           <button class="btn btn-primary" onclick="openAddResume()">+ Add Version</button>
         </div>
       </div>
@@ -1074,7 +1074,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Stored versions linked to applications</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Cover Letter')">⬆ Upload Cover Letter</button>
+          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Cover Letter');})()">⬆ Upload Cover Letter</button>
           <button class="btn btn-primary" onclick="openAddCoverLetter()">+ Add Cover Letter</button>
         </div>
       </div>
@@ -1699,7 +1699,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Upload and track resumes, cover letters, and job descriptions</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-primary" onclick="openUploadModal()">⬆ Upload Document</button>
+          <button class="btn btn-primary" onclick="(async()=>{await openUploadModal();})()">⬆ Upload Document</button>
         </div>
       </div>
       <div class="filter-bar">
@@ -3122,14 +3122,14 @@ async function loadDetailDocs(appId) {
   }
 }
 
-function openUploadFromDetail() {
+async function openUploadFromDetail() {
   const appId = window._detailAppId;
   const company = window._detailAppCompany || '';
   const role = window._detailAppRole || '';
   closeModal('modal-detail');
 
   // Open upload modal pre-filled for this application
-  openUploadModal();
+  await openUploadModal();
   setTimeout(function() {
     // Pre-select doc type and link to this application
     const docType = document.getElementById('upload-doc-type');
@@ -5992,10 +5992,10 @@ async function deleteDoc(id, storagePath) {
   toast('Document deleted.', 'success');
 }
 
-function editDocRecord(id) {
+async function editDocRecord(id) {
   const d = allDocs.find(function(x) { return x.id === id; });
   if (!d) return;
-  openUploadModal();
+  await openUploadModal();
   setTimeout(function() {
     document.getElementById('upload-company').value = d.company || '';
     document.getElementById('upload-role').value = d.role || '';
@@ -6037,7 +6037,7 @@ async function openUploadDoc(docType) {
     const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=500');
     allContacts = Array.isArray(data) ? data : [];
   }
-  openUploadModal();
+  await openUploadModal();
   setTimeout(function() {
     const el = document.getElementById('upload-doc-type');
     if (el && docType) el.value = docType;
