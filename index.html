@@ -3349,7 +3349,15 @@ function viewContact(id) {
 
 function viewContactFromApp(contactId) {
   closeModal('modal-detail');
-  setTimeout(function() { editContact(contactId); }, 200);
+  setTimeout(function() {
+    // Navigate to contacts tab and open the contact detail
+    navigateTo('contacts');
+    if (!allContacts.length) {
+      loadContacts().then(function() { viewContact(contactId); });
+    } else {
+      viewContact(contactId);
+    }
+  }, 200);
 }
 
 function openAddContact(defaultType) {
