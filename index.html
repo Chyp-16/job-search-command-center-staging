@@ -820,9 +820,6 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="uploads">
         <span class="nav-icon">📁</span><span>My Documents</span>
       </div>
-      <div class="nav-item" data-page="uploads">
-        <span class="nav-icon">🗂</span><span>Uploaded Docs</span>
-      </div>
       <div class="nav-section-label">Intelligence</div>
       <div class="nav-item" data-page="ai">
         <span class="nav-icon">✦</span><span>AI Tools</span>
@@ -994,6 +991,8 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="">All Contacts</option>
             <option value="Recruiter">Recruiters</option>
             <option value="Hiring Manager">Hiring Managers</option>
+            <option value="HR">HR</option>
+            <option value="Talent Acquisition">Talent Acquisition</option>
             <option value="Networking">Networking</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
@@ -1915,7 +1914,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="form-group">
           <label class="form-label">Contact Type</label>
           <select class="form-select" id="cf-type">
-            <option>Recruiter</option><option>Hiring Manager</option><option>Networking</option>
+            <option>Recruiter</option><option>Hiring Manager</option><option>HR</option><option>Talent Acquisition</option><option>Networking</option>
           </select>
         </div>
         <div class="form-group">
@@ -2588,6 +2587,12 @@ async function refreshDashboard() {
   if (!allApps.length) {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
+  }
+  // Auto-sync HubSpot tasks and activity on dashboard load
+  if (!window._hubspotAutoSynced) {
+    window._hubspotAutoSynced = true;
+    syncHubSpotTasks();
+    syncHubSpotActivity();
   }
 
   const total = allApps.length;
@@ -6740,7 +6745,13 @@ async function runJobSearch() {
     const result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
-    contentEl.textContent = result;
+    // Render markdown bold (**text**) as actual bold HTML
+    var rendered = result
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    contentEl.innerHTML = rendered;
+    contentEl.style.whiteSpace = 'normal';
     toast('Search complete.', 'success');
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
