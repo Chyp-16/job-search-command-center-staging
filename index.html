@@ -3351,16 +3351,16 @@ function viewContact(id) {
 }
 
 function viewContactFromApp(contactId) {
-  closeModal('modal-detail');
-  // Fetch just this one contact and open its detail view
+  // Fetch contact and open detail popup WITHOUT leaving the current page
   dbGet('contacts', 'select=*&id=eq.' + contactId).then(function(data) {
     var c = Array.isArray(data) ? data[0] : data;
     if (!c) { toast('Contact not found.', 'error'); return; }
-    // Add to allContacts if not already there
     if (!allContacts.find(function(x) { return x.id === contactId; })) {
       allContacts.push(c);
     }
-    viewContact(contactId);
+    // Close app detail first, then open contact detail
+    closeModal('modal-detail');
+    setTimeout(function() { viewContact(contactId); }, 150);
   }).catch(function(e) {
     toast('Could not load contact.', 'error');
   });
