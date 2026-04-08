@@ -3582,12 +3582,14 @@ async function syncHubSpot() {
                         hc.properties?.linkedinbio ||
                         hc.properties?.linkedinid ||
                         hc.properties?.hs_linkedinid || null;
-      // If it's just an ID (not a full URL), build the URL
+      // Clean and build LinkedIn URL
       var linkedInUrl = null;
       if (rawLinkedIn) {
+        // Strip HubSpot formatting underscores e.g. __https://...__ 
+        rawLinkedIn = rawLinkedIn.replace(/^_+|_+$/g, '').trim();
         if (rawLinkedIn.startsWith('http')) {
           linkedInUrl = rawLinkedIn;
-        } else {
+        } else if (rawLinkedIn.length > 0) {
           linkedInUrl = 'https://linkedin.com/in/' + rawLinkedIn;
         }
       }
