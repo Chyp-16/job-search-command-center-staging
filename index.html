@@ -3128,7 +3128,7 @@ async function loadDetailContacts(company) {
             (linkedInHtml ? '<div style="margin-top:2px">' + linkedInHtml + '</div>' : '') +
           '</div>' +
           '<span class="badge ' + badgeCls + '">' + (c.contact_type || '—') + '</span>' +
-          '<button class="btn btn-secondary btn-sm" onclick="viewContactFromApp(\'' + c.id + '\')">View</button>' +
+          '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
         '</div>';
       }).join('');
     detailBody.appendChild(section);
