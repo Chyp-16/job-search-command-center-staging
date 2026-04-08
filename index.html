@@ -3574,7 +3574,9 @@ async function syncHubSpot() {
       if (!name) continue;
       const hsId = String(hc.id);
       // Extract LinkedIn URL from HubSpot — try all known property names
-      var rawLinkedIn = hc.properties?.hs_linkedinbio ||
+      var rawLinkedIn = hc.properties?.hs_linkedin_url ||
+                        hc.properties?.linkedin_url ||
+                        hc.properties?.hs_linkedinbio ||
                         hc.properties?.hs_linkedin_bio ||
                         hc.properties?.linkedin_bio ||
                         hc.properties?.linkedinbio ||
