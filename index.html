@@ -3629,11 +3629,25 @@ async function syncHubSpot() {
       await new Promise(res => setTimeout(res, 300));
     }
 
-    // Update existing contacts one at a time (small number expected)
+    // Update existing contacts — only patch fields that have changed
     let updated = 0;
     for (const { id, payload } of toUpdate) {
-      await dbPatch('contacts', id, payload);
-      updated++;
+      const existing = allContacts.find(c => c.id === id);
+      // Only update if linkedin_url or email has changed
+      const patch = {};
+      if (payload.linkedin_url && payload.linkedin_url !== (existing?.linkedin_url || null)) {
+        patch.linkedin_url = payload.linkedin_url;
+      }
+      if (payload.email && payload.email !== (existing?.email || null)) {
+        patch.email = payload.email;
+      }
+      if (payload.name && payload.name !== existing?.name) patch.name = payload.name;
+      if (payload.title && payload.title !== existing?.title) patch.title = payload.title;
+      if (payload.company && payload.company !== existing?.company) patch.company = payload.company;
+      if (Object.keys(patch).length > 0) {
+        await dbPatch('contacts', id, patch);
+        updated++;
+      }
     }
 
     // Reload contacts from DB to get full fresh list
