@@ -3513,6 +3513,12 @@ async function syncHubSpot() {
   if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
 
   try {
+    // Ensure all contacts are loaded from DB before matching
+    if (allContacts.length < 100) {
+      if (btn) btn.textContent = '⟳ Loading contacts...';
+      await loadContacts();
+    }
+
     // Paginate through all HubSpot contacts (100 per page)
     let allHsContacts = [];
     let after = '';
