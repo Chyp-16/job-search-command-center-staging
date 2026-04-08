@@ -3248,19 +3248,21 @@ const CONTACT_TYPE_BADGE = {
 
 async function migrateContactEmails() {
   // One-time migration: extract emails from notes field into email field
+  // Run silently in background — don't block page render
   var toMigrate = allContacts.filter(function(c) {
     return !c.email && c.notes && c.notes.includes('Email: ');
   });
-  for (var i = 0; i < toMigrate.length; i++) {
-    var c = toMigrate[i];
-    var match = c.notes.match(/Email:\s*([^\s,;]+@[^\s,;]+)/);
-    if (match) {
-      var email = match[1];
-      await dbPatch('contacts', c.id, { email: email, notes: c.notes.replace(/Email:\s*[^\s,;]+@[^\s,;]+\s*/, '').trim() || null });
-      c.email = email;
-    }
-  }
-  if (toMigrate.length > 0) console.log('Migrated emails for', toMigrate.length, 'contacts.');
+  if (toMigrate.length === 0) return;
+  console.log('Migrating emails for', toMigrate.length, 'contacts in background...');
+  // Fire and forget — don't await individual patches
+  toMigrate.forEach(function(c) {
+    var emailMatch = c.notes ? c.notes.match(/Email:\s*([^\s,;<]+@[^\s,;<]+)/) : null;
+    if (!emailMatch) return;
+    var email = emailMatch[1];
+    var newNotes = c.notes.replace('Email: ' + email, '').trim() || null;
+    c.email = email; // update in memory immediately
+    dbPatch('contacts', c.id, { email: email, notes: newNotes }); // fire without await
+  });
 }
 
 async function loadContacts() {
@@ -3280,7 +3282,7 @@ async function loadContacts() {
 
   allContacts = allData;
   filteredContacts = allContacts;
-  await migrateContactEmails();
+  migrateContactEmails(); // non-blocking background migration
   renderContactsTable();
   updateContactCount();
 }
