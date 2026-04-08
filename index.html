@@ -3352,15 +3352,18 @@ function viewContact(id) {
 
 function viewContactFromApp(contactId) {
   closeModal('modal-detail');
-  setTimeout(function() {
-    // Navigate to contacts tab and open the contact detail
-    navigateTo('contacts');
-    if (!allContacts.length) {
-      loadContacts().then(function() { viewContact(contactId); });
-    } else {
-      viewContact(contactId);
+  // Fetch just this one contact and open its detail view
+  dbGet('contacts', 'select=*&id=eq.' + contactId).then(function(data) {
+    var c = Array.isArray(data) ? data[0] : data;
+    if (!c) { toast('Contact not found.', 'error'); return; }
+    // Add to allContacts if not already there
+    if (!allContacts.find(function(x) { return x.id === contactId; })) {
+      allContacts.push(c);
     }
-  }, 200);
+    viewContact(contactId);
+  }).catch(function(e) {
+    toast('Could not load contact.', 'error');
+  });
 }
 
 function openAddContact(defaultType) {
