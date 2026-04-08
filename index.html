@@ -1944,7 +1944,11 @@ a { color: var(--burgundy); text-decoration: none; }
           <label class="form-label">Next Action Date</label>
           <input class="form-input" type="date" id="cf-next-date">
         </div>
-        <div class="form-group full">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="cf-email" placeholder="name@company.com">
+        </div>
+        <div class="form-group">
           <label class="form-label">LinkedIn URL</label>
           <input class="form-input" type="url" id="cf-linkedin" placeholder="https://linkedin.com/in/...">
         </div>
@@ -3242,6 +3246,23 @@ const CONTACT_TYPE_BADGE = {
   'Networking': 'badge-outreach',
 };
 
+async function migrateContactEmails() {
+  // One-time migration: extract emails from notes field into email field
+  var toMigrate = allContacts.filter(function(c) {
+    return !c.email && c.notes && c.notes.includes('Email: ');
+  });
+  for (var i = 0; i < toMigrate.length; i++) {
+    var c = toMigrate[i];
+    var match = c.notes.match(/Email:\s*([^\s,;]+@[^\s,;]+)/);
+    if (match) {
+      var email = match[1];
+      await dbPatch('contacts', c.id, { email: email, notes: c.notes.replace(/Email:\s*[^\s,;]+@[^\s,;]+\s*/, '').trim() || null });
+      c.email = email;
+    }
+  }
+  if (toMigrate.length > 0) console.log('Migrated emails for', toMigrate.length, 'contacts.');
+}
+
 async function loadContacts() {
   // Paginate through all contacts — Supabase caps at 1000 per request
   const PAGE = 1000;
@@ -3259,6 +3280,7 @@ async function loadContacts() {
 
   allContacts = allData;
   filteredContacts = allContacts;
+  await migrateContactEmails();
   renderContactsTable();
   updateContactCount();
 }
@@ -3376,7 +3398,8 @@ function viewContactFromApp(contactId) {
           '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + (c.next_action||'—') + '</span></div>' +
-          (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+          (c.email ? '<div class="detail-field"><span class="detail-field-label">Email</span><span class="detail-field-value"><a href="mailto:' + c.email + '" style="color:var(--burgundy)">' + c.email + '</a></span></div>' : '') +
+        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
           (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
         '</div>' +
       '</div>';
@@ -3395,7 +3418,7 @@ function viewContactFromApp(contactId) {
 function openAddContact(defaultType) {
   editingId = null;
   document.getElementById('modal-contact-title').textContent = 'Add Contact';
-  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action','cf-linkedin','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  ['cf-name','cf-company','cf-title','cf-email','cf-notes','cf-next-action','cf-linkedin','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-o1s','cf-o2s','cf-o3s'].forEach(function(id) { var e=document.getElementById(id); if(e) e.selectedIndex=0; });
   if (defaultType) { var el=document.getElementById('cf-type'); if(el) el.value=defaultType; }
@@ -3411,7 +3434,7 @@ function editContact(id) {
   sv('cf-name', c.name); sv('cf-company', c.company); sv('cf-title', c.title);
   sv('cf-type', c.contact_type); sv('cf-source', c.connection_source);
   sv('cf-last-date', c.last_contact_date); sv('cf-next-action', c.next_action);
-  sv('cf-next-date', c.next_action_date); sv('cf-linkedin', c.linkedin_url); sv('cf-notes', c.notes);
+  sv('cf-next-date', c.next_action_date); sv('cf-email', c.email); sv('cf-linkedin', c.linkedin_url); sv('cf-notes', c.notes);
   sv('cf-o1s', c.outreach_1_status); sv('cf-o1d', c.outreach_1_date); sv('cf-o1n', c.outreach_1_notes);
   sv('cf-o2s', c.outreach_2_status); sv('cf-o2d', c.outreach_2_date); sv('cf-o2n', c.outreach_2_notes);
   sv('cf-o3s', c.outreach_3_status); sv('cf-o3d', c.outreach_3_date); sv('cf-o3n', c.outreach_3_notes);
@@ -3427,6 +3450,7 @@ async function saveContact() {
     last_contact_date: getVal('cf-last-date') || null,
     next_action: getVal('cf-next-action'),
     next_action_date: getVal('cf-next-date') || null,
+    email: getVal('cf-email'),
     linkedin_url: getVal('cf-linkedin'),
     notes: getVal('cf-notes'),
     outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
@@ -3571,8 +3595,9 @@ async function syncHubSpot() {
         contact_type: 'Recruiter',
         connection_source: 'HubSpot',
         hubspot_contact_id: hsId,
+        email: hc.properties?.email || null,
         linkedin_url: linkedInUrl,
-        notes: hc.properties?.email ? 'Email: ' + hc.properties.email : null,
+        notes: null,
         last_contact_date: hc.properties?.lastmodifieddate
           ? hc.properties.lastmodifieddate.split('T')[0] : null,
       };
