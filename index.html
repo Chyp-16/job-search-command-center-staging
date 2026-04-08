@@ -3351,56 +3351,40 @@ function viewContact(id) {
 }
 
 function viewContactFromApp(contactId) {
-  // Remember which page we're on so we can restore it after closing the contact modal
-  var currentActivePage = document.querySelector('.page.active');
-  var currentActiveNav = document.querySelector('.nav-item.active');
-  var currentPageId = currentActivePage ? currentActivePage.id : 'page-applications';
-  var currentNavPage = currentActiveNav ? currentActiveNav.dataset.page : 'applications';
-
-  // Save the current application ID so we can reopen it after
-  var currentAppId = window._detailAppId || null;
+  var appId = window._detailAppId;
   dbGet('contacts', 'select=*&id=eq.' + contactId).then(function(data) {
     var c = Array.isArray(data) ? data[0] : data;
     if (!c) { toast('Contact not found.', 'error'); return; }
-    if (!allContacts.find(function(x) { return x.id === contactId; })) {
-      allContacts.push(c);
+
+    // Store in allContacts if needed
+    if (!allContacts.find(function(x) { return x.id === contactId; })) allContacts.push(c);
+
+    // Swap modal-detail content with contact info + Back button
+    document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
+    var badgeCls = c.contact_type === 'Recruiter' ? 'badge-interview-recruiter' :
+                   c.contact_type === 'Hiring Manager' ? 'badge-inprogress' : 'badge-outreach';
+    document.getElementById('detail-body').innerHTML =
+      '<div class="detail-section">' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + (c.next_action||'—') + '</span></div>' +
+          (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+          (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
+        '</div>' +
+      '</div>';
+
+    // Replace footer buttons
+    var editBtn = document.getElementById('detail-edit-btn');
+    if (editBtn) {
+      editBtn.textContent = '← Back to Application';
+      editBtn.onclick = function() { if (appId) viewApp(appId); };
     }
-    closeModal('modal-detail');
-    setTimeout(function() {
-      // Open contact modal
-      viewContact(contactId);
-
-      // After contact modal closes, restore the original page
-      var contactModal = document.getElementById('modal-contact');
-      var detailModal = document.getElementById('modal-detail');
-      function restorePage() {
-        // Restore the original page if we navigated away
-        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-        document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
-        document.getElementById(currentPageId).classList.add('active');
-        var navItem = document.querySelector('[data-page="' + currentNavPage + '"]');
-        if (navItem) navItem.classList.add('active');
-        // Reopen the application detail popup
-        if (currentNavPage === 'applications' && currentAppId) {
-          setTimeout(function() { viewApp(currentAppId); }, 100);
-        }
-        if (contactModal) contactModal.removeEventListener('click', onOverlayClick);
-      }
-      function onOverlayClick(e) {
-        if (e.target === contactModal) {
-          setTimeout(restorePage, 50);
-        }
-      }
-      if (contactModal) contactModal.addEventListener('click', onOverlayClick);
-
-      // Also handle the X close button
-      var closeBtn = contactModal ? contactModal.querySelector('.modal-close') : null;
-      if (closeBtn) {
-        closeBtn.addEventListener('click', function() { setTimeout(restorePage, 50); }, { once: true });
-      }
-    }, 150);
   }).catch(function(e) {
-    toast('Could not load contact.', 'error');
+    toast('Could not load contact: ' + e.message, 'error');
   });
 }
 
