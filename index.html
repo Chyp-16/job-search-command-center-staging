@@ -3357,6 +3357,8 @@ function viewContactFromApp(contactId) {
   var currentPageId = currentActivePage ? currentActivePage.id : 'page-applications';
   var currentNavPage = currentActiveNav ? currentActiveNav.dataset.page : 'applications';
 
+  // Save the current application ID so we can reopen it after
+  var currentAppId = window._detailAppId || null;
   dbGet('contacts', 'select=*&id=eq.' + contactId).then(function(data) {
     var c = Array.isArray(data) ? data[0] : data;
     if (!c) { toast('Contact not found.', 'error'); return; }
@@ -3372,14 +3374,15 @@ function viewContactFromApp(contactId) {
       var contactModal = document.getElementById('modal-contact');
       var detailModal = document.getElementById('modal-detail');
       function restorePage() {
-        // Only restore if we navigated away
-        var activePage = document.querySelector('.page.active');
-        if (activePage && activePage.id !== currentPageId) {
-          document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-          document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
-          document.getElementById(currentPageId).classList.add('active');
-          var navItem = document.querySelector('[data-page="' + currentNavPage + '"]');
-          if (navItem) navItem.classList.add('active');
+        // Restore the original page if we navigated away
+        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
+        document.getElementById(currentPageId).classList.add('active');
+        var navItem = document.querySelector('[data-page="' + currentNavPage + '"]');
+        if (navItem) navItem.classList.add('active');
+        // Reopen the application detail popup
+        if (currentNavPage === 'applications' && currentAppId) {
+          setTimeout(function() { viewApp(currentAppId); }, 100);
         }
         if (contactModal) contactModal.removeEventListener('click', onOverlayClick);
       }
