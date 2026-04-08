@@ -991,8 +991,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="">All Contacts</option>
             <option value="Recruiter">Recruiters</option>
             <option value="Hiring Manager">Hiring Managers</option>
-            <option value="HR">HR</option>
-            <option value="Talent Acquisition">Talent Acquisition</option>
+            <option value="HR / Talent Acquisition">HR / Talent Acquisition</option>
             <option value="Networking">Networking</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
@@ -1914,7 +1913,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="form-group">
           <label class="form-label">Contact Type</label>
           <select class="form-select" id="cf-type">
-            <option>Recruiter</option><option>Hiring Manager</option><option>HR</option><option>Talent Acquisition</option><option>Networking</option>
+            <option>Recruiter</option><option>Hiring Manager</option><option>HR / Talent Acquisition</option><option>Networking</option>
           </select>
         </div>
         <div class="form-group">
@@ -3548,12 +3547,22 @@ async function syncHubSpot() {
       const name = ((hc.properties?.firstname || '') + ' ' + (hc.properties?.lastname || '')).trim();
       if (!name) continue;
       const hsId = String(hc.id);
-      // Extract LinkedIn URL from multiple possible HubSpot property names
-      // HubSpot stores LinkedIn as hs_linkedinbio (no underscore before bio)
-      const linkedInUrl = hc.properties?.hs_linkedinbio ||
-                          hc.properties?.hs_linkedin_bio ||
-                          hc.properties?.linkedin_bio ||
-                          hc.properties?.linkedinbio || null;
+      // Extract LinkedIn URL from HubSpot — try all known property names
+      var rawLinkedIn = hc.properties?.hs_linkedinbio ||
+                        hc.properties?.hs_linkedin_bio ||
+                        hc.properties?.linkedin_bio ||
+                        hc.properties?.linkedinbio ||
+                        hc.properties?.linkedinid ||
+                        hc.properties?.hs_linkedinid || null;
+      // If it's just an ID (not a full URL), build the URL
+      var linkedInUrl = null;
+      if (rawLinkedIn) {
+        if (rawLinkedIn.startsWith('http')) {
+          linkedInUrl = rawLinkedIn;
+        } else {
+          linkedInUrl = 'https://linkedin.com/in/' + rawLinkedIn;
+        }
+      }
 
       const payload = {
         name,
