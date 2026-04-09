@@ -396,7 +396,7 @@ a { color: var(--burgundy); text-decoration: none; }
 }
 .search-input {
   width: 100%;
-  padding: 7px 10px 7px 32px;
+  padding: 7px 32px 7px 32px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg);
@@ -962,7 +962,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <span class="search-icon">🔍</span>
           <input class="search-input" type="text" placeholder="Search company, title, notes..." id="app-search" oninput="filterApps();document.getElementById('clear-app-search').style.display=this.value?'block':'none'">
           <button class="search-clear" id="clear-app-search" onclick="document.getElementById('app-search').value='';filterApps();this.style.display='none'">✕</button>
-          <button onclick="clearSearch('app-search', filterApps)" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:0 8px;font-size:14px;line-height:1" title="Clear">✕</button>
+
         </div>
         <select class="filter-select" id="filter-status" onchange="filterApps()">
           <option value="">All Statuses</option>
@@ -1028,7 +1028,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <span class="search-icon">🔍</span>
           <input class="search-input" type="text" placeholder="Search name, company..." id="contact-search" oninput="filterContacts();document.getElementById('clear-contact-search').style.display=this.value?'block':'none'">
           <button class="search-clear" id="clear-contact-search" onclick="document.getElementById('contact-search').value='';filterContacts();this.style.display='none'">✕</button>
-          <button onclick="clearSearch('contact-search', filterContacts)" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:0 8px;font-size:14px;line-height:1" title="Clear">✕</button>
+
         </div>
         <span class="filter-count" id="contact-filter-count"></span>
       </div>
@@ -2957,12 +2957,6 @@ function clearSearch(inputId, filterFn) {
   if (filterFn) filterFn();
 }
 
-function clearSearch(inputId, filterFn) {
-  var el = document.getElementById(inputId);
-  if (el) { el.value = ''; el.focus(); }
-  if (filterFn) filterFn();
-}
-
 function filterApps() {
   const q = document.getElementById('app-search').value.toLowerCase();
   var clearBtn = document.getElementById('app-search-clear');
@@ -3391,11 +3385,14 @@ async function loadDetailContacts(company, appId) {
       const data = await dbGet('contacts', 'select=*&order=name.asc&limit=2000');
       allContacts = Array.isArray(data) ? data : [];
     }
-    // Find contacts at the same company
+    // Find contacts at same company OR explicitly linked to this app
     const companyLower = company.toLowerCase().trim();
-    const related = allContacts.filter(function(c) {
-      return c.company && c.company.toLowerCase().includes(companyLower);
+    var related = allContacts.filter(function(c) {
+      return (c.company && c.company.toLowerCase().includes(companyLower)) ||
+             (appId && c.linked_application_id === appId);
     });
+    // Deduplicate
+    var seenIds = {}; related = related.filter(function(c) { if(seenIds[c.id]) return false; seenIds[c.id]=1; return true; });
     const detailBody = document.getElementById('detail-body');
     if (!detailBody) return;
 
@@ -3756,8 +3753,12 @@ async function loadContactRelatedApps(company, linkedAppId, contactId) {
     }
     var companyLower = company.toLowerCase().trim();
     var related = allApps.filter(function(a) {
-      return a.company && a.company.toLowerCase().includes(companyLower);
+      // Show apps at same company OR the explicitly linked app
+      return (a.company && a.company.toLowerCase().includes(companyLower)) ||
+             (linkedAppId && a.id === linkedAppId);
     });
+    // Deduplicate
+    var seenA = {}; related = related.filter(function(a) { if(seenA[a.id]) return false; seenA[a.id]=1; return true; });
 
     var detailBody = document.getElementById('detail-body');
     if (!detailBody) return;
