@@ -3444,9 +3444,16 @@ async function unlinkContactFromApp(contactId, appId) {
 }
 
 async function openLinkContactToApp(appId) {
-  // Always fetch full sorted contact list for the dropdown
-  const cdata = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000');
-  if (Array.isArray(cdata) && cdata.length > 0) allContacts = cdata;
+  // Fetch all contacts with pagination for the dropdown
+  var allC = [], cOffset = 0;
+  while (true) {
+    var batch = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000&offset=' + cOffset);
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    allC = allC.concat(batch);
+    if (batch.length < 1000) break;
+    cOffset += 1000;
+  }
+  if (allC.length > 0) allContacts = allC;
   var div = document.createElement('div');
   div.id = 'link-contact-overlay';
   div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
