@@ -837,6 +837,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="resources">
         <span class="nav-icon">🔖</span><span>Resources</span>
       </div>
+      <div class="nav-item" data-page="templates">
+        <span class="nav-icon">📋</span><span>Email Templates</span>
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="theme-toggle" onclick="toggleTheme()">
@@ -1713,6 +1716,51 @@ a { color: var(--burgundy); text-decoration: none; }
 
 
 
+    <!-- ── EMAIL TEMPLATES PAGE ────────────────────────────────────── -->
+    <div class="page" id="page-templates">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Email Templates</h2>
+          <p>Reusable outreach templates for recruiters, hiring managers, and networking</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openAddTemplate()">+ Add Template</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates()">
+        </div>
+        <select class="filter-select" id="template-type-filter" onchange="filterTemplates()">
+          <option value="">All Types</option>
+          <option>Initial Outreach</option>
+          <option>Follow-Up</option>
+          <option>Thank You</option>
+          <option>Rejection Response</option>
+          <option>Networking</option>
+          <option>Other</option>
+        </select>
+        <span class="filter-count" id="template-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th onclick="sortTemplates('name')">Name ↕</th>
+              <th onclick="sortTemplates('type')">Type ↕</th>
+              <th>Subject</th>
+              <th>Preview</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="templates-tbody">
+            <tr><td colspan="5"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
     <div class="page" id="page-uploads">
       <div class="page-header">
@@ -2445,6 +2493,54 @@ a { color: var(--burgundy); text-decoration: none; }
   </div>
 </div>
 
+<!-- Email Template Modal -->
+<div class="modal-overlay" id="modal-template">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="modal-template-title">Add Template</h3>
+      <button class="modal-close" onclick="closeModal('modal-template')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-x:hidden">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Template Name *</label>
+            <input class="form-input" type="text" id="tmpl-name" placeholder="e.g. Initial Recruiter Outreach">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="tmpl-type">
+              <option>Initial Outreach</option>
+              <option>Follow-Up</option>
+              <option>Thank You</option>
+              <option>Rejection Response</option>
+              <option>Networking</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject Line</label>
+          <input class="form-input" type="text" id="tmpl-subject" placeholder="e.g. VP Marketing — Jay Wadhwa | 6x Emmy Award Winner">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Body *</label>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Use {{name}}, {{company}}, {{role}} as merge fields</div>
+          <textarea class="form-textarea" id="tmpl-body" rows="8" placeholder="Hi {{name}},&#10;&#10;...&#10;&#10;Cheers,&#10;Jay"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <input class="form-input" type="text" id="tmpl-notes" placeholder="When to use this template...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-template')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
 
@@ -2590,6 +2686,7 @@ function navigateTo(page) {
   if (page === 'coverletters') loadCoverLetters();
   if (page === 'prompts') loadPrompts();
   if (page === 'resources') loadResources();
+  if (page === 'templates') loadTemplates();
   if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
   if (page === 'interviewprep') loadInterviewPrepPage();
@@ -3878,37 +3975,230 @@ function showHubSpotSetupGuide() {
 
 
 // Push a contact to HubSpot when saved
-async function openGmailCompose() {
+// ── EMAIL TEMPLATES ────────────────────────────────────────────────────
+
+let allTemplates = [];
+let filteredTemplates = [];
+let templateSortField = 'name';
+let templateSortDir = 'asc';
+
+async function loadTemplates() {
+  const data = await dbGet('email_templates', 'select=*&order=name.asc');
+  allTemplates = Array.isArray(data) ? data : [];
+  filteredTemplates = allTemplates;
+  renderTemplatesTable();
+  updateTemplateCount();
+}
+
+function updateTemplateCount() {
+  const el = document.getElementById('template-count');
+  if (el) el.textContent = filteredTemplates.length + ' of ' + allTemplates.length + ' templates';
+}
+
+function filterTemplates() {
+  const q = (document.getElementById('template-search').value || '').toLowerCase();
+  const type = document.getElementById('template-type-filter').value;
+  filteredTemplates = allTemplates.filter(function(t) {
+    const text = ((t.name||'') + ' ' + (t.subject||'') + ' ' + (t.body||'')).toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (type && t.type !== type) return false;
+    return true;
+  });
+  updateTemplateCount();
+  renderTemplatesTable();
+}
+
+function sortTemplates(field) {
+  if (templateSortField === field) templateSortDir = templateSortDir === 'asc' ? 'desc' : 'asc';
+  else { templateSortField = field; templateSortDir = 'asc'; }
+  filteredTemplates.sort(function(a, b) {
+    var av = (a[field]||'').toLowerCase(), bv = (b[field]||'').toLowerCase();
+    return templateSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  renderTemplatesTable();
+}
+
+function renderTemplatesTable() {
+  const tbody = document.getElementById('templates-tbody');
+  if (!tbody) return;
+  if (filteredTemplates.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><h3>No templates yet</h3><p>Add your first email template to get started.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filteredTemplates.map(function(t) {
+    var preview = (t.body || '').replace(/\n/g, ' ').slice(0, 80);
+    return '<tr>' +
+      '<td><strong>' + (t.name||'—') + '</strong>' + (t.notes ? '<div style="font-size:11px;color:var(--text-secondary)">' + t.notes + '</div>' : '') + '</td>' +
+      '<td><span class="badge badge-applied">' + (t.type||'—') + '</span></td>' +
+      '<td style="font-size:12px">' + (t.subject||'—') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + preview + '</td>' +
+      '<td><div class="table-actions">' +
+        '<button class="action-btn" data-tid="' + t.id + '" onclick="editTemplate(this.dataset.tid)" title="Edit">✏️</button>' +
+        '<button class="action-btn danger" data-tid="' + t.id + '" onclick="deleteTemplate(this.dataset.tid)" title="Delete">🗑</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openAddTemplate() {
+  window._editingTemplateId = null;
+  document.getElementById('modal-template-title').textContent = 'Add Template';
+  ['tmpl-name','tmpl-subject','tmpl-body','tmpl-notes'].forEach(function(id) {
+    var e = document.getElementById(id); if(e) e.value = '';
+  });
+  var sel = document.getElementById('tmpl-type'); if(sel) sel.selectedIndex = 0;
+  openModal('modal-template');
+}
+
+function editTemplate(id) {
+  var t = allTemplates.find(function(x) { return x.id === id; });
+  if (!t) return;
+  window._editingTemplateId = id;
+  document.getElementById('modal-template-title').textContent = 'Edit Template';
+  var sv = function(fid, val) { var e=document.getElementById(fid); if(e) e.value=val||''; };
+  sv('tmpl-name', t.name); sv('tmpl-subject', t.subject);
+  sv('tmpl-body', t.body); sv('tmpl-notes', t.notes);
+  var sel = document.getElementById('tmpl-type'); if(sel && t.type) sel.value = t.type;
+  openModal('modal-template');
+}
+
+async function saveTemplate() {
+  var name = (document.getElementById('tmpl-name').value||'').trim();
+  if (!name) { toast('Template name required.', 'error'); return; }
+  var payload = {
+    name,
+    type: document.getElementById('tmpl-type').value,
+    subject: (document.getElementById('tmpl-subject').value||'').trim(),
+    body: (document.getElementById('tmpl-body').value||'').trim(),
+    notes: (document.getElementById('tmpl-notes').value||'').trim() || null,
+  };
+  try {
+    if (window._editingTemplateId) {
+      await dbPatch('email_templates', window._editingTemplateId, payload);
+      var idx = allTemplates.findIndex(function(x) { return x.id === window._editingTemplateId; });
+      if (idx >= 0) allTemplates[idx] = Object.assign({}, allTemplates[idx], payload);
+      toast('Template updated.', 'success');
+    } else {
+      var result = await dbPost('email_templates', payload);
+      var saved = Array.isArray(result) ? result[0] : result;
+      if (saved) allTemplates.unshift(saved);
+      toast('Template saved.', 'success');
+    }
+    filteredTemplates = allTemplates;
+    closeModal('modal-template');
+    renderTemplatesTable();
+    updateTemplateCount();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  await dbDelete('email_templates', id);
+  allTemplates = allTemplates.filter(function(t) { return t.id !== id; });
+  filteredTemplates = filteredTemplates.filter(function(t) { return t.id !== id; });
+  renderTemplatesTable();
+  updateTemplateCount();
+  toast('Template deleted.');
+}
+
+function getTemplatesForDropdown() {
+  return allTemplates;
+}
+
+function openGmailCompose() {
   var c = window._detailContact;
   if (!c || !c.email) { toast('No email address for this contact.', 'error'); return; }
 
-  // Generate a short AI outreach email
-  var emailBtn = document.getElementById('detail-email-btn');
-  if (emailBtn) { emailBtn.disabled = true; emailBtn.textContent = '⏳ Generating...'; }
+  // Show template picker modal
+  var templates = getTemplatesForDropdown();
+  var opts = '<option value="">✦ AI-generate email</option>' +
+    templates.map(function(t) {
+      return '<option value="' + t.id + '">' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>';
+    }).join('');
 
-  try {
-    var prompt = 'Write a brief, professional follow-up email from Jay Wadhwa to ' + c.name +
-      (c.title ? ', ' + c.title : '') +
-      (c.company ? ' at ' + c.company : '') +
-      '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created the "programmable privacy" category at Secret Network). ' +
-      'Keep it under 100 words. Peer-to-peer tone. Lead with a relevant credential. End with a clear ask for a call or conversation. Close with Cheers, Jay. No subject line in the body.';
+  var picker = document.createElement('div');
+  picker.id = 'email-compose-picker';
+  picker.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:360px;max-width:480px';
+  var pickerInner = document.createElement('div');
+  pickerInner.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Email ' + c.name + '</h3>' +
+    '<div class="form-group" style="margin-bottom:16px">' +
+      '<label class="form-label">Choose template or AI-generate</label>' +
+      '<select class="form-select" id="email-template-picker">' + opts + '</select>' +
+    '</div>';
+  var pickerFooter = document.createElement('div');
+  pickerFooter.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-secondary';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = closeEmailPicker;
+  var sendBtn = document.createElement('button');
+  sendBtn.id = 'gmail-compose-btn';
+  sendBtn.className = 'btn btn-primary';
+  sendBtn.textContent = 'Open Gmail ↗';
+  sendBtn.onclick = executeGmailCompose;
+  pickerFooter.appendChild(cancelBtn);
+  pickerFooter.appendChild(sendBtn);
+  picker.appendChild(pickerInner);
+  picker.appendChild(pickerFooter);
 
-    var result = await callAI([{role:'user', content: prompt}],
-      'You write concise, human outreach emails for Jay Wadhwa. No AI-sounding language. Direct and warm.');
+  // Backdrop
+  var backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = closeEmailPicker;
 
-    // Build Gmail compose URL
-    var subject = 'Connecting — Jay Wadhwa';
-    var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
-      '&to=' + encodeURIComponent(c.email) +
-      '&su=' + encodeURIComponent(subject) +
-      '&body=' + encodeURIComponent(result);
+  document.body.appendChild(backdrop);
+  document.body.appendChild(picker);
+  window._gmailBackdrop = backdrop;
+}
 
-    window.open(gmailUrl, '_blank');
-  } catch(e) {
-    toast('Could not generate email: ' + e.message, 'error');
-  } finally {
-    if (emailBtn) { emailBtn.disabled = false; emailBtn.textContent = '✉️ Email'; }
+function closeEmailPicker() {
+  var p = document.getElementById('email-compose-picker');
+  if (p) p.remove();
+  if (window._gmailBackdrop) { window._gmailBackdrop.remove(); window._gmailBackdrop = null; }
+}
+
+async function executeGmailCompose() {
+  var c = window._detailContact;
+  if (!c) return;
+  var sel = document.getElementById('email-template-picker');
+  var templateId = sel ? sel.value : '';
+  var picker = sel ? sel.closest('div[style]') : null;
+  var backdrop = window._gmailBackdrop;
+
+  var subject = '', body = '';
+
+  if (templateId) {
+    // Use selected template with merge fields
+    var t = allTemplates.find(function(x) { return x.id === templateId; });
+    if (t) {
+      subject = (t.subject || '').replace(/{{name}}/g, c.name).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
+      body = (t.body || '').replace(/{{name}}/g, (c.name||'').split(' ')[0]).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
+    }
+  } else {
+    // AI-generate
+    if (picker) picker.querySelector('.btn-primary').textContent = '⏳ Generating...';
+    try {
+      var prompt = 'Write a brief, professional outreach email from Jay Wadhwa to ' + c.name +
+        (c.title ? ', ' + c.title : '') + (c.company ? ' at ' + c.company : '') +
+        '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created "programmable privacy" category). ' +
+        'Under 100 words. Peer-to-peer tone. One relevant credential. Clear ask for a call. Close with Cheers, Jay. No subject line in body.';
+      body = await callAI([{role:'user', content: prompt}], 'Write concise human outreach emails for Jay Wadhwa. No AI language. Direct and warm.');
+      subject = 'Connecting — Jay Wadhwa';
+    } catch(e) {
+      toast('Could not generate email: ' + e.message, 'error');
+      if (picker) picker.querySelector('.btn-primary').textContent = 'Open Gmail ↗';
+      return;
+    }
   }
+
+  closeEmailPicker();
+  if (backdrop) backdrop.remove();
+
+  var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
+    '&to=' + encodeURIComponent(c.email) +
+    '&su=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
+  window.open(gmailUrl, '_blank');
 }
 
 async function loadContactHubSpotActivity(contactId, hubspotId) {
