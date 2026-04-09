@@ -2252,6 +2252,7 @@ a { color: var(--burgundy); text-decoration: none; }
     <div class="modal-footer">
       <button class="btn btn-ghost" id="detail-edit-btn">Edit</button>
       <button class="btn btn-secondary btn-sm" id="detail-upload-btn" style="display:none" onclick="openUploadFromDetail()">⬆ Upload Resume</button>
+      <button class="btn btn-secondary btn-sm" id="detail-email-btn" style="display:none" onclick="openGmailCompose()">✉️ Email</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Close</button>
     </div>
   </div>
@@ -3182,6 +3183,9 @@ function viewApp(id) {
     </div>` : ''}
   `;
   document.getElementById('detail-edit-btn').onclick = () => { closeModal('modal-detail'); editApp(id); };
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) emailBtn.style.display = 'none';
+  window._detailContact = null;
 
   // Show upload button and wire it for this application
   const uploadBtn = document.getElementById('detail-upload-btn');
@@ -3497,6 +3501,12 @@ function viewContact(id) {
   document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
   var uploadBtn = document.getElementById('detail-upload-btn');
   if (uploadBtn) uploadBtn.style.display = 'none';
+  // Show email button and store contact for Gmail compose
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) {
+    emailBtn.style.display = c.email ? '' : 'none';
+    window._detailContact = c;
+  }
   openModal('modal-detail');
 }
 
@@ -3868,6 +3878,39 @@ function showHubSpotSetupGuide() {
 
 
 // Push a contact to HubSpot when saved
+async function openGmailCompose() {
+  var c = window._detailContact;
+  if (!c || !c.email) { toast('No email address for this contact.', 'error'); return; }
+
+  // Generate a short AI outreach email
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) { emailBtn.disabled = true; emailBtn.textContent = '⏳ Generating...'; }
+
+  try {
+    var prompt = 'Write a brief, professional follow-up email from Jay Wadhwa to ' + c.name +
+      (c.title ? ', ' + c.title : '') +
+      (c.company ? ' at ' + c.company : '') +
+      '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created the "programmable privacy" category at Secret Network). ' +
+      'Keep it under 100 words. Peer-to-peer tone. Lead with a relevant credential. End with a clear ask for a call or conversation. Close with Cheers, Jay. No subject line in the body.';
+
+    var result = await callAI([{role:'user', content: prompt}],
+      'You write concise, human outreach emails for Jay Wadhwa. No AI-sounding language. Direct and warm.');
+
+    // Build Gmail compose URL
+    var subject = 'Connecting — Jay Wadhwa';
+    var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
+      '&to=' + encodeURIComponent(c.email) +
+      '&su=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(result);
+
+    window.open(gmailUrl, '_blank');
+  } catch(e) {
+    toast('Could not generate email: ' + e.message, 'error');
+  } finally {
+    if (emailBtn) { emailBtn.disabled = false; emailBtn.textContent = '✉️ Email'; }
+  }
+}
+
 async function loadContactHubSpotActivity(contactId, hubspotId) {
   var el = document.getElementById('hs-activity-' + contactId);
   if (!el) return;
