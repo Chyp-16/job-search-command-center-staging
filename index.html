@@ -3560,8 +3560,8 @@ async function syncHubSpot() {
       after = nextAfter;
       page++;
 
-      // Safety limit — stop at 2000 contacts
-      if (allHsContacts.length >= 2000) break;
+      // Safety limit — stop at 10000 contacts
+      if (allHsContacts.length >= 10000) break;
     }
 
     if (allHsContacts.length === 0) {
