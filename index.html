@@ -3418,6 +3418,7 @@ async function loadDetailContacts(company, appId) {
             '</div>' +
             '<span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span>' +
             '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
+          '<button class="action-btn danger" data-cid="' + c.id + '" data-aid="' + (appId||'') + '" onclick="unlinkContactFromApp(this.dataset.cid, this.dataset.aid)" title="Remove">✕</button>' +
           '</div>';
         }).join('');
 
@@ -3426,6 +3427,20 @@ async function loadDetailContacts(company, appId) {
   } catch(e) {
     console.warn('Could not load contacts:', e.message);
   }
+}
+
+async function unlinkContactFromApp(contactId, appId) {
+  if (!confirm('Remove this contact link?')) return;
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: null });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = null;
+    toast('Contact unlinked.', 'success');
+    var section = document.getElementById('app-contacts-section');
+    if (section) section.remove();
+    var app = allApps.find(function(a) { return a.id === appId; });
+    if (app) loadDetailContacts(app.company, appId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 function openLinkContactToApp(appId) {
