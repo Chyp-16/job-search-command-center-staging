@@ -4105,7 +4105,10 @@ async function fetchHubSpotTemplates() {
   try {
     const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } });
     const data = await r.json();
-    return (data.results || []).map(function(t) {
+    var results = data.results || [];
+    // Sort by name for easier browsing
+    results.sort(function(a, b) { return (a.name||'').localeCompare(b.name||''); });
+    return results.map(function(t) {
       // Extract plain text from HubSpot template
       var name = t.name || 'Untitled';
       var subject = t.content?.emailBody?.subject || t.subject || '';
@@ -4212,12 +4215,17 @@ async function openGmailCompose() {
   cancelBtn.className = 'btn btn-secondary';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.onclick = closeEmailPicker;
+  var hsBtn = document.createElement('button');
+  hsBtn.className = 'btn btn-secondary';
+  hsBtn.textContent = 'Send via HubSpot ↗';
+  hsBtn.onclick = openHubSpotCompose;
   var sendBtn = document.createElement('button');
   sendBtn.id = 'gmail-compose-btn';
   sendBtn.className = 'btn btn-primary';
   sendBtn.textContent = 'Open Gmail ↗';
   sendBtn.onclick = executeGmailCompose;
   pickerFooter.appendChild(cancelBtn);
+  pickerFooter.appendChild(hsBtn);
   pickerFooter.appendChild(sendBtn);
   picker.appendChild(pickerInner);
   picker.appendChild(pickerFooter);
@@ -4236,6 +4244,24 @@ function closeEmailPicker() {
   var p = document.getElementById('email-compose-picker');
   if (p) p.remove();
   if (window._gmailBackdrop) { window._gmailBackdrop.remove(); window._gmailBackdrop = null; }
+}
+
+function openHubSpotCompose() {
+  var c = window._detailContact;
+  if (!c) return;
+  closeEmailPicker();
+  var sel = document.getElementById('email-template-picker');
+  var templateId = sel ? sel.value : '';
+  var portalId = window._hubspotPortalId || '242599414';
+
+  // Build HubSpot compose URL with contact pre-loaded
+  var hsUrl = 'https://app.hubspot.com/contacts/' + portalId + '/record/0-1/' + (c.hubspot_contact_id || '') + '/actions/send-email';
+  if (!c.hubspot_contact_id) {
+    // Fall back to general email compose
+    hsUrl = 'https://app.hubspot.com/contacts/' + portalId + '/email/single-send';
+  }
+  window.open(hsUrl, '_blank');
+  toast('Opening HubSpot email composer...', 'success');
 }
 
 async function executeGmailCompose() {
