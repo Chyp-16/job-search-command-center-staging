@@ -3441,9 +3441,9 @@ function buildContactDetailHTML(c) {
   // Shared HTML builder used by both viewContact and related contacts popup
   const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
   const touches = [
-    {l:'Touch 1', s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
-    {l:'Touch 2', s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
-    {l:'Touch 3', s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
+    {l:'Touch 1', type:c.outreach_1_type, s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
+    {l:'Touch 2', type:c.outreach_2_type, s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
+    {l:'Touch 3', type:c.outreach_3_type, s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
   ];
   return '<div class="detail-section">' +
     '<div class="detail-section-title">Contact Info</div>' +
@@ -3466,13 +3466,26 @@ function buildContactDetailHTML(c) {
       touches.map(function(t) {
         return '<div class="outreach-touch">' +
           '<div class="touch-label">' + t.l + '</div>' +
+          (t.type ? '<div style="font-size:10px;color:var(--burgundy);font-weight:600;text-transform:uppercase">' + t.type + '</div>' : '') +
           '<div class="touch-status">' + (t.s||'—') + '</div>' +
           '<div class="touch-date">' + fmt(t.d) + '</div>' +
           (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
         '</div>';
       }).join('') +
     '</div>' +
-  '</div>';
+  '</div>' +
+  (c.hubspot_contact_id ? 
+    '<div class="detail-section" id="hs-activity-section-' + c.id + '">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div class="detail-section-title" style="margin:0">HubSpot Activity</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" data-hsid="' + c.hubspot_contact_id + '" onclick="loadContactHubSpotActivity(this.dataset.cid,this.dataset.hsid)">⟳ Load</button>' +
+          '<a href="https://app.hubspot.com/contacts/242599414/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' +
+        '</div>' +
+      '</div>' +
+      '<div id="hs-activity-' + c.id + '" style="font-size:12px;color:var(--text-secondary)">Click Load to fetch latest HubSpot activity.</div>' +
+    '</div>'
+  : '');
 }
 
 function viewContact(id) {
@@ -3855,6 +3868,38 @@ function showHubSpotSetupGuide() {
 
 
 // Push a contact to HubSpot when saved
+async function loadContactHubSpotActivity(contactId, hubspotId) {
+  var el = document.getElementById('hs-activity-' + contactId);
+  if (!el) return;
+  el.textContent = 'Loading...';
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/contact-activity/' + hubspotId, {
+      headers: { 'Origin': location.origin }
+    });
+    if (!r.ok) { el.textContent = 'Could not load activity.'; return; }
+    const data = await r.json();
+    const results = data.results || [];
+    if (results.length === 0) { el.textContent = 'No activity found in HubSpot.'; return; }
+    const typeIcons = { EMAIL:'📧', CALL:'📞', MEETING:'📅', NOTE:'📝', TASK:'✅' };
+    el.innerHTML = results.slice(0, 10).map(function(a) {
+      var props = a.properties || {};
+      var type = (props.hs_activity_type || a.type || 'NOTE').toUpperCase();
+      var icon = typeIcons[type] || '📌';
+      var title = props.hs_email_subject || props.hs_call_title || props.hs_meeting_title || props.hs_note_body || props.subject || 'Activity';
+      var date = props.hs_timestamp ? new Date(props.hs_timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
+        '<span style="font-size:14px;flex-shrink:0">' + icon + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</div>' +
+          '<div style="font-size:11px;color:var(--text-light)">' + type + (date ? ' · ' + date : '') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    if (el) el.textContent = 'Error: ' + e.message;
+  }
+}
+
 async function pushContactToHubSpot(contact) {
   try {
     const properties = {
