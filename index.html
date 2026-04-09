@@ -3593,6 +3593,13 @@ async function saveContact() {
       const idx = allContacts.findIndex(x => x.id === editingId);
       if (idx >= 0) allContacts[idx] = { ...allContacts[idx], ...payload };
       toast('Contact updated.', 'success');
+      // Ensure hubspot_contact_id is preserved from the original record
+      if (idx >= 0 && !allContacts[idx].hubspot_contact_id) {
+        var fresh = await dbGet('contacts', 'select=hubspot_contact_id&id=eq.' + editingId);
+        if (Array.isArray(fresh) && fresh[0]?.hubspot_contact_id) {
+          allContacts[idx].hubspot_contact_id = fresh[0].hubspot_contact_id;
+        }
+      }
     } else {
       const result = await dbPost('contacts', payload);
       const saved = Array.isArray(result) ? result[0] : result;
@@ -3606,9 +3613,10 @@ async function saveContact() {
     }
     closeModal('modal-contact');
     filterContacts();
-    // Sync to HubSpot for updates
+    // Sync to HubSpot for updates — use the merged contact with hubspot_contact_id
     var savedContact = allContacts.find(function(c) { return c.id === editingId; });
     if (savedContact) pushContactToHubSpot(savedContact);
+    return;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
