@@ -4109,16 +4109,33 @@ async function fetchHubSpotTemplates() {
       // Extract plain text from HubSpot template
       var name = t.name || 'Untitled';
       var subject = t.content?.emailBody?.subject || t.subject || '';
-      // Get plain text body from widgets or emailBody
+      // Get plain text body from HubSpot template structure
       var body = '';
       try {
-        var emailBody = t.content?.emailBody;
-        if (emailBody && emailBody.body) {
-          // Strip HTML tags
-          body = emailBody.body.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+        var c2 = t.content || {};
+        if (c2.emailBody && c2.emailBody.body) {
+          body = c2.emailBody.body;
+        } else if (c2.flexAreas) {
+          var allWidgets = [];
+          Object.values(c2.flexAreas).forEach(function(area) {
+            (area.sections || []).forEach(function(sec) {
+              (sec.columns || []).forEach(function(col) {
+                (col.widgets || []).forEach(function(w) { allWidgets.push(w); });
+              });
+            });
+          });
+          allWidgets.forEach(function(w) {
+            var html = (w.body && w.body.html) || (w.content && w.content.html) || '';
+            if (html) body += html + '\n';
+          });
         }
-      } catch(e) {}
-      return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
+        if (body) {
+          body = body.replace(/<br[^>]*>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim();
+        }
+        subject = (subject || '').replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}').replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}');
+        body = body.replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}').replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}');
+      } catch(e) { console.warn('Template parse error:', e.message); }
+            return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
     });
   } catch(e) {
     console.warn('Could not fetch HubSpot templates:', e.message);
@@ -4145,14 +4162,12 @@ async function openGmailCompose() {
   if (emailBtn) { emailBtn.disabled = false; emailBtn.textContent = '✉️ Email'; }
 
   var opts = '<option value="">✦ AI-generate email</option>';
-  if (hsTemplates.length > 0) {
-    opts += '<optgroup label="HubSpot Templates">' +
-      hsTemplates.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('') +
-      '</optgroup>';
-  }
+  hsTemplates.forEach(function(t) {
+    opts += '<option value="' + t.id + '">📧 ' + t.name + '</option>';
+  });
   if (localTemplates.length > 0) {
-    opts += '<optgroup label="My Templates">' +
-      localTemplates.map(function(t) { return '<option value="' + t.id + '">' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>'; }).join('') +
+    opts += '<optgroup label="── My Templates ──">' +
+      localTemplates.map(function(t) { return '<option value="' + t.id + '">📋 ' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>'; }).join('') +
       '</optgroup>';
   }
   window._allEmailTemplates = allTmpls;
