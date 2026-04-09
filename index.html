@@ -4113,27 +4113,52 @@ async function fetchHubSpotTemplates() {
       var body = '';
       try {
         var c2 = t.content || {};
-        if (c2.emailBody && c2.emailBody.body) {
-          body = c2.emailBody.body;
-        } else if (c2.flexAreas) {
-          var allWidgets = [];
-          Object.values(c2.flexAreas).forEach(function(area) {
-            (area.sections || []).forEach(function(sec) {
-              (sec.columns || []).forEach(function(col) {
-                (col.widgets || []).forEach(function(w) { allWidgets.push(w); });
-              });
-            });
-          });
-          allWidgets.forEach(function(w) {
+        // Try widgets object (Sales templates store content here)
+        if (c2.widgets) {
+          Object.values(c2.widgets).forEach(function(w) {
             var html = (w.body && w.body.html) || (w.content && w.content.html) || '';
             if (html) body += html + '\n';
           });
         }
-        if (body) {
-          body = body.replace(/<br[^>]*>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim();
+        // Try emailBody
+        if (!body && c2.emailBody && c2.emailBody.body) {
+          body = c2.emailBody.body;
         }
-        subject = (subject || '').replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}').replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}');
-        body = body.replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}').replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}');
+        // Try flexAreas widgets
+        if (!body && c2.flexAreas) {
+          Object.values(c2.flexAreas).forEach(function(area) {
+            (area.sections || []).forEach(function(sec) {
+              (sec.columns || []).forEach(function(col) {
+                (col.widgets || []).forEach(function(w) {
+                  var html = (w.body && w.body.html) || '';
+                  if (html) body += html + '\n';
+                });
+              });
+            });
+          });
+        }
+        if (body) {
+          body = body
+            .replace(/<br[^>]*>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<\/div>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        }
+        // Convert HubSpot merge tags
+        var fixMerge = function(s) {
+          return (s || '')
+            .replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}')
+            .replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}')
+            .replace(/\{\{\s*contact\.fullname\s*\}\}/g, '{{name}}');
+        };
+        subject = fixMerge(subject);
+        body = fixMerge(body);
       } catch(e) { console.warn('Template parse error:', e.message); }
             return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
     });
