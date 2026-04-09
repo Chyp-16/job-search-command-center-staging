@@ -1383,6 +1383,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Links, research, and reference materials</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openUploadResource()">⬆ Upload File</button>
           <button class="btn btn-primary" onclick="openAddResource()">+ Add Resource</button>
         </div>
       </div>
@@ -1409,7 +1410,8 @@ a { color: var(--burgundy); text-decoration: none; }
             <tr>
               <th onclick="sortResources('title')">Title ↕</th>
               <th onclick="sortResources('category')">Category ↕</th>
-              <th>URL</th>
+              <th>Type</th>
+              <th>URL / File</th>
               <th>Notes</th>
               <th></th>
             </tr>
@@ -2122,37 +2124,89 @@ a { color: var(--burgundy); text-decoration: none; }
 
 <!-- Resource Modal -->
 <div class="modal-overlay" id="modal-resource">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3>Add Resource</h3>
       <button class="modal-close" onclick="closeModal('modal-resource')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group full">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
           <label class="form-label">Title *</label>
           <input class="form-input" type="text" id="rsf-title" placeholder="Resource title">
         </div>
-        <div class="form-group">
-          <label class="form-label">Category</label>
-          <select class="form-select" id="rsf-cat">
-            <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
-            <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
-          </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="rsf-cat">
+              <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
+              <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL (optional)</label>
+            <input class="form-input" type="url" id="rsf-url" placeholder="https://...">
+          </div>
         </div>
         <div class="form-group">
-          <label class="form-label">URL</label>
-          <input class="form-input" type="url" id="rsf-url" placeholder="https://...">
-        </div>
-        <div class="form-group full">
           <label class="form-label">Notes</label>
-          <textarea class="form-textarea" id="rsf-notes" placeholder="Notes about this resource..."></textarea>
+          <textarea class="form-textarea" id="rsf-notes" rows="2" placeholder="Notes about this resource..."></textarea>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-resource')">Cancel</button>
       <button class="btn btn-primary" onclick="saveResource()">Save Resource</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Resource Modal -->
+<div class="modal-overlay" id="modal-upload-resource">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>⬆ Upload Resource File</h3>
+      <button class="modal-close" onclick="closeModal('modal-upload-resource')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-x:hidden">
+      <div id="rsf-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;margin-bottom:16px;background:var(--bg)"
+        onclick="document.getElementById('rsf-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
+        ondragleave="this.style.borderColor='var(--border-strong)'"
+        ondrop="handleResourceFileDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px">📎</div>
+        <p style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to browse or drag a file here</p>
+        <p style="font-size:12px;color:var(--text-secondary)">.pdf, .doc, .docx, .png, .jpg, .xlsx supported</p>
+        <input type="file" id="rsf-file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.xls" style="display:none" onchange="handleResourceFileSelect(event)">
+      </div>
+      <div id="rsf-file-info" style="display:none;background:rgba(151,43,50,0.06);border:1px solid var(--burgundy);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--burgundy)">
+        <span id="rsf-file-name"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Title *</label>
+          <input class="form-input" type="text" id="rsf-upload-title" placeholder="Resource title">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="rsf-upload-cat">
+            <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
+            <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="rsf-upload-notes" rows="2" placeholder="Notes about this file..."></textarea>
+        </div>
+      </div>
+      <div id="rsf-upload-progress" style="display:none;margin-top:12px">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="rsf-progress-bar" style="width:0%"></div></div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="rsf-progress-text">Uploading...</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-upload-resource')">Cancel</button>
+      <button class="btn btn-primary" id="rsf-submit-btn" onclick="submitResourceUpload()">⬆ Upload File</button>
     </div>
   </div>
 </div>
@@ -4220,6 +4274,103 @@ function editResource(id) {
   const modal = document.getElementById('modal-resource');
   if (modal) modal.querySelector('h3').textContent = 'Edit Resource';
   openModal('modal-resource');
+}
+
+function openUploadResource() {
+  var inp = document.getElementById('rsf-file-input');
+  if (inp) inp.value = '';
+  var fi = document.getElementById('rsf-file-info');
+  if (fi) fi.style.display = 'none';
+  ['rsf-upload-title','rsf-upload-notes'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  var cat = document.getElementById('rsf-upload-cat'); if(cat) cat.selectedIndex = 0;
+  var prog = document.getElementById('rsf-upload-progress'); if(prog) prog.style.display = 'none';
+  var btn = document.getElementById('rsf-submit-btn'); if(btn) { btn.disabled = false; btn.textContent = '⬆ Upload File'; }
+  window._resourceFile = null;
+  openModal('modal-upload-resource');
+}
+
+function handleResourceFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('rsf-dropzone').style.borderColor = 'var(--border-strong)';
+  var file = e.dataTransfer.files[0];
+  if (file) setResourceFile(file);
+}
+
+function handleResourceFileSelect(e) {
+  var file = e.target.files[0];
+  if (file) setResourceFile(file);
+}
+
+function setResourceFile(file) {
+  window._resourceFile = file;
+  var fi = document.getElementById('rsf-file-info');
+  var fn = document.getElementById('rsf-file-name');
+  if (fi) fi.style.display = 'block';
+  if (fn) fn.textContent = file.name + ' (' + (file.size > 1048576 ? (file.size/1048576).toFixed(1)+'MB' : Math.round(file.size/1024)+'KB') + ')';
+  // Auto-fill title if empty
+  var title = document.getElementById('rsf-upload-title');
+  if (title && !title.value) title.value = file.name.replace(/\.[^.]+$/, '');
+}
+
+async function submitResourceUpload() {
+  if (!window._resourceFile) { toast('Select a file first.', 'error'); return; }
+  var title = (document.getElementById('rsf-upload-title').value || '').trim();
+  if (!title) { toast('Title required.', 'error'); return; }
+  var category = document.getElementById('rsf-upload-cat').value;
+  var notes = (document.getElementById('rsf-upload-notes').value || '').trim();
+  var btn = document.getElementById('rsf-submit-btn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  document.getElementById('rsf-upload-progress').style.display = 'block';
+  document.getElementById('rsf-progress-bar').style.width = '30%';
+  document.getElementById('rsf-progress-text').textContent = 'Uploading file...';
+  try {
+    var file = window._resourceFile;
+    var timestamp = Date.now();
+    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    var storagePath = 'resources/' + timestamp + '_' + safeName;
+    var uploadRes = await fetch(WORKER_URL + '/storage/upload/' + encodeURIComponent(storagePath), {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream', 'Origin': location.origin },
+      body: file
+    });
+    if (!uploadRes.ok) { var err = await uploadRes.json().catch(function(){return{};}); throw new Error(err.message || 'Upload failed'); }
+    document.getElementById('rsf-progress-bar').style.width = '70%';
+    document.getElementById('rsf-progress-text').textContent = 'Saving record...';
+    var record = { title, category, notes: notes || null, storage_path: storagePath, file_type: file.name.split('.').pop().toUpperCase(), file_size: file.size };
+    var result = await dbPost('resources', record);
+    var saved = Array.isArray(result) ? result[0] : result;
+    if (saved) { allResources.unshift(saved); filteredResources = allResources; }
+    document.getElementById('rsf-progress-bar').style.width = '100%';
+    document.getElementById('rsf-progress-text').textContent = 'Upload complete.';
+    closeModal('modal-upload-resource');
+    renderResourcesTable();
+    updateResourceCount();
+    toast(file.name + ' uploaded.', 'success');
+  } catch(e) {
+    document.getElementById('rsf-progress-text').textContent = 'Error: ' + e.message;
+    toast('Upload failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = '⬆ Upload File';
+  }
+}
+
+async function downloadResource(storagePath) {
+  if (!storagePath) { toast('No file path.', 'error'); return; }
+  toast('Preparing download...', '');
+  try {
+    var r = await fetch(WORKER_URL + '/storage/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
+    });
+    var data = await r.json();
+    var signedUrl = data.signedURL || data.signedUrl || '';
+    if (signedUrl) {
+      if (!signedUrl.startsWith('http')) signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co/storage/v1' + signedUrl;
+      window.open(signedUrl, '_blank');
+    } else {
+      toast('Could not generate download link.', 'error');
+    }
+  } catch(e) { toast('Download error: ' + e.message, 'error'); }
 }
 
 async function saveResource() {
