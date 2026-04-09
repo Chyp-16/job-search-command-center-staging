@@ -3443,7 +3443,13 @@ async function unlinkContactFromApp(contactId, appId) {
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-function openLinkContactToApp(appId) {
+async function openLinkContactToApp(appId) {
+  // Ensure all contacts are loaded
+  if (allContacts.length < 100) {
+    toast('Loading contacts...', '');
+    const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000');
+    if (Array.isArray(data) && data.length > allContacts.length) allContacts = data;
+  }
   var div = document.createElement('div');
   div.id = 'link-contact-overlay';
   div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
@@ -3474,6 +3480,9 @@ function openLinkContactToApp(appId) {
 async function saveLinkContactToApp(appId) {
   var contactId = document.getElementById('link-contact-sel').value;
   if (!contactId) { toast('Select a contact first.', 'error'); return; }
+  // Check for duplicate
+  var existing = allContacts.find(function(c) { return c.id === contactId && c.linked_application_id === appId; });
+  if (existing) { toast('This contact is already linked to this application.', 'error'); return; }
   try {
     await dbPatch('contacts', contactId, { linked_application_id: appId });
     var c = allContacts.find(function(x) { return x.id === contactId; });
@@ -3811,6 +3820,9 @@ async function loadContactRelatedApps(company, linkedAppId, contactId) {
 
 async function quickLinkAppToContact(contactId, appId) {
   if (!appId) { toast('Select an application first.', 'error'); return; }
+  // Check for duplicate
+  var c = allContacts.find(function(x) { return x.id === contactId; });
+  if (c && c.linked_application_id === appId) { toast('This application is already linked to this contact.', 'error'); return; }
   try {
     await dbPatch('contacts', contactId, { linked_application_id: appId });
     var c = allContacts.find(function(x) { return x.id === contactId; });
