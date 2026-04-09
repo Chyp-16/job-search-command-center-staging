@@ -4249,18 +4249,15 @@ function closeEmailPicker() {
 function openHubSpotCompose() {
   var c = window._detailContact;
   if (!c) return;
-  closeEmailPicker();
-  var sel = document.getElementById('email-template-picker');
-  var templateId = sel ? sel.value : '';
   var portalId = window._hubspotPortalId || '242599414';
   var hsBase = 'https://app-na2.hubspot.com';
-
-  // Open contact record in HubSpot — email panel opens from there
   var hsUrl = c.hubspot_contact_id
     ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id
     : hsBase + '/contacts/' + portalId + '/objects/0-1/views/all/list';
+  // Open first, then close picker
   window.open(hsUrl, '_blank');
-  toast('Opening HubSpot email composer...', 'success');
+  closeEmailPicker();
+  toast('Opening HubSpot...', 'success');
 }
 
 async function executeGmailCompose() {
