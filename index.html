@@ -4255,9 +4255,9 @@ function openHubSpotCompose() {
   var portalId = window._hubspotPortalId || '242599414';
   var hsBase = 'https://app-na2.hubspot.com';
 
-  // Build HubSpot compose URL with contact pre-loaded and email interaction
+  // Open contact record in HubSpot — email panel opens from there
   var hsUrl = c.hubspot_contact_id
-    ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id + '?interaction=email'
+    ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id
     : hsBase + '/contacts/' + portalId + '/objects/0-1/views/all/list';
   window.open(hsUrl, '_blank');
   toast('Opening HubSpot email composer...', 'success');
