@@ -3328,6 +3328,7 @@ function renderContactsTable() {
       '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
       '<td><div class="table-actions">' +
 
+        '<button class="action-btn" onclick="viewContact(\'' + c.id + '\')" title="View">👁</button>' +
         '<button class="action-btn" onclick="editContact(\'' + c.id + '\')" title="Edit">✏️</button>' +
         '<button class="action-btn danger" onclick="deleteContact(\'' + c.id + '\')" title="Delete">🗑</button>' +
       '</div></td>' +
