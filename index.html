@@ -4253,13 +4253,12 @@ function openHubSpotCompose() {
   var sel = document.getElementById('email-template-picker');
   var templateId = sel ? sel.value : '';
   var portalId = window._hubspotPortalId || '242599414';
+  var hsBase = 'https://app-na2.hubspot.com';
 
-  // Build HubSpot compose URL with contact pre-loaded
-  var hsUrl = 'https://app.hubspot.com/contacts/' + portalId + '/record/0-1/' + (c.hubspot_contact_id || '') + '/actions/send-email';
-  if (!c.hubspot_contact_id) {
-    // Fall back to general email compose
-    hsUrl = 'https://app.hubspot.com/contacts/' + portalId + '/email/single-send';
-  }
+  // Build HubSpot compose URL with contact pre-loaded and email interaction
+  var hsUrl = c.hubspot_contact_id
+    ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id + '?interaction=email'
+    : hsBase + '/contacts/' + portalId + '/objects/0-1/views/all/list';
   window.open(hsUrl, '_blank');
   toast('Opening HubSpot email composer...', 'success');
 }
