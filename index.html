@@ -3444,12 +3444,9 @@ async function unlinkContactFromApp(contactId, appId) {
 }
 
 async function openLinkContactToApp(appId) {
-  // Ensure all contacts are loaded
-  if (allContacts.length < 100) {
-    toast('Loading contacts...', '');
-    const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000');
-    if (Array.isArray(data) && data.length > allContacts.length) allContacts = data;
-  }
+  // Always fetch full sorted contact list for the dropdown
+  const cdata = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000');
+  if (Array.isArray(cdata) && cdata.length > 0) allContacts = cdata;
   var div = document.createElement('div');
   div.id = 'link-contact-overlay';
   div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
