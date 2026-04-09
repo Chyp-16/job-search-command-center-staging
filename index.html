@@ -1107,8 +1107,23 @@ a { color: var(--burgundy); text-decoration: none; }
           <h2>AI Tools</h2>
           <p>Claude-powered document generation and analysis</p>
         </div>
+        <div class="page-header-actions">
+          <select id="ai-resource-picker" class="filter-select" onchange="attachResourceContext(this.value)" style="font-size:12px">
+            <option value="">📎 Attach Resource...</option>
+          </select>
+        </div>
       </div>
       <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+
+        <!-- Resource Context Panel -->
+        <div id="ai-resource-panel" style="display:none;background:rgba(151,43,50,0.05);border:1px solid var(--burgundy);border-radius:var(--radius);padding:12px 16px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:700;color:var(--burgundy);text-transform:uppercase;letter-spacing:.5px">📎 Attached Resource Context</span>
+            <button onclick="clearResourceContext()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:13px">✕ Clear</button>
+          </div>
+          <div id="ai-resource-context-text" style="font-size:12px;color:var(--text-secondary)"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
 
           <!-- Job URL Extractor -->
@@ -2519,6 +2534,17 @@ async function dbDelete(table, id) {
 }
 
 async function callAI(messages, systemPrompt = '', useWebSearch = false) {
+  // Append resource context to last user message if present
+  var resourceCtx = getResourceContext();
+  if (resourceCtx && messages.length > 0) {
+    var lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'user') {
+      messages = messages.slice(0, -1).concat([{
+        role: 'user',
+        content: lastMsg.content + '\n\n---\nAdditional context from attached resource:\n' + resourceCtx
+      }]);
+    }
+  }
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
   // Keep max_tokens low to stay under rate limits
@@ -2548,6 +2574,7 @@ function navigateTo(page) {
   if (page === 'coverletters') loadCoverLetters();
   if (page === 'prompts') loadPrompts();
   if (page === 'resources') loadResources();
+  if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
   if (page === 'interviewprep') loadInterviewPrepPage();
   if (page === 'resumetailor') loadRTPage();
@@ -4371,6 +4398,48 @@ async function downloadResource(storagePath) {
       toast('Could not generate download link.', 'error');
     }
   } catch(e) { toast('Download error: ' + e.message, 'error'); }
+}
+
+function populateAIResourcePicker() {
+  var picker = document.getElementById('ai-resource-picker');
+  if (!picker) return;
+  picker.innerHTML = '<option value="">📎 Attach Resource...</option>';
+  allResources.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = (r.storage_path ? '📄 ' : '🔗 ') + r.title + (r.category ? ' (' + r.category + ')' : '');
+    picker.appendChild(opt);
+  });
+}
+
+function attachResourceContext(id) {
+  if (!id) return;
+  var r = allResources.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var panel = document.getElementById('ai-resource-panel');
+  var textEl = document.getElementById('ai-resource-context-text');
+  if (!panel || !textEl) return;
+  var ctx = 'Resource: ' + r.title;
+  if (r.category) ctx += ' [' + r.category + ']';
+  if (r.url) ctx += ' — ' + r.url;
+  if (r.notes) ctx += '\n' + r.notes;
+  if (r.storage_path) ctx += ' (uploaded file: ' + r.storage_path.split('/').pop() + ')';
+  window._aiResourceContext = ctx;
+  textEl.textContent = ctx;
+  panel.style.display = 'block';
+  // Reset picker
+  var picker = document.getElementById('ai-resource-picker');
+  if (picker) picker.value = '';
+}
+
+function clearResourceContext() {
+  window._aiResourceContext = null;
+  var panel = document.getElementById('ai-resource-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function getResourceContext() {
+  return window._aiResourceContext || '';
 }
 
 async function saveResource() {
