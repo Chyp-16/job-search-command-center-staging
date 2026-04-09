@@ -3604,7 +3604,40 @@ function viewContact(id) {
     emailBtn.style.display = c.email ? '' : 'none';
     window._detailContact = c;
   }
+  // Load docs linked to this contact
+  loadContactDocs(id);
   openModal('modal-detail');
+}
+
+async function loadContactDocs(contactId) {
+  try {
+    const data = await dbGet('uploaded_documents', 'select=*&linked_contact_id=eq.' + contactId + '&order=created_at.desc');
+    const docs = Array.isArray(data) ? data : [];
+    if (docs.length === 0) return;
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+    const section = document.createElement('div');
+    section.className = 'detail-section';
+    section.innerHTML =
+      '<div class="detail-section-title">Uploaded Documents (' + docs.length + ')</div>' +
+      docs.map(function(d) {
+        const ext = (d.file_name || '').split('.').pop().toLowerCase();
+        const icon = ext === 'pdf' ? '📕' : '📘';
+        const size = d.file_size ? (d.file_size > 1048576 ? (d.file_size/1048576).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:20px">' + icon + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (d.file_name||'—') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + (d.doc_type||'') + (size ? ' · ' + size : '') + '</div>' +
+          '</div>' +
+          '<button class="btn btn-secondary btn-sm" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(null, this.dataset.path)">⬇</button>' +
+          '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
+        '</div>';
+      }).join('');
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load contact docs:', e.message);
+  }
 }
 
 function viewContactFromApp(contactId) {
