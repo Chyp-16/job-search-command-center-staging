@@ -3862,10 +3862,16 @@ async function pushContactToHubSpot(contact) {
       lastname: contact.name.split(' ').slice(1).join(' ') || '',
       company: contact.company || '',
       jobtitle: contact.title || '',
+      email: contact.email || '',
     };
-    const body = contact.hubspot_contact_id
-      ? { id: contact.hubspot_contact_id, properties }
-      : { properties };
+    // Always fetch fresh hubspot_contact_id from DB to avoid stale memory
+    var hsId = contact.hubspot_contact_id;
+    if (!hsId && contact.id) {
+      var fresh = await dbGet('contacts', 'select=hubspot_contact_id&id=eq.' + contact.id);
+      if (Array.isArray(fresh) && fresh[0]?.hubspot_contact_id) hsId = fresh[0].hubspot_contact_id;
+    }
+    const body = hsId ? { id: hsId, properties } : { properties };
+    console.log('HubSpot push:', hsId ? 'UPDATE ' + hsId : 'CREATE', contact.name);
     const r = await fetch(WORKER_URL + '/hubspot/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
@@ -3873,9 +3879,15 @@ async function pushContactToHubSpot(contact) {
     });
     if (r.ok) {
       const data = await r.json();
-      if (data.id && !contact.hubspot_contact_id) {
-        // Save the new HubSpot ID back to our database
-        await dbPatch('contacts', contact.id, { hubspot_contact_id: String(data.id) });
+      if (data.id) {
+        if (!hsId) {
+          // New contact — save HubSpot ID back to DB and memory
+          await dbPatch('contacts', contact.id, { hubspot_contact_id: String(data.id) });
+          contact.hubspot_contact_id = String(data.id);
+          var idx = allContacts.findIndex(function(c) { return c.id === contact.id; });
+          if (idx >= 0) allContacts[idx].hubspot_contact_id = String(data.id);
+        }
+        console.log('HubSpot push success:', data.id);
       }
     }
   } catch(e) {
