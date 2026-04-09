@@ -4101,20 +4101,61 @@ async function deleteTemplate(id) {
   toast('Template deleted.');
 }
 
+async function fetchHubSpotTemplates() {
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } });
+    const data = await r.json();
+    return (data.results || []).map(function(t) {
+      // Extract plain text from HubSpot template
+      var name = t.name || 'Untitled';
+      var subject = t.content?.emailBody?.subject || t.subject || '';
+      // Get plain text body from widgets or emailBody
+      var body = '';
+      try {
+        var emailBody = t.content?.emailBody;
+        if (emailBody && emailBody.body) {
+          // Strip HTML tags
+          body = emailBody.body.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+      } catch(e) {}
+      return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
+    });
+  } catch(e) {
+    console.warn('Could not fetch HubSpot templates:', e.message);
+    return [];
+  }
+}
+
 function getTemplatesForDropdown() {
   return allTemplates;
 }
 
-function openGmailCompose() {
+async function openGmailCompose() {
   var c = window._detailContact;
   if (!c || !c.email) { toast('No email address for this contact.', 'error'); return; }
 
-  // Show template picker modal
-  var templates = getTemplatesForDropdown();
-  var opts = '<option value="">✦ AI-generate email</option>' +
-    templates.map(function(t) {
-      return '<option value="' + t.id + '">' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>';
-    }).join('');
+  // Load HubSpot templates + local templates
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) { emailBtn.disabled = true; emailBtn.textContent = '⏳ Loading...'; }
+
+  var hsTemplates = await fetchHubSpotTemplates();
+  var localTemplates = getTemplatesForDropdown();
+  var allTmpls = hsTemplates.concat(localTemplates);
+
+  if (emailBtn) { emailBtn.disabled = false; emailBtn.textContent = '✉️ Email'; }
+
+  var opts = '<option value="">✦ AI-generate email</option>';
+  if (hsTemplates.length > 0) {
+    opts += '<optgroup label="HubSpot Templates">' +
+      hsTemplates.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('') +
+      '</optgroup>';
+  }
+  if (localTemplates.length > 0) {
+    opts += '<optgroup label="My Templates">' +
+      localTemplates.map(function(t) { return '<option value="' + t.id + '">' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>'; }).join('') +
+      '</optgroup>';
+  }
+  window._allEmailTemplates = allTmpls;
 
   var picker = document.createElement('div');
   picker.id = 'email-compose-picker';
@@ -4169,7 +4210,7 @@ async function executeGmailCompose() {
 
   if (templateId) {
     // Use selected template with merge fields
-    var t = allTemplates.find(function(x) { return x.id === templateId; });
+    var t = (window._allEmailTemplates || allTemplates).find(function(x) { return x.id === templateId; });
     if (t) {
       subject = (t.subject || '').replace(/{{name}}/g, c.name).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
       body = (t.body || '').replace(/{{name}}/g, (c.name||'').split(' ')[0]).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
