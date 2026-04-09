@@ -1917,13 +1917,13 @@ a { color: var(--burgundy); text-decoration: none; }
 
 <!-- Contact Modal -->
 <div class="modal-overlay" id="modal-contact">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3 id="modal-contact-title">Add Contact</h3>
       <button class="modal-close" onclick="closeModal('modal-contact')">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-grid">
+    <div class="modal-body" style="overflow-x:hidden">
+      <div class="form-grid" style="width:100%;box-sizing:border-box">
         <div class="form-group">
           <label class="form-label">Name *</label>
           <input class="form-input" type="text" id="cf-name" placeholder="Full name">
