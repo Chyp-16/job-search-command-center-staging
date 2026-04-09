@@ -3595,13 +3595,19 @@ async function saveContact() {
       toast('Contact updated.', 'success');
     } else {
       const result = await dbPost('contacts', payload);
-      allContacts.unshift(Array.isArray(result) ? result[0] : result);
+      const saved = Array.isArray(result) ? result[0] : result;
+      if (saved) allContacts.unshift(saved);
       toast('Contact added.', 'success');
+      closeModal('modal-contact');
+      filterContacts();
+      // Push to HubSpot now that we have the saved contact with its DB id
+      if (saved) pushContactToHubSpot(saved);
+      return;
     }
     closeModal('modal-contact');
     filterContacts();
-    // Sync to HubSpot in background
-    var savedContact = editingId ? allContacts.find(function(c) { return c.id === editingId; }) : allContacts[0];
+    // Sync to HubSpot for updates
+    var savedContact = allContacts.find(function(c) { return c.id === editingId; });
     if (savedContact) pushContactToHubSpot(savedContact);
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
