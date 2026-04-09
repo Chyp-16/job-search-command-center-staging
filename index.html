@@ -365,6 +365,21 @@ a { color: var(--burgundy); text-decoration: none; }
   flex-wrap: wrap;
   flex-shrink: 0;
 }
+.search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+  display: none;
+}
+.search-clear:hover { color: var(--text); }
 .search-wrap {
   position: relative;
   flex: 1;
@@ -945,7 +960,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search company, title, notes..." id="app-search" oninput="filterApps()">
+          <input class="search-input" type="text" placeholder="Search company, title, notes..." id="app-search" oninput="filterApps();document.getElementById('clear-app-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-app-search" onclick="document.getElementById('app-search').value='';filterApps();this.style.display='none'">✕</button>
+          <button onclick="clearSearch('app-search', filterApps)" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:0 8px;font-size:14px;line-height:1" title="Clear">✕</button>
         </div>
         <select class="filter-select" id="filter-status" onchange="filterApps()">
           <option value="">All Statuses</option>
@@ -1009,7 +1026,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search name, company..." id="contact-search" oninput="filterContacts()">
+          <input class="search-input" type="text" placeholder="Search name, company..." id="contact-search" oninput="filterContacts();document.getElementById('clear-contact-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-contact-search" onclick="document.getElementById('contact-search').value='';filterContacts();this.style.display='none'">✕</button>
+          <button onclick="clearSearch('contact-search', filterContacts)" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:0 8px;font-size:14px;line-height:1" title="Clear">✕</button>
         </div>
         <span class="filter-count" id="contact-filter-count"></span>
       </div>
@@ -1411,7 +1430,8 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search resources..." id="resource-search" oninput="filterResources()">
+          <input class="search-input" type="text" placeholder="Search resources..." id="resource-search" oninput="filterResources();document.getElementById('clear-resource-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-resource-search" onclick="document.getElementById('resource-search').value='';filterResources();this.style.display='none'">✕</button>
         </div>
         <select class="filter-select" id="resource-cat-filter" onchange="filterResources()">
           <option value="">All Categories</option>
@@ -1730,7 +1750,8 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates()">
+          <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates();document.getElementById('clear-template-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-template-search" onclick="document.getElementById('template-search').value='';filterTemplates();this.style.display='none'">✕</button>
         </div>
         <select class="filter-select" id="template-type-filter" onchange="filterTemplates()">
           <option value="">All Types</option>
@@ -1775,7 +1796,8 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs()">
+          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs();document.getElementById('clear-docs-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-docs-search" onclick="document.getElementById('docs-search').value='';filterDocs();this.style.display='none'">✕</button>
         </div>
         <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
           <option value="">All Types</option>
@@ -1867,6 +1889,18 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="form-group">
           <label class="form-label">Cover Letter Version</label>
           <input class="form-input" type="text" id="f-coverletter" placeholder="Version name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary Contact</label>
+          <select class="form-select" id="f-contact">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Contact</label>
+          <select class="form-select" id="f-linked-contact">
+            <option value="">— None —</option>
+          </select>
         </div>
         <div class="form-group full">
           <label class="form-label">Notes</label>
@@ -2746,6 +2780,19 @@ function populateDropdowns() {
   indSel.innerHTML = '<option value="">-- Select --</option>';
   INDUSTRIES.forEach(i => indSel.innerHTML += `<option>${i}</option>`);
 
+  // Populate contact dropdown
+  const contactSel = document.getElementById('f-contact');
+  if (contactSel) {
+    contactSel.innerHTML = '<option value="">— None —</option>';
+    allContacts.slice(0, 500).forEach(function(c) {
+      if (!c.name) return;
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+      contactSel.appendChild(opt);
+    });
+  }
+
   // Filter dropdowns
   const fs = document.getElementById('filter-status');
   fs.innerHTML = '<option value="">All Statuses</option>';
@@ -2902,8 +2949,24 @@ async function loadApps() {
   filterApps();
 }
 
+function clearSearch(inputId, filterFn) {
+  var el = document.getElementById(inputId);
+  if (el) { el.value = ''; el.focus(); }
+  var clearBtn = document.getElementById(inputId + '-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (filterFn) filterFn();
+}
+
+function clearSearch(inputId, filterFn) {
+  var el = document.getElementById(inputId);
+  if (el) { el.value = ''; el.focus(); }
+  if (filterFn) filterFn();
+}
+
 function filterApps() {
   const q = document.getElementById('app-search').value.toLowerCase();
+  var clearBtn = document.getElementById('app-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
   const st = document.getElementById('filter-status').value;
   const sr = document.getElementById('filter-source').value;
   const ind = document.getElementById('filter-industry').value;
@@ -3030,16 +3093,31 @@ function goPage(p) {
 }
 
 // ── APP FORM ───────────────────────────────────────────────────────────
+function populateAppContactDropdown(selectedId) {
+  var sel = document.getElementById('f-linked-contact');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>';
+  allContacts.forEach(function(c) {
+    if (!c.name) return;
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    sel.appendChild(opt);
+  });
+  if (selectedId) sel.value = selectedId;
+}
+
 function openAddApp() {
   editingId = null;
   document.getElementById('modal-app-title').textContent = 'Add Application';
   clearAppForm();
   document.getElementById('f-date').value = today();
+  populateAppContactDropdown(null);
   openModal('modal-app');
 }
 
 function clearAppForm() {
-  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes',
+  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes','f-linked-contact',
    'f-io-date','f-io-notes','f-3d-date','f-3d-notes','f-1w-date','f-1w-notes',
    'f-2w-date','f-2w-notes','f-rf-date','f-rf-notes'].forEach(id => {
     const el = document.getElementById(id);
@@ -3074,6 +3152,8 @@ function editApp(id) {
   setVal('f-salary', a.salary);
   setVal('f-resume', a.resume_version);
   setVal('f-coverletter', a.cover_letter_version);
+  var contactSel = document.getElementById('f-contact');
+  if (contactSel && a.linked_contact_id) contactSel.value = a.linked_contact_id;
   setVal('f-notes', a.notes);
 
   // Set select values after ensuring options are populated
@@ -3107,6 +3187,7 @@ function editApp(id) {
   setVal('f-rf-status', a.rejection_followup_status);
   setVal('f-rf-date', a.rejection_followup_date);
   setVal('f-rf-notes', a.rejection_followup_notes);
+  populateAppContactDropdown(a.linked_contact_id || null);
 
   openModal('modal-app');
 }
@@ -3130,6 +3211,8 @@ async function saveApp() {
     resume_version: getVal('f-resume'),
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
+    linked_contact_id: getVal('f-linked-contact') || null,
+    linked_contact_id: (document.getElementById('f-contact') || {}).value || null,
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
@@ -3249,6 +3332,7 @@ function viewApp(id) {
         <div class="detail-field"><span class="detail-field-label">Cover Letter</span><span class="detail-field-value">${a.cover_letter_version || '—'}</span></div>
         ${a.job_url ? `<div class="detail-field full"><span class="detail-field-label">Job URL</span><span class="detail-field-value"><a href="${a.job_url}" target="_blank">${a.job_url}</a></span></div>` : ''}
         ${a.notes ? `<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">${a.notes}</span></div>` : ''}
+        ${a.linked_contact_id ? (() => { var lc = allContacts.find(function(c){return c.id===a.linked_contact_id;}); return lc ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Linked Contact</span><span class="detail-field-value"><button class="btn btn-secondary btn-sm" data-cid="' + lc.id + '" onclick="viewContactFromApp(this.dataset.cid)">' + lc.name + (lc.company ? ' — ' + lc.company : '') + '</button></span></div>' : ''; })() : ''}
       </div>
     </div>
     <div class="detail-section">
@@ -3295,11 +3379,11 @@ function viewApp(id) {
 
   // Load linked uploaded documents and related contacts
   loadDetailDocs(id);
-  loadDetailContacts(a.company);
+  loadDetailContacts(a.company, id);
   openModal('modal-detail');
 }
 
-async function loadDetailContacts(company) {
+async function loadDetailContacts(company, appId) {
   if (!company) return;
   try {
     // Load contacts from DB if not yet loaded
@@ -3312,35 +3396,85 @@ async function loadDetailContacts(company) {
     const related = allContacts.filter(function(c) {
       return c.company && c.company.toLowerCase().includes(companyLower);
     });
-    if (related.length === 0) return;
-
     const detailBody = document.getElementById('detail-body');
     if (!detailBody) return;
 
     const section = document.createElement('div');
     section.className = 'detail-section';
-    // Show compact summary cards — click View to open full contact detail
-    section.innerHTML =
-      '<div class="detail-section-title">Related Contacts at ' + company + ' (' + related.length + ')</div>' +
-      related.map(function(c) {
-        const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
-        var linkedInHtml = c.linkedin_url
-          ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>'
-          : '';
-        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
-          '<div style="flex:1">' +
-            '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
-            '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title || '') + '</div>' +
-            (linkedInHtml ? '<div style="margin-top:2px">' + linkedInHtml + '</div>' : '') +
-          '</div>' +
-          '<span class="badge ' + badgeCls + '">' + (c.contact_type || '—') + '</span>' +
-          '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
-        '</div>';
-      }).join('');
+    section.id = 'app-contacts-section';
+
+    var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+      '<div class="detail-section-title" style="margin:0">Contacts at ' + company + ' (' + related.length + ')</div>' +
+      (appId ? '<button class="btn btn-secondary btn-sm" data-aid="' + appId + '" onclick="openLinkContactToApp(this.dataset.aid)">+ Link Contact</button>' : '') +
+    '</div>';
+
+    var contactsHtml = related.length === 0
+      ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No contacts at this company yet.</div>'
+      : related.map(function(c) {
+          const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+          var linkedInHtml = c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
+          return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<div style="flex:1">' +
+              '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
+              '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title||'') + '</div>' +
+              (linkedInHtml ? '<div>' + linkedInHtml + '</div>' : '') +
+            '</div>' +
+            '<span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span>' +
+            '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
+          '</div>';
+        }).join('');
+
+    section.innerHTML = headerHtml + contactsHtml;
     detailBody.appendChild(section);
   } catch(e) {
     console.warn('Could not load contacts:', e.message);
   }
+}
+
+function openLinkContactToApp(appId) {
+  var div = document.createElement('div');
+  div.id = 'link-contact-overlay';
+  div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
+  var selHtml = '<select id="link-contact-sel" class="form-select" style="margin-bottom:12px;width:100%"><option value="">— Select contact —</option>' +
+    allContacts.map(function(c) { return '<option value="' + c.id + '">' + c.name + (c.company ? ' — ' + c.company : '') + '</option>'; }).join('') +
+  '</select>';
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelB = document.createElement('button');
+  cancelB.className = 'btn btn-secondary';
+  cancelB.textContent = 'Cancel';
+  cancelB.onclick = function() { div.remove(); var b=document.getElementById('link-contact-backdrop'); if(b) b.remove(); };
+  var saveB = document.createElement('button');
+  saveB.className = 'btn btn-primary';
+  saveB.textContent = 'Link Contact';
+  saveB.onclick = function() { saveLinkContactToApp(appId); };
+  btns.appendChild(cancelB); btns.appendChild(saveB);
+  div.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Link Contact to Application</h3>' + selHtml;
+  div.appendChild(btns);
+  var backdrop = document.createElement('div');
+  backdrop.id = 'link-contact-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = function() { div.remove(); backdrop.remove(); };
+  document.body.appendChild(backdrop);
+  document.body.appendChild(div);
+}
+
+async function saveLinkContactToApp(appId) {
+  var contactId = document.getElementById('link-contact-sel').value;
+  if (!contactId) { toast('Select a contact first.', 'error'); return; }
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: appId });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = appId;
+    var div = document.getElementById('link-contact-overlay');
+    var bk = document.getElementById('link-contact-backdrop');
+    if (div) div.remove(); if (bk) bk.remove();
+    toast('Contact linked to application.', 'success');
+    var section = document.getElementById('app-contacts-section');
+    if (section) section.remove();
+    var app = allApps.find(function(a) { return a.id === appId; });
+    if (app) loadDetailContacts(app.company, appId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function loadDetailDocs(appId) {
@@ -3496,6 +3630,8 @@ function updateContactCount() {
 
 function filterContacts() {
   const q = document.getElementById('contact-search').value.toLowerCase();
+  var clearBtn = document.getElementById('contact-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
   const type = document.getElementById('contact-type-filter').value;
   filteredContacts = allContacts.filter(c => {
     const text = (c.name + ' ' + (c.company||'') + ' ' + (c.title||'') + ' ' + (c.notes||'')).toLowerCase();
@@ -3606,7 +3742,112 @@ function viewContact(id) {
   }
   // Load docs linked to this contact
   loadContactDocs(id);
+  // Load related applications from same company
+  if (c.company) loadContactRelatedApps(c.company, c.linked_application_id, id);
   openModal('modal-detail');
+}
+
+async function loadContactRelatedApps(company, linkedAppId, contactId) {
+  if (!company) return;
+  try {
+    if (!allApps.length) {
+      const data = await dbGet('applications', 'select=id,company,job_title,date_applied,status&order=date_applied.desc&limit=5000');
+      allApps = Array.isArray(data) ? data : [];
+    }
+    var companyLower = company.toLowerCase().trim();
+    var related = allApps.filter(function(a) {
+      return a.company && a.company.toLowerCase().includes(companyLower);
+    });
+
+    var detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+    var section = document.createElement('div');
+    section.className = 'detail-section';
+    section.id = 'contact-apps-section';
+
+    var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+      '<div class="detail-section-title" style="margin:0">Applications at ' + company + ' (' + related.length + ')</div>' +
+      (contactId ? '<button class="btn btn-secondary btn-sm" data-cid="' + contactId + '" onclick="openLinkAppToContact(this.dataset.cid)">+ Link App</button>' : '') +
+    '</div>';
+
+    var rows = related.length === 0
+      ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No applications at this company.</div>'
+      : related.map(function(a) {
+          var isLinked = a.id === linkedAppId;
+          return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<div style="flex:1">' +
+              '<div style="font-size:13px;font-weight:600">' + (a.job_title||'—') + (isLinked ? ' <span style="font-size:10px;color:var(--burgundy);font-weight:700">● LINKED</span>' : '') + '</div>' +
+              '<div style="font-size:11px;color:var(--text-secondary)">' + fmt(a.date_applied) + '</div>' +
+            '</div>' +
+            badge(a.status) +
+            '<button class="btn btn-secondary btn-sm" data-aid="' + a.id + '" onclick="closeModal(&quot;modal-detail&quot;);viewApp(this.dataset.aid)">View</button>' +
+            (contactId && !isLinked ? ' <button class="btn btn-secondary btn-sm" data-aid="' + a.id + '" data-cid="' + contactId + '" onclick="quickLinkAppToContact(this.dataset.cid,this.dataset.aid)">Link</button>' : '') +
+            (contactId && isLinked ? ' <button class="action-btn danger" data-cid="' + contactId + '" onclick="unlinkAppFromContact(this.dataset.cid)" title="Unlink">✕</button>' : '') +
+          '</div>';
+        }).join('');
+
+    section.innerHTML = header + rows;
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load related apps:', e.message);
+  }
+}
+
+async function quickLinkAppToContact(contactId, appId) {
+  if (!appId) { toast('Select an application first.', 'error'); return; }
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: appId });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = appId;
+    toast('Application linked.', 'success');
+    var section = document.getElementById('contact-apps-section');
+    if (section) section.remove();
+    if (c) loadContactRelatedApps(c.company, appId, contactId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function unlinkAppFromContact(contactId) {
+  if (!confirm('Remove linked application?')) return;
+  await dbPatch('contacts', contactId, { linked_application_id: null });
+  var c = allContacts.find(function(x) { return x.id === contactId; });
+  if (c) {
+    var company = c.company;
+    c.linked_application_id = null;
+    var section = document.getElementById('contact-apps-section');
+    if (section) section.remove();
+    loadContactRelatedApps(company, null, contactId);
+  }
+  toast('Application unlinked.', 'success');
+}
+
+function openLinkAppToContact(contactId) {
+  if (!allApps.length) { toast('Loading...', ''); loadApps().then(function() { openLinkAppToContact(contactId); }); return; }
+  var div = document.createElement('div');
+  div.id = 'link-app-overlay';
+  div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
+  var selHtml = '<select id="link-app-sel" class="form-select" style="margin-bottom:12px;width:100%"><option value="">— Select application —</option>' +
+    allApps.map(function(a) {
+      var dp = a.date_applied ? a.date_applied.slice(0,10).split('-') : null;
+      var dateStr = dp ? ' (' + parseInt(dp[1]) + '/' + parseInt(dp[2]) + '/' + dp[0] + ')' : '';
+      return '<option value="' + a.id + '">' + (a.company||'') + (a.job_title ? ' — ' + a.job_title : '') + dateStr + '</option>';
+    }).join('') + '</select>';
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelB = document.createElement('button'); cancelB.className = 'btn btn-secondary'; cancelB.textContent = 'Cancel';
+  cancelB.onclick = function() { div.remove(); var b=document.getElementById('link-app-backdrop'); if(b) b.remove(); };
+  var saveB = document.createElement('button'); saveB.className = 'btn btn-primary'; saveB.textContent = 'Link Application';
+  saveB.onclick = function() {
+    var appId = document.getElementById('link-app-sel').value;
+    quickLinkAppToContact(contactId, appId);
+    div.remove(); var b=document.getElementById('link-app-backdrop'); if(b) b.remove();
+  };
+  btns.appendChild(cancelB); btns.appendChild(saveB);
+  div.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Link Application to Contact</h3>' + selHtml;
+  div.appendChild(btns);
+  var backdrop = document.createElement('div'); backdrop.id = 'link-app-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = function() { div.remove(); backdrop.remove(); };
+  document.body.appendChild(backdrop); document.body.appendChild(div);
 }
 
 async function loadContactDocs(contactId) {
