@@ -3375,8 +3375,15 @@ function buildContactDetailHTML(c) {
 }
 
 function viewContact(id) {
-  // Just open the edit modal directly — no separate view modal
-  editContact(id);
+  const c = allContacts.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
+  document.getElementById('detail-body').innerHTML = buildContactDetailHTML(c);
+  document.getElementById('detail-edit-btn').textContent = '✏️ Edit';
+  document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
+  var uploadBtn = document.getElementById('detail-upload-btn');
+  if (uploadBtn) uploadBtn.style.display = 'none';
+  openModal('modal-detail');
 }
 
 function viewContactFromApp(contactId) {
