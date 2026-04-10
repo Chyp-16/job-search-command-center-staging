@@ -6752,6 +6752,10 @@ function _ppr(opts) {
   return x ? '<w:pPr>' + x + '</w:pPr>' : '';
 }
 
+function _pageBreak() {
+  return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+}
+
 function _h1(text) {
   // Burgundy, bold, 14pt, with bottom border, Calibri
   var ppr = _ppr({ spacing_before: 160, spacing_after: 80, border_bottom: true });
@@ -6822,17 +6826,17 @@ function _tableXml(rows) {
         ? '<w:shd w:val="clear" w:color="auto" w:fill="972B32"/>'
         : (ri % 2 === 1 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
 
-      var cellTxt = cell.trim().replace(/\*\*([^*]+)\*\*/g, '$1');
-      var rprOpts = isHeader
-        ? { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' }
-        : { sz: 20, font: 'Calibri' };
-
+      var cellTxt = cell.trim();
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
       tbl += '<w:vAlign w:val="center"/>';
       tbl += '</w:tcPr>';
       tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
-      tbl += _run(cellTxt, rprOpts);
+      if (isHeader) {
+        tbl += _run(cellTxt.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
+      } else {
+        tbl += _inlineRuns(cellTxt);
+      }
       tbl += '</w:p></w:tc>';
     });
     tbl += '</w:tr>';
@@ -6876,12 +6880,18 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId) {
 
     // Headings
     if (t.startsWith('# '))   { parts.push(_h1(t.slice(2)));  continue; }
+    // ## DOC XX: headers get treated as H1 with page break before (except first)
+    if (t.startsWith('## DOC ') || t.startsWith('## Doc ')) {
+      if (parts.length > 0) parts.push(_pageBreak());
+      parts.push(_h1(t.slice(3))); continue;
+    }
     if (t.startsWith('## '))  { parts.push(_h2(t.slice(3)));  continue; }
     if (t.startsWith('### ')) { parts.push(_h3(t.slice(4)));  continue; }
+    if (t.startsWith('#### ')) { parts.push(_h3(t.slice(5))); continue; }
 
-    // ALL CAPS section header
+    // ALL CAPS section header (e.g. STRENGTHS, OPPORTUNITIES)
     if (t === t.toUpperCase() && t.length > 4 && t.length < 90 && /[A-Z]{3}/.test(t) && !/[.!?]$/.test(t) && !t.includes('|')) {
-      parts.push(_h1(t)); continue;
+      parts.push(_h2(t)); continue;
     }
 
     // Bullet
