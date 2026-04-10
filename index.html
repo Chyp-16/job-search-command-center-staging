@@ -4048,11 +4048,23 @@ async function saveContact() {
 }
 
 async function deleteContact(id) {
-  if (!confirm('Delete this contact?')) return;
+  if (!confirm('Delete this contact? This will also remove them from HubSpot.')) return;
+  var c = allContacts.find(function(x) { return x.id === id; });
   await dbDelete('contacts', id);
   allContacts = allContacts.filter(x => x.id !== id);
   filterContacts();
-  toast('Contact deleted.');
+  toast('Contact deleted.', 'success');
+  // Delete from HubSpot in background if they have a HubSpot ID
+  if (c && c.hubspot_contact_id) {
+    try {
+      await fetch(WORKER_URL + '/hubspot/contact/' + c.hubspot_contact_id, {
+        method: 'DELETE',
+        headers: { 'Origin': location.origin }
+      });
+    } catch(e) {
+      console.warn('HubSpot delete failed:', e.message);
+    }
+  }
 }
 
 // ── RECRUITER IMPORT ────────────────────────────────────────────────────
