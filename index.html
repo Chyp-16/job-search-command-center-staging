@@ -1589,8 +1589,13 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
-                <label class="form-label">Job Description *</label>
-                <textarea class="form-textarea" id="rt-jd" rows="10" placeholder="Paste the full job description here..."></textarea>
+                <label class="form-label">Job Description (optional — paste or upload)</label>
+                <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="rt-jd-file-page" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUploadPage(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file-page').click()">📎 Upload JD File</button>
+                  <span id="rt-jd-file-page-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
@@ -1656,8 +1661,13 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
-                <label class="form-label">Job Description or Context</label>
-                <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role..."></textarea>
+                <label class="form-label">Job Description or Context (optional — paste or upload)</label>
+                <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role... (optional if uploading a file)"></textarea>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="clg-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLGFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('clg-jd-file').click()">📎 Upload JD File</button>
+                  <span id="clg-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
@@ -6121,6 +6131,28 @@ function handleIPFileUpload(event) {
   reader.onload = function(e) {
     document.getElementById('ip-jd').value = e.target.result;
     document.getElementById('ip-jd-file-name').textContent = '✓ ' + file.name;
+  };
+  reader.readAsText(file);
+}
+
+function handleRTFileUploadPage(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('rt-jd').value = e.target.result;
+    document.getElementById('rt-jd-file-page-name').textContent = '✓ ' + file.name;
+  };
+  reader.readAsText(file);
+}
+
+function handleCLGFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('clg-jd').value = e.target.result;
+    document.getElementById('clg-jd-file-name').textContent = '✓ ' + file.name;
   };
   reader.readAsText(file);
 }
