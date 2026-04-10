@@ -4035,14 +4035,14 @@ async function saveContact() {
       closeModal('modal-contact');
       filterContacts();
       // Push to HubSpot now that we have the saved contact with its DB id
-      if (saved) pushContactToHubSpot(saved);
+      if (saved) await pushContactToHubSpot(saved);
       return;
     }
     closeModal('modal-contact');
     filterContacts();
     // Sync to HubSpot for updates — use the merged contact with hubspot_contact_id
     var savedContact = allContacts.find(function(c) { return c.id === editingId; });
-    if (savedContact) pushContactToHubSpot(savedContact);
+    if (savedContact) await pushContactToHubSpot(savedContact);
     return;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
