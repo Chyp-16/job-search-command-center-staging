@@ -1171,8 +1171,13 @@ a { color: var(--burgundy); text-decoration: none; }
             <div class="dash-card-header">📄 Tailor Resume to Job</div>
             <div style="padding:16px;">
               <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Job Description</label>
-                <textarea class="form-textarea" id="ai-jd-text" placeholder="Paste the full job description here..." rows="4"></textarea>
+                <label class="form-label">Job Description (optional)</label>
+                <textarea class="form-textarea" id="ai-jd-text" placeholder="Paste the full job description here... (optional)" rows="4"></textarea>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="rt-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file').click()">📎 Upload JD File</button>
+                  <span id="rt-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
               <div class="form-group" style="margin-bottom:10px;">
                 <label class="form-label">Must-Have Keywords (comma separated)</label>
@@ -1218,8 +1223,13 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="ai-gen-contact" placeholder="First name">
               </div>
               <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Job Description or Context</label>
-                <textarea class="form-textarea" id="ai-gen-jd" placeholder="Paste job description or add context about the role..." rows="3"></textarea>
+                <label class="form-label">Job Description or Context (optional)</label>
+                <textarea class="form-textarea" id="ai-gen-jd" placeholder="Paste job description or add context about the role... (optional)" rows="3"></textarea>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="cl-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('cl-jd-file').click()">📎 Upload JD File</button>
+                  <span id="cl-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
               <button class="btn btn-primary" style="width:100%" onclick="generateDoc()">
                 Generate with Claude
@@ -1510,8 +1520,13 @@ a { color: var(--burgundy); text-decoration: none; }
                   <input class="form-input" type="text" id="ip-interviewer-title" placeholder="e.g. Chief Marketing Officer">
                 </div>
                 <div class="form-group full">
-                  <label class="form-label">Job Description *</label>
-                  <textarea class="form-textarea" id="ip-jd" rows="8" placeholder="Paste the full job description here..."></textarea>
+                  <label class="form-label">Job Description (optional — paste or upload)</label>
+                  <textarea class="form-textarea" id="ip-jd" rows="6" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                  <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                    <input type="file" id="ip-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleIPFileUpload(event)">
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ip-jd-file').click()">📎 Upload JD File</button>
+                    <span id="ip-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                  </div>
                 </div>
               </div>
               <div style="margin-top:16px;display:flex;gap:10px">
@@ -5633,7 +5648,7 @@ function useExtracted(data) {
 
 async function tailorResume() {
   const jd = document.getElementById('ai-jd-text').value.trim();
-  if (!jd) { toast('Paste a job description first.', 'error'); return; }
+  // JD optional — proceed without if empty
 
   const reqKw = document.getElementById('ai-keywords-required').value;
   const niceKw = document.getElementById('ai-keywords-nice').value;
@@ -6098,6 +6113,40 @@ function loadInterviewPrepPage() {
   });
 }
 
+// File upload handlers for AI tools
+function handleIPFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('ip-jd').value = e.target.result;
+    document.getElementById('ip-jd-file-name').textContent = '✓ ' + file.name;
+  };
+  reader.readAsText(file);
+}
+
+function handleRTFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('ai-jd-text').value = e.target.result;
+    document.getElementById('rt-jd-file-name').textContent = '✓ ' + file.name;
+  };
+  reader.readAsText(file);
+}
+
+function handleCLFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('ai-gen-jd').value = e.target.result;
+    document.getElementById('cl-jd-file-name').textContent = '✓ ' + file.name;
+  };
+  reader.readAsText(file);
+}
+
 async function runInterviewPrep() {
   const company = (document.getElementById('ip-company').value || '').trim();
   const role = (document.getElementById('ip-role').value || '').trim();
@@ -6107,7 +6156,7 @@ async function runInterviewPrep() {
   const intTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
-  if (!jd) { toast('Paste the job description to get the best results.', 'error'); return; }
+  // JD is optional — note it if missing but continue
 
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
@@ -6126,7 +6175,7 @@ async function runInterviewPrep() {
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
   contentEl.textContent = 'Step 1 of 2 — Generating Company Research, SWOT, Niche Analysis, and 30-60-90 Day Plan...';
 
-  const prompt1 = 'You are a strategy and career-docs expert creating an interview prep pack for a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\nFounded, HQ, employees, revenue estimates, valuation with sources. Products, services, target customers. Leadership structure. Key milestones, funding, deals. Market position. Positioning and core products. Top 3-5 competitors. 3-4 biggest opportunities and risks. Key recent news.\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\nSWOT table (markdown table format). Competitor grid comparing 3-5 peers. Pros/cons vs target company. Market share, growth, differentiators.\n\n## DOC 03: TARGET NICHE ANALYSIS\nCore customer niches. Unmet needs and market gaps. Where company can win. High-growth micro-segments.\n\n## DOC 04: 30-60-90 DAY PLAN\nDays 0-30: Learn and audit. Days 31-60: Test and build. Days 61-90: Scale and optimize. Cover brand, content, partnerships, demand generation. Senior-level, practical, actionable.\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes.';
+  const prompt1 = 'You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and attached resume.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- What they do: products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and competitor grids. Sentences 15 words or fewer. Active voice. No em dashes.';
 
   let result1 = '';
   try {
@@ -6140,7 +6189,7 @@ async function runInterviewPrep() {
   contentEl.textContent = 'Step 1 complete. Step 2 of 2 — Generating Fit Analysis, Executive Summary, Strategic Questions, and Q&A Guide...';
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
-  const prompt2 = 'You are a strategy and career-docs expert creating an interview prep pack for Jay Wadhwa, a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\nSide-by-side markdown table: Company Need | Jay Experience | Evidence/Metric. At least 8 rows. Below the table: key overlap narrative, how multi-industry background (ESPN, NBCUniversal, Web3, SaaS, nonprofits) is an advantage, short fit summary paragraph.\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\nBULLET POINTS ONLY — no tables. Company snapshot bullets (founded, size, revenue, market position, top competitor). Key strengths and risks bullets. Primary growth paths bullets. Role fit bullets. Bottom-line takeaway (2-3 sentences). This doc must stand alone — do not reference Doc 01.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER' + (intName ? ' / ' + intName : '') + '\nQUESTIONS ONLY — no answers. Minimum 3 questions per category:\nTeam Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture' + (intName ? '\nAlso include 3 questions specifically for ' + intName + (intTitle ? ' as ' + intTitle : '') + '.' : '') + '\n\n## DOC 08: INTERVIEW Q&A GUIDE\n12 common interview questions with prepared answers for Jay. Each answer: lead with a specific metric or result, tie to this company and role, 3-5 sentences, peer-to-peer tone, no banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager).\n\nFORMAT: Use **bold** for stats. Use markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes.';
+  const prompt2 = 'You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: Company Need | Jay Experience | Evidence/Metric (at least 8 rows)\n- Highlight overlaps and strengths\n- Explain how multi-industry background (ESPN, NBCUniversal, Web3, SaaS, nonprofits) is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\nCompany snapshot as BULLET POINTS ONLY — no tables:\n- Company snapshot bullets (founded, size, revenue, market position, top competitor)\n- Key strengths and risks bullets\n- Primary growth paths bullets\n- Role fit bullets\n- Bottom-line takeaway (2-3 sentences)\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER' + (intName ? ' / ' + intName : '') + '\nPure questions only (no answers). Minimum 3 questions per category:\n- Team Dynamics\n- Strategic Priorities\n- Measurement and Success\n- Budget and Resources\n- Culture\nDemonstrates research depth and strategic thinking. Helps gather intelligence for deeper rounds.' + (intName ? '\nAlso include 3 questions specifically for ' + intName + (intTitle ? ' as ' + intTitle : '') + '.' : '') + '\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused responses\n- Structured for easy memorization\n- Peer-to-peer tone. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager)\n\nFORMAT: Use **bold** for stats. Use markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes.';
 
   let result2 = '';
   try {
