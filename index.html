@@ -7012,8 +7012,8 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId) {
 
     // Table row detection
     if (t.startsWith('|') && t.endsWith('|')) {
-      if (/^\|[\s\-:|]+\|$/.test(t)) { i++; continue; } // separator
-      var cells = t.slice(1, -1).split('|');
+      if (/^\|[\s\-:|]+\|$/.test(t)) { continue; } // skip separator row, don't advance i
+      var cells = t.slice(1, -1).split('|').map(function(c){ return c.trim(); });
       tableBuffer.push(cells);
       continue;
     } else {
@@ -7079,7 +7079,9 @@ async function makeDocxBlob(text, title) {
       _ppr({ spacing_before: 0, spacing_after: 200 })
     );
 
-  var bodyXml = _mdToDocxXml(text, BULLET_ID, NUMBERED_ID);
+  // Strip leading DOC header line to avoid duplicate with document title
+  var cleanText = text.replace(/^#+\s*DOC\s+\d+[:\s][^\n]*/im, '').replace(/^\s*---+\s*/m, '').trim();
+  var bodyXml = _mdToDocxXml(cleanText, BULLET_ID, NUMBERED_ID);
 
   var sectPr =
     '<w:sectPr>' +
@@ -7101,7 +7103,7 @@ async function makeDocxBlob(text, title) {
     ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
     ' xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"' +
     ' mc:Ignorable="w14 w15"' +
-    ' w:rsidR="00000000" w:rsidRDefault="00000000">' +
+    '>' +
     '<w:body>' +
     headerXml +
     bodyXml +
@@ -7153,7 +7155,7 @@ async function makeDocxBlob(text, title) {
     '<w:zoom w:percent="100"/>' +
     '<w:defaultTabStop w:val="720"/>' +
     '<w:characterSpacingControl w:val="doNotCompress"/>' +
-    '<w:rsids><w:rsidDel w:val="00000000"/></w:rsids>' +
+    '<w:saveSubsetFonts/>' +
     '</w:settings>';
 
   var contentTypesXml =
