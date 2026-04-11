@@ -6244,13 +6244,13 @@ async function runInterviewPrep() {
   const sysPrompt = getSystemPromptWithResume();
 
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
-  contentEl.textContent = 'Step 1 of 2 — Researching ' + company + ' and generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan... (web search active — this may take 60-90 seconds)';
+  contentEl.textContent = 'Step 1 of 2 — Generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan...';
 
   const prompt1 = 'You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and attached resume. Use web search to research the company thoroughly. Find their actual website, leadership team, recent news, awards, exact founding details, and real revenue/team size data before writing. Cite specific facts you find.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- What they do: products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and competitor grids. Sentences 15 words or fewer. Active voice. No em dashes.';
 
   let result1 = '';
   try {
-    result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt, true);
+    result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt, false);
   } catch(e) {
     contentEl.textContent = 'Error on Step 1: ' + e.message;
     toast('Generation failed: ' + e.message, 'error');
