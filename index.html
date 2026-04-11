@@ -3,17 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Job Search Command Center</title>
+<title>Job Search Command Center v2</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
 <link rel="apple-touch-icon" href="logo-192.png?v=2">
 <meta name="theme-color" content="#972b32">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 /* ── DESIGN TOKENS ─────────────────────────────────────────────────── */
 :root {
@@ -362,6 +367,21 @@ a { color: var(--burgundy); text-decoration: none; }
   flex-wrap: wrap;
   flex-shrink: 0;
 }
+.search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+  display: none;
+}
+.search-clear:hover { color: var(--text); }
 .search-wrap {
   position: relative;
   flex: 1;
@@ -378,7 +398,7 @@ a { color: var(--burgundy); text-decoration: none; }
 }
 .search-input {
   width: 100%;
-  padding: 7px 10px 7px 32px;
+  padding: 7px 32px 7px 32px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg);
@@ -537,7 +557,7 @@ a { color: var(--burgundy); text-decoration: none; }
   transition: all var(--transition);
 }
 .modal-close:hover { background: var(--border); color: var(--text); }
-.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-body { padding: 20px 24px; overflow-y: auto; overflow-x: hidden; flex: 1; box-sizing: border-box; }
 .modal-footer {
   padding: 16px 24px;
   border-top: 1px solid var(--border);
@@ -551,9 +571,12 @@ a { color: var(--burgundy); text-decoration: none; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 .form-grid .full { grid-column: 1 / -1; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .form-label {
   font-size: 12px;
   font-weight: 600;
@@ -817,9 +840,6 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="uploads">
         <span class="nav-icon">📁</span><span>My Documents</span>
       </div>
-      <div class="nav-item" data-page="uploaddocs">
-        <span class="nav-icon">🗂</span><span>Uploaded Docs</span>
-      </div>
       <div class="nav-section-label">Intelligence</div>
       <div class="nav-item" data-page="ai">
         <span class="nav-icon">✦</span><span>AI Tools</span>
@@ -833,6 +853,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-section-label">Library</div>
       <div class="nav-item" data-page="resources">
         <span class="nav-icon">🔖</span><span>Resources</span>
+      </div>
+      <div class="nav-item" data-page="templates">
+        <span class="nav-icon">📋</span><span>Email Templates</span>
       </div>
     </div>
     <div class="sidebar-footer">
@@ -857,6 +880,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">↻ Refresh</button>
         </div>
       </div>
+      <div id="task-reminder-banner" style="display:none;margin:0 0 16px 0;padding:12px 16px;border-radius:var(--radius);border:1px solid var(--burgundy);background:rgba(151,43,50,0.06)"></div>
       <div class="dashboard-body">
         <div class="stats-grid" id="stats-grid">
           <div class="stat-card loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div></div>
@@ -938,7 +962,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search company, title, notes..." id="app-search" oninput="filterApps()">
+          <input class="search-input" type="text" placeholder="Search company, title, notes..." id="app-search" oninput="filterApps();document.getElementById('clear-app-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-app-search" onclick="document.getElementById('app-search').value='';filterApps();this.style.display='none'">✕</button>
+
         </div>
         <select class="filter-select" id="filter-status" onchange="filterApps()">
           <option value="">All Statuses</option>
@@ -961,13 +987,13 @@ a { color: var(--burgundy); text-decoration: none; }
         <table class="data-table">
           <thead>
             <tr>
-              <th onclick="sortApps('date_applied')">Date ↕</th>
-              <th onclick="sortApps('company')">Company ↕</th>
-              <th>Title</th>
-              <th onclick="sortApps('status')">Status ↕</th>
-              <th>Source</th>
-              <th>Salary</th>
-              <th>Outreach</th>
+              <th onclick="sortApps('date_applied')" id="sh-date_applied">Date ↕</th>
+              <th onclick="sortApps('company')" id="sh-company">Company ↕</th>
+              <th onclick="sortApps('job_title')" id="sh-job_title">Title ↕</th>
+              <th onclick="sortApps('status')" id="sh-status">Status ↕</th>
+              <th onclick="sortApps('source')" id="sh-source">Source ↕</th>
+              <th onclick="sortApps('salary')" id="sh-salary">Salary ↕</th>
+              <th onclick="sortApps('outreach_count')" id="sh-outreach_count">Outreach ↕</th>
               <th></th>
             </tr>
           </thead>
@@ -991,6 +1017,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="">All Contacts</option>
             <option value="Recruiter">Recruiters</option>
             <option value="Hiring Manager">Hiring Managers</option>
+            <option value="HR / Talent Acquisition">HR / Talent Acquisition</option>
             <option value="Networking">Networking</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
@@ -1001,7 +1028,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search name, company..." id="contact-search" oninput="filterContacts()">
+          <input class="search-input" type="text" placeholder="Search name, company..." id="contact-search" oninput="filterContacts();document.getElementById('clear-contact-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-contact-search" onclick="document.getElementById('contact-search').value='';filterContacts();this.style.display='none'">✕</button>
+
         </div>
         <span class="filter-count" id="contact-filter-count"></span>
       </div>
@@ -1035,7 +1064,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">📄 Base Documents</button>
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Resume')">⬆ Upload Resume</button>
+          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Resume');})()">⬆ Upload Resume</button>
           <button class="btn btn-primary" onclick="openAddResume()">+ Add Version</button>
         </div>
       </div>
@@ -1074,7 +1103,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Stored versions linked to applications</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Cover Letter')">⬆ Upload Cover Letter</button>
+          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Cover Letter');})()">⬆ Upload Cover Letter</button>
           <button class="btn btn-primary" onclick="openAddCoverLetter()">+ Add Cover Letter</button>
         </div>
       </div>
@@ -1105,8 +1134,23 @@ a { color: var(--burgundy); text-decoration: none; }
           <h2>AI Tools</h2>
           <p>Claude-powered document generation and analysis</p>
         </div>
+        <div class="page-header-actions">
+          <select id="ai-resource-picker" class="filter-select" onchange="attachResourceContext(this.value)" style="font-size:12px">
+            <option value="">📎 Attach Resource...</option>
+          </select>
+        </div>
       </div>
       <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+
+        <!-- Resource Context Panel -->
+        <div id="ai-resource-panel" style="display:none;background:rgba(151,43,50,0.05);border:1px solid var(--burgundy);border-radius:var(--radius);padding:12px 16px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:700;color:var(--burgundy);text-transform:uppercase;letter-spacing:.5px">📎 Attached Resource Context</span>
+            <button onclick="clearResourceContext()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:13px">✕ Clear</button>
+          </div>
+          <div id="ai-resource-context-text" style="font-size:12px;color:var(--text-secondary)"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
 
           <!-- Job URL Extractor -->
@@ -1129,8 +1173,13 @@ a { color: var(--burgundy); text-decoration: none; }
             <div class="dash-card-header">📄 Tailor Resume to Job</div>
             <div style="padding:16px;">
               <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Job Description</label>
-                <textarea class="form-textarea" id="ai-jd-text" placeholder="Paste the full job description here..." rows="4"></textarea>
+                <label class="form-label">Job Description (optional)</label>
+                <textarea class="form-textarea" id="ai-jd-text" placeholder="Paste the full job description here... (optional)" rows="4"></textarea>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="rt-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file').click()">📎 Upload JD File</button>
+                  <span id="rt-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
               <div class="form-group" style="margin-bottom:10px;">
                 <label class="form-label">Must-Have Keywords (comma separated)</label>
@@ -1176,8 +1225,13 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="ai-gen-contact" placeholder="First name">
               </div>
               <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Job Description or Context</label>
-                <textarea class="form-textarea" id="ai-gen-jd" placeholder="Paste job description or add context about the role..." rows="3"></textarea>
+                <label class="form-label">Job Description or Context (optional)</label>
+                <textarea class="form-textarea" id="ai-gen-jd" placeholder="Paste job description or add context about the role... (optional)" rows="3"></textarea>
+                <div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="cl-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('cl-jd-file').click()">📎 Upload JD File</button>
+                  <span id="cl-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
               <button class="btn btn-primary" style="width:100%" onclick="generateDoc()">
                 Generate with Claude
@@ -1381,13 +1435,15 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Links, research, and reference materials</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openUploadResource()">⬆ Upload File</button>
           <button class="btn btn-primary" onclick="openAddResource()">+ Add Resource</button>
         </div>
       </div>
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search resources..." id="resource-search" oninput="filterResources()">
+          <input class="search-input" type="text" placeholder="Search resources..." id="resource-search" oninput="filterResources();document.getElementById('clear-resource-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-resource-search" onclick="document.getElementById('resource-search').value='';filterResources();this.style.display='none'">✕</button>
         </div>
         <select class="filter-select" id="resource-cat-filter" onchange="filterResources()">
           <option value="">All Categories</option>
@@ -1407,7 +1463,8 @@ a { color: var(--burgundy); text-decoration: none; }
             <tr>
               <th onclick="sortResources('title')">Title ↕</th>
               <th onclick="sortResources('category')">Category ↕</th>
-              <th>URL</th>
+              <th>Type</th>
+              <th>URL / File</th>
               <th>Notes</th>
               <th></th>
             </tr>
@@ -1465,8 +1522,13 @@ a { color: var(--burgundy); text-decoration: none; }
                   <input class="form-input" type="text" id="ip-interviewer-title" placeholder="e.g. Chief Marketing Officer">
                 </div>
                 <div class="form-group full">
-                  <label class="form-label">Job Description *</label>
-                  <textarea class="form-textarea" id="ip-jd" rows="8" placeholder="Paste the full job description here..."></textarea>
+                  <label class="form-label">Job Description (optional — paste or upload)</label>
+                  <textarea class="form-textarea" id="ip-jd" rows="6" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                  <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                    <input type="file" id="ip-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleIPFileUpload(event)">
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ip-jd-file').click()">📎 Upload JD File</button>
+                    <span id="ip-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                  </div>
                 </div>
               </div>
               <div style="margin-top:16px;display:flex;gap:10px">
@@ -1529,8 +1591,13 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
-                <label class="form-label">Job Description *</label>
-                <textarea class="form-textarea" id="rt-jd" rows="10" placeholder="Paste the full job description here..."></textarea>
+                <label class="form-label">Job Description (optional — paste or upload)</label>
+                <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="rt-jd-file-page" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUploadPage(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file-page').click()">📎 Upload JD File</button>
+                  <span id="rt-jd-file-page-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
@@ -1596,8 +1663,13 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
-                <label class="form-label">Job Description or Context</label>
-                <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role..."></textarea>
+                <label class="form-label">Job Description or Context (optional — paste or upload)</label>
+                <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role... (optional if uploading a file)"></textarea>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="clg-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLGFileUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('clg-jd-file').click()">📎 Upload JD File</button>
+                  <span id="clg-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
               </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
@@ -1688,52 +1760,54 @@ a { color: var(--burgundy); text-decoration: none; }
 
 
     <!-- ── UPLOADED DOCUMENTS PAGE ───────────────────────────────── -->
-    <div class="page" id="page-uploaddocs">
+
+
+
+    <!-- ── EMAIL TEMPLATES PAGE ────────────────────────────────────── -->
+    <div class="page" id="page-templates">
       <div class="page-header">
         <div class="page-header-left">
-          <h2>Uploaded Documents</h2>
-          <p>Final resumes and cover letters linked to applications and contacts</p>
+          <h2>Email Templates</h2>
+          <p>Reusable outreach templates for recruiters, hiring managers, and networking</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Resume')">⬆ Upload Resume</button>
-          <button class="btn btn-secondary btn-sm" onclick="openUploadDoc('Cover Letter')">⬆ Upload Cover Letter</button>
-          <button class="btn btn-primary" onclick="openUploadDoc('Other')">⬆ Upload Document</button>
+          <button class="btn btn-primary" onclick="openAddTemplate()">+ Add Template</button>
         </div>
       </div>
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search by file name, company, role..." id="docs-search" oninput="filterDocs()">
+          <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates();document.getElementById('clear-template-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-template-search" onclick="document.getElementById('template-search').value='';filterTemplates();this.style.display='none'">✕</button>
         </div>
-        <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
+        <select class="filter-select" id="template-type-filter" onchange="filterTemplates()">
           <option value="">All Types</option>
-          <option value="Resume">Resumes</option>
-          <option value="Cover Letter">Cover Letters</option>
-          <option value="Other">Other</option>
+          <option>Initial Outreach</option>
+          <option>Follow-Up</option>
+          <option>Thank You</option>
+          <option>Rejection Response</option>
+          <option>Networking</option>
+          <option>Other</option>
         </select>
-        <span class="filter-count" id="docs-count"></span>
+        <span class="filter-count" id="template-count"></span>
       </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th onclick="sortDocs('file_name')">File Name ↕</th>
-              <th onclick="sortDocs('doc_type')">Type ↕</th>
-              <th onclick="sortDocs('company')">Company ↕</th>
-              <th onclick="sortDocs('role')">Role ↕</th>
-              <th>Contact</th>
-              <th onclick="sortDocs('created_at')">Uploaded ↕</th>
-              <th>Notes</th>
+              <th onclick="sortTemplates('name')">Name ↕</th>
+              <th onclick="sortTemplates('type')">Type ↕</th>
+              <th>Subject</th>
+              <th>Preview</th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="docs-tbody">
-            <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+          <tbody id="templates-tbody">
+            <tr><td colspan="5"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
           </tbody>
         </table>
       </div>
     </div>
-
 
     <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
     <div class="page" id="page-uploads">
@@ -1743,13 +1817,14 @@ a { color: var(--burgundy); text-decoration: none; }
           <p>Upload and track resumes, cover letters, and job descriptions</p>
         </div>
         <div class="page-header-actions">
-          <button class="btn btn-primary" onclick="openUploadModal()">⬆ Upload Document</button>
+          <button class="btn btn-primary" onclick="(async()=>{await openUploadModal();})()">⬆ Upload Document</button>
         </div>
       </div>
       <div class="filter-bar">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs()">
+          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs();document.getElementById('clear-docs-search').style.display=this.value?'block':'none'">
+          <button class="search-clear" id="clear-docs-search" onclick="document.getElementById('docs-search').value='';filterDocs();this.style.display='none'">✕</button>
         </div>
         <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
           <option value="">All Types</option>
@@ -1841,6 +1916,18 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="form-group">
           <label class="form-label">Cover Letter Version</label>
           <input class="form-input" type="text" id="f-coverletter" placeholder="Version name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary Contact</label>
+          <select class="form-select" id="f-contact">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Contact</label>
+          <select class="form-select" id="f-linked-contact">
+            <option value="">— None —</option>
+          </select>
         </div>
         <div class="form-group full">
           <label class="form-label">Notes</label>
@@ -1942,13 +2029,13 @@ a { color: var(--burgundy); text-decoration: none; }
 
 <!-- Contact Modal -->
 <div class="modal-overlay" id="modal-contact">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3 id="modal-contact-title">Add Contact</h3>
       <button class="modal-close" onclick="closeModal('modal-contact')">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-grid">
+    <div class="modal-body" style="overflow-x:hidden">
+      <div class="form-grid" style="width:100%;box-sizing:border-box">
         <div class="form-group">
           <label class="form-label">Name *</label>
           <input class="form-input" type="text" id="cf-name" placeholder="Full name">
@@ -1956,7 +2043,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="form-group">
           <label class="form-label">Contact Type</label>
           <select class="form-select" id="cf-type">
-            <option>Recruiter</option><option>Hiring Manager</option><option>Networking</option>
+            <option>Recruiter</option><option>Hiring Manager</option><option>HR / Talent Acquisition</option><option>Networking</option>
           </select>
         </div>
         <div class="form-group">
@@ -1987,6 +2074,20 @@ a { color: var(--burgundy); text-decoration: none; }
           <label class="form-label">Next Action Date</label>
           <input class="form-input" type="date" id="cf-next-date">
         </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="cf-email" placeholder="name@company.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link to Application</label>
+          <select class="form-select" id="cf-linked-app">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">LinkedIn URL</label>
+          <input class="form-input" type="url" id="cf-linkedin" placeholder="https://linkedin.com/in/...">
+        </div>
         <div class="form-group full">
           <label class="form-label">Notes</label>
           <textarea class="form-textarea" id="cf-notes" placeholder="Context, conversation notes..."></textarea>
@@ -1995,22 +2096,28 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="form-section">
         <div class="form-section-title">Outreach Log</div>
         <div class="outreach-grid">
-          <div class="form-group"><label class="form-label">Touch 1 Status</label>
+          <div class="form-group"><label class="form-label">Touch 1 Type</label>
+            <select class="form-select" id="cf-o1t"><option value="">-- Select --</option><option>LinkedIn</option><option>Email - App</option><option>Email - HubSpot</option><option>Live Conversation</option></select></div>
+          <div class="form-group"><label class="form-label">Status</label>
             <select class="form-select" id="cf-o1s"><option value="">-- None --</option><option>Scheduled</option><option>Sent</option><option>Opened</option><option>Responded</option><option>Skipped</option></select></div>
           <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="cf-o1d"></div>
-          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o1n" placeholder="Channel, notes..."></div>
+          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o1n" placeholder="Notes..."></div>
         </div>
         <div class="outreach-grid">
-          <div class="form-group"><label class="form-label">Touch 2 Status</label>
+          <div class="form-group"><label class="form-label">Touch 2 Type</label>
+            <select class="form-select" id="cf-o2t"><option value="">-- Select --</option><option>LinkedIn</option><option>Email - App</option><option>Email - HubSpot</option><option>Live Conversation</option></select></div>
+          <div class="form-group"><label class="form-label">Status</label>
             <select class="form-select" id="cf-o2s"><option value="">-- None --</option><option>Scheduled</option><option>Sent</option><option>Opened</option><option>Responded</option><option>Skipped</option></select></div>
           <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="cf-o2d"></div>
-          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o2n" placeholder="Channel, notes..."></div>
+          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o2n" placeholder="Notes..."></div>
         </div>
         <div class="outreach-grid">
-          <div class="form-group"><label class="form-label">Touch 3 Status</label>
+          <div class="form-group"><label class="form-label">Touch 3 Type</label>
+            <select class="form-select" id="cf-o3t"><option value="">-- Select --</option><option>LinkedIn</option><option>Email - App</option><option>Email - HubSpot</option><option>Live Conversation</option></select></div>
+          <div class="form-group"><label class="form-label">Status</label>
             <select class="form-select" id="cf-o3s"><option value="">-- None --</option><option>Scheduled</option><option>Sent</option><option>Opened</option><option>Responded</option><option>Skipped</option></select></div>
           <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="cf-o3d"></div>
-          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o3n" placeholder="Channel, notes..."></div>
+          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" type="text" id="cf-o3n" placeholder="Notes..."></div>
         </div>
       </div>
     </div>
@@ -2156,37 +2263,89 @@ a { color: var(--burgundy); text-decoration: none; }
 
 <!-- Resource Modal -->
 <div class="modal-overlay" id="modal-resource">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3>Add Resource</h3>
       <button class="modal-close" onclick="closeModal('modal-resource')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group full">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
           <label class="form-label">Title *</label>
           <input class="form-input" type="text" id="rsf-title" placeholder="Resource title">
         </div>
-        <div class="form-group">
-          <label class="form-label">Category</label>
-          <select class="form-select" id="rsf-cat">
-            <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
-            <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
-          </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="rsf-cat">
+              <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
+              <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL (optional)</label>
+            <input class="form-input" type="url" id="rsf-url" placeholder="https://...">
+          </div>
         </div>
         <div class="form-group">
-          <label class="form-label">URL</label>
-          <input class="form-input" type="url" id="rsf-url" placeholder="https://...">
-        </div>
-        <div class="form-group full">
           <label class="form-label">Notes</label>
-          <textarea class="form-textarea" id="rsf-notes" placeholder="Notes about this resource..."></textarea>
+          <textarea class="form-textarea" id="rsf-notes" rows="2" placeholder="Notes about this resource..."></textarea>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-resource')">Cancel</button>
       <button class="btn btn-primary" onclick="saveResource()">Save Resource</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Resource Modal -->
+<div class="modal-overlay" id="modal-upload-resource">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>⬆ Upload Resource File</h3>
+      <button class="modal-close" onclick="closeModal('modal-upload-resource')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-x:hidden">
+      <div id="rsf-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;margin-bottom:16px;background:var(--bg)"
+        onclick="document.getElementById('rsf-file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
+        ondragleave="this.style.borderColor='var(--border-strong)'"
+        ondrop="handleResourceFileDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px">📎</div>
+        <p style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to browse or drag a file here</p>
+        <p style="font-size:12px;color:var(--text-secondary)">.pdf, .doc, .docx, .png, .jpg, .xlsx supported</p>
+        <input type="file" id="rsf-file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.xls" style="display:none" onchange="handleResourceFileSelect(event)">
+      </div>
+      <div id="rsf-file-info" style="display:none;background:rgba(151,43,50,0.06);border:1px solid var(--burgundy);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--burgundy)">
+        <span id="rsf-file-name"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Title *</label>
+          <input class="form-input" type="text" id="rsf-upload-title" placeholder="Resource title">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="rsf-upload-cat">
+            <option>Interview Prep</option><option>Salary Research</option><option>Industry Research</option>
+            <option>Company Research</option><option>Job Boards</option><option>Networking</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="rsf-upload-notes" rows="2" placeholder="Notes about this file..."></textarea>
+        </div>
+      </div>
+      <div id="rsf-upload-progress" style="display:none;margin-top:12px">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="rsf-progress-bar" style="width:0%"></div></div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="rsf-progress-text">Uploading...</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-upload-resource')">Cancel</button>
+      <button class="btn btn-primary" id="rsf-submit-btn" onclick="submitResourceUpload()">⬆ Upload File</button>
     </div>
   </div>
 </div>
@@ -2201,6 +2360,8 @@ a { color: var(--burgundy); text-decoration: none; }
     <div class="modal-body" id="detail-body"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="detail-edit-btn">Edit</button>
+      <button class="btn btn-secondary btn-sm" id="detail-upload-btn" style="display:none" onclick="openUploadFromDetail()">⬆ Upload Resume</button>
+      <button class="btn btn-secondary btn-sm" id="detail-email-btn" style="display:none" onclick="openGmailCompose()">✉️ Email</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Close</button>
     </div>
   </div>
@@ -2319,86 +2480,14 @@ a { color: var(--burgundy); text-decoration: none; }
 
 
 <!-- Upload Document Modal -->
-<div class="modal-overlay" id="modal-upload-doc">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="upload-modal-title">⬆ Upload Document</h3>
-      <button class="modal-close" onclick="closeModal('modal-upload-doc')">✕</button>
-    </div>
-    <div class="modal-body">
-
-      <!-- Drop zone -->
-      <div id="upload-dropzone"
-        style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px"
-        onclick="document.getElementById('upload-file-input').click()"
-        ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
-        ondragleave="this.style.borderColor=''"
-        ondrop="handleFileDrop(event)">
-        <div style="font-size:32px;margin-bottom:8px">📎</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Click to browse or drag & drop</div>
-        <div style="font-size:12px;color:var(--text-secondary)">.docx and .pdf files supported</div>
-        <div id="upload-file-name" style="margin-top:10px;font-size:13px;font-weight:600;color:var(--burgundy);display:none"></div>
-      </div>
-      <input type="file" id="upload-file-input" accept=".docx,.pdf,.doc" style="display:none" onchange="handleFileSelect(event)">
-
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Document Type</label>
-          <select class="form-select" id="upload-doc-type">
-            <option value="Resume">Resume</option>
-            <option value="Cover Letter">Cover Letter</option>
-            <option value="Job Description">Job Description</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Link to Application</label>
-          <select class="form-select" id="upload-link-app" onchange="autoFillFromApp()">
-            <option value="">— Don't link —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Company</label>
-          <input class="form-input" type="text" id="upload-company" placeholder="Company name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Role</label>
-          <input class="form-input" type="text" id="upload-role" placeholder="VP of Marketing">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Link to Contact</label>
-          <select class="form-select" id="upload-link-contact">
-            <option value="">— No contact —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Notes</label>
-          <input class="form-input" type="text" id="upload-notes" placeholder="e.g. Final version submitted 3/15">
-        </div>
-      </div>
-
-      <!-- Progress bar -->
-      <div id="upload-progress-wrap" style="display:none;margin-top:14px">
-        <div class="progress-bar-wrap"><div class="progress-bar" id="upload-progress-bar" style="width:0%"></div></div>
-        <p class="progress-text" id="upload-progress-text">Uploading...</p>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-upload-doc')">Cancel</button>
-      <button class="btn btn-primary" id="upload-submit-btn" onclick="submitUpload()">⬆ Upload</button>
-    </div>
-  </div>
-</div>
-
-
 <!-- Upload Document Modal -->
 <div class="modal-overlay" id="modal-upload">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header">
       <h3>⬆ Upload Document</h3>
       <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" style="overflow-x:hidden">
       <!-- Drop zone -->
       <div id="upload-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px;background:var(--bg)"
            onclick="document.getElementById('upload-file-input').click()"
@@ -2415,7 +2504,7 @@ a { color: var(--burgundy); text-decoration: none; }
         <button onclick="clearUploadFile()" style="margin-left:auto;background:none;border:none;color:var(--burgundy);cursor:pointer;font-size:16px">✕</button>
       </div>
 
-      <div class="form-grid">
+      <div style="display:flex;flex-direction:column;gap:12px">
         <div class="form-group">
           <label class="form-label">Document Type</label>
           <select class="form-select" id="upload-doc-type" onchange="autoFillUploadType()">
@@ -2432,21 +2521,22 @@ a { color: var(--burgundy); text-decoration: none; }
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Company</label>
-          <input class="form-input" type="text" id="upload-company" placeholder="Company name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Role</label>
-          <input class="form-input" type="text" id="upload-role" placeholder="VP of Marketing">
-        </div>
-        <div class="form-group">
           <label class="form-label">Link to Contact (optional)</label>
           <select class="form-select" id="upload-link-contact">
             <option value="">— Don't link —</option>
           </select>
         </div>
-        <div class="form-group"></div>
-        <div class="form-group full">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Company</label>
+            <input class="form-input" type="text" id="upload-company" placeholder="Company name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <input class="form-input" type="text" id="upload-role" placeholder="VP of Marketing">
+          </div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Notes (optional)</label>
           <textarea class="form-textarea" id="upload-notes" rows="2" placeholder="e.g. Final version submitted, tailored for SaaS roles..."></textarea>
         </div>
@@ -2457,9 +2547,57 @@ a { color: var(--burgundy); text-decoration: none; }
         <p style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="upload-progress-text">Uploading...</p>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px;min-height:56px">
       <button class="btn btn-secondary" onclick="closeModal('modal-upload')">Cancel</button>
       <button class="btn btn-primary" id="upload-submit-btn" onclick="submitUpload()">Upload Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Template Modal -->
+<div class="modal-overlay" id="modal-template">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="modal-template-title">Add Template</h3>
+      <button class="modal-close" onclick="closeModal('modal-template')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-x:hidden">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Template Name *</label>
+            <input class="form-input" type="text" id="tmpl-name" placeholder="e.g. Initial Recruiter Outreach">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="tmpl-type">
+              <option>Initial Outreach</option>
+              <option>Follow-Up</option>
+              <option>Thank You</option>
+              <option>Rejection Response</option>
+              <option>Networking</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject Line</label>
+          <input class="form-input" type="text" id="tmpl-subject" placeholder="e.g. VP Marketing — Jay Wadhwa | 6x Emmy Award Winner">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Body *</label>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Use {{name}}, {{company}}, {{role}} as merge fields</div>
+          <textarea class="form-textarea" id="tmpl-body" rows="8" placeholder="Hi {{name}},&#10;&#10;...&#10;&#10;Cheers,&#10;Jay"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <input class="form-input" type="text" id="tmpl-notes" placeholder="When to use this template...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-template')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
     </div>
   </div>
 </div>
@@ -2568,7 +2706,33 @@ async function dbDelete(table, id) {
   return r.ok;
 }
 
+async function callAILong(messages, systemPrompt) {
+  // High token limit for long document generation
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
+  if (systemPrompt) body.system = systemPrompt;
+  const r = await fetch(WORKER_URL + '/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('API error: ' + r.status);
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
+}
+
 async function callAI(messages, systemPrompt = '', useWebSearch = false) {
+  // Append resource context to last user message if present
+  var resourceCtx = getResourceContext();
+  if (resourceCtx && messages.length > 0) {
+    var lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'user') {
+      messages = messages.slice(0, -1).concat([{
+        role: 'user',
+        content: lastMsg.content + '\n\n---\nAdditional context from attached resource:\n' + resourceCtx
+      }]);
+    }
+  }
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
   // Keep max_tokens low to stay under rate limits
@@ -2598,6 +2762,8 @@ function navigateTo(page) {
   if (page === 'coverletters') loadCoverLetters();
   if (page === 'prompts') loadPrompts();
   if (page === 'resources') loadResources();
+  if (page === 'templates') loadTemplates();
+  if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
   if (page === 'interviewprep') loadInterviewPrepPage();
   if (page === 'resumetailor') loadRTPage();
@@ -2656,6 +2822,19 @@ function populateDropdowns() {
   indSel.innerHTML = '<option value="">-- Select --</option>';
   INDUSTRIES.forEach(i => indSel.innerHTML += `<option>${i}</option>`);
 
+  // Populate contact dropdown
+  const contactSel = document.getElementById('f-contact');
+  if (contactSel) {
+    contactSel.innerHTML = '<option value="">— None —</option>';
+    allContacts.slice(0, 500).forEach(function(c) {
+      if (!c.name) return;
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+      contactSel.appendChild(opt);
+    });
+  }
+
   // Filter dropdowns
   const fs = document.getElementById('filter-status');
   fs.innerHTML = '<option value="">All Statuses</option>';
@@ -2695,6 +2874,12 @@ async function refreshDashboard() {
   if (!allApps.length) {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
+  }
+  // Auto-sync HubSpot tasks and activity on dashboard load
+  if (!window._hubspotAutoSynced) {
+    window._hubspotAutoSynced = true;
+    syncHubSpotTasks();
+    syncHubSpotActivity();
   }
 
   const total = allApps.length;
@@ -2802,11 +2987,22 @@ async function loadApps() {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
+  populateDropdowns();
   filterApps();
+}
+
+function clearSearch(inputId, filterFn) {
+  var el = document.getElementById(inputId);
+  if (el) { el.value = ''; el.focus(); }
+  var clearBtn = document.getElementById(inputId + '-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (filterFn) filterFn();
 }
 
 function filterApps() {
   const q = document.getElementById('app-search').value.toLowerCase();
+  var clearBtn = document.getElementById('app-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
   const st = document.getElementById('filter-status').value;
   const sr = document.getElementById('filter-source').value;
   const ind = document.getElementById('filter-industry').value;
@@ -2822,19 +3018,53 @@ function filterApps() {
     return true;
   });
 
-  currentPage = 1;
-  document.getElementById('app-count-label').textContent = `${allApps.length} total applications`;
-  document.getElementById('app-filter-count').textContent = filteredApps.length !== allApps.length ? `${filteredApps.length} shown` : '';
+  // Only reset to page 1 when filter values actually changed (not on edit save)
+  if (typeof arguments[0] === 'undefined' || arguments[0] !== 'keep-page') currentPage = 1;
+  document.getElementById('app-count-label').textContent = allApps.length + ' total applications';
+  document.getElementById('app-filter-count').textContent = filteredApps.length !== allApps.length ? filteredApps.length + ' shown' : '';
   renderAppsTable();
 }
 
 function sortApps(field) {
   if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
   else { sortField = field; sortDir = 'desc'; }
-  filteredApps.sort((a, b) => {
-    const av = a[field] || '', bv = b[field] || '';
-    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+
+  filteredApps.sort(function(a, b) {
+    var av, bv;
+    if (field === 'outreach_count') {
+      var countSent = function(x) {
+        return [x.initial_outreach_status, x.followup_3day_status, x.followup_1week_status, x.followup_2week_status]
+          .filter(function(s) { return s === 'Sent' || s === 'Opened' || s === 'Responded'; }).length;
+      };
+      av = countSent(a); bv = countSent(b);
+      return sortDir === 'asc' ? av - bv : bv - av;
+    } else if (field === 'salary') {
+      // Extract first number from salary string
+      av = parseFloat((a.salary || '0').replace(/[^0-9.]/g, '')) || 0;
+      bv = parseFloat((b.salary || '0').replace(/[^0-9.]/g, '')) || 0;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    } else if (field === 'date_applied') {
+      av = a.date_applied || ''; bv = b.date_applied || '';
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    } else {
+      av = (a[field] || '').toLowerCase(); bv = (b[field] || '').toLowerCase();
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
   });
+
+  // Update header indicators
+  document.querySelectorAll('[id^="sh-"]').forEach(function(th) {
+    var thField = th.id.replace('sh-', '');
+    var label = th.textContent.replace(' ↑','').replace(' ↓','').replace(' ↕','');
+    if (thField === field) {
+      th.textContent = label + (sortDir === 'asc' ? ' ↑' : ' ↓');
+      th.style.color = 'var(--burgundy)';
+    } else {
+      th.textContent = label + ' ↕';
+      th.style.color = '';
+    }
+  });
+
   renderAppsTable();
 }
 
@@ -2899,16 +3129,31 @@ function goPage(p) {
 }
 
 // ── APP FORM ───────────────────────────────────────────────────────────
+function populateAppContactDropdown(selectedId) {
+  var sel = document.getElementById('f-linked-contact');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>';
+  allContacts.forEach(function(c) {
+    if (!c.name) return;
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    sel.appendChild(opt);
+  });
+  if (selectedId) sel.value = selectedId;
+}
+
 function openAddApp() {
   editingId = null;
   document.getElementById('modal-app-title').textContent = 'Add Application';
   clearAppForm();
   document.getElementById('f-date').value = today();
+  populateAppContactDropdown(null);
   openModal('modal-app');
 }
 
 function clearAppForm() {
-  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes',
+  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes','f-linked-contact',
    'f-io-date','f-io-notes','f-3d-date','f-3d-notes','f-1w-date','f-1w-notes',
    'f-2w-date','f-2w-notes','f-rf-date','f-rf-notes'].forEach(id => {
     const el = document.getElementById(id);
@@ -2927,7 +3172,15 @@ function editApp(id) {
   editingId = id;
   document.getElementById('modal-app-title').textContent = 'Edit Application';
 
-  const setVal = (fid, val) => { const el = document.getElementById(fid); if (el) el.value = val || ''; };
+  // Ensure form dropdowns are populated before setting values
+  populateDropdowns();
+
+  const setVal = (fid, val) => {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    el.value = val || '';
+  };
+
   setVal('f-date', a.date_applied);
   setVal('f-company', a.company);
   setVal('f-title', a.job_title);
@@ -2935,11 +3188,26 @@ function editApp(id) {
   setVal('f-salary', a.salary);
   setVal('f-resume', a.resume_version);
   setVal('f-coverletter', a.cover_letter_version);
+  var contactSel = document.getElementById('f-contact');
+  if (contactSel && a.linked_contact_id) contactSel.value = a.linked_contact_id;
   setVal('f-notes', a.notes);
-  setVal('f-status', a.status);
-  setVal('f-source', a.source);
-  setVal('f-jobtype', a.job_type);
-  setVal('f-industry', a.industry);
+
+  // Set select values after ensuring options are populated
+  ['f-status', 'f-source', 'f-jobtype', 'f-industry'].forEach(function(fid) {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    const fieldMap = { 'f-status': 'status', 'f-source': 'source', 'f-jobtype': 'job_type', 'f-industry': 'industry' };
+    const val = a[fieldMap[fid]] || '';
+    // Check if option exists, if not add it temporarily
+    const exists = Array.from(el.options).some(function(o) { return o.value === val; });
+    if (!exists && val) {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      el.appendChild(opt);
+    }
+    el.value = val;
+  });
+
   setVal('f-io-status', a.initial_outreach_status);
   setVal('f-io-date', a.initial_outreach_date);
   setVal('f-io-notes', a.initial_outreach_notes);
@@ -2955,6 +3223,7 @@ function editApp(id) {
   setVal('f-rf-status', a.rejection_followup_status);
   setVal('f-rf-date', a.rejection_followup_date);
   setVal('f-rf-notes', a.rejection_followup_notes);
+  populateAppContactDropdown(a.linked_contact_id || null);
 
   openModal('modal-app');
 }
@@ -2978,6 +3247,8 @@ async function saveApp() {
     resume_version: getVal('f-resume'),
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
+    linked_contact_id: getVal('f-linked-contact') || null,
+    linked_contact_id: (document.getElementById('f-contact') || {}).value || null,
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
@@ -2996,22 +3267,79 @@ async function saveApp() {
   };
 
   try {
+    let savedApp;
     if (editingId) {
       await dbPatch('applications', editingId, payload);
       const idx = allApps.findIndex(x => x.id === editingId);
       if (idx >= 0) allApps[idx] = { ...allApps[idx], ...payload };
+      savedApp = allApps.find(x => x.id === editingId);
       toast('Application updated.', 'success');
     } else {
+      // Check for duplicate before saving
+      const duplicate = allApps.find(function(a) {
+        return a.company && payload.company &&
+          a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
+          a.job_title && payload.job_title &&
+          a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
+      });
+      if (duplicate) {
+        if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
+      }
       const result = await dbPost('applications', payload);
-      const newApp = Array.isArray(result) ? result[0] : result;
-      allApps.unshift(newApp);
+      savedApp = Array.isArray(result) ? result[0] : result;
+      allApps.unshift(savedApp);
       toast('Application added.', 'success');
     }
     closeModal('modal-app');
-    filterApps();
+    filterApps('keep-page');
+
+    // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
+    if (savedApp) syncOutreachToHubSpot(savedApp);
+
   } catch (e) {
     toast('Error saving application: ' + e.message, 'error');
   }
+}
+
+async function syncOutreachToHubSpot(app) {
+  // Build a task for each outreach step that is Scheduled with a date
+  const steps = [
+    { label: 'Initial Outreach', status: app.initial_outreach_status, date: app.initial_outreach_date },
+    { label: '3-Day Follow-Up', status: app.followup_3day_status, date: app.followup_3day_date },
+    { label: '1-Week Follow-Up', status: app.followup_1week_status, date: app.followup_1week_date },
+    { label: '2-Week Follow-Up', status: app.followup_2week_status, date: app.followup_2week_date },
+    { label: 'Rejection Follow-Up', status: app.rejection_followup_status, date: app.rejection_followup_date },
+  ];
+
+  const toSync = steps.filter(function(s) { return s.status === 'Scheduled' && s.date; });
+  if (toSync.length === 0) return;
+
+  let created = 0;
+  for (const step of toSync) {
+    try {
+      // Convert date to milliseconds for HubSpot
+      const dueMsUtc = new Date(step.date + 'T12:00:00Z').getTime();
+      const taskBody = {
+        properties: {
+          hs_task_subject: step.label + ' — ' + app.company + ' (' + app.job_title + ')',
+          hs_task_status: 'NOT_STARTED',
+          hs_task_type: 'EMAIL',
+          hs_task_due_date: String(dueMsUtc),
+          hs_task_body: 'Job Search Command Center: ' + step.label + ' for ' + app.company + ' — ' + app.job_title,
+        }
+      };
+      const r = await fetch(WORKER_URL + '/hubspot/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        body: JSON.stringify(taskBody)
+      });
+      if (r.ok) created++;
+    } catch(e) {
+      // Silent fail — HubSpot sync is best-effort
+      console.warn('HubSpot task sync failed:', e.message);
+    }
+  }
+  if (created > 0) toast(created + ' follow-up task' + (created > 1 ? 's' : '') + ' synced to HubSpot.', 'success');
 }
 
 async function deleteApp(id) {
@@ -3040,6 +3368,7 @@ function viewApp(id) {
         <div class="detail-field"><span class="detail-field-label">Cover Letter</span><span class="detail-field-value">${a.cover_letter_version || '—'}</span></div>
         ${a.job_url ? `<div class="detail-field full"><span class="detail-field-label">Job URL</span><span class="detail-field-value"><a href="${a.job_url}" target="_blank">${a.job_url}</a></span></div>` : ''}
         ${a.notes ? `<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">${a.notes}</span></div>` : ''}
+        ${a.linked_contact_id ? (() => { var lc = allContacts.find(function(c){return c.id===a.linked_contact_id;}); return lc ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Linked Contact</span><span class="detail-field-value"><button class="btn btn-secondary btn-sm" data-cid="' + lc.id + '" onclick="viewContactFromApp(this.dataset.cid)">' + lc.name + (lc.company ? ' — ' + lc.company : '') + '</button></span></div>' : ''; })() : ''}
       </div>
     </div>
     <div class="detail-section">
@@ -3071,7 +3400,206 @@ function viewApp(id) {
     </div>` : ''}
   `;
   document.getElementById('detail-edit-btn').onclick = () => { closeModal('modal-detail'); editApp(id); };
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) emailBtn.style.display = 'none';
+  window._detailContact = null;
+
+  // Show upload button and wire it for this application
+  const uploadBtn = document.getElementById('detail-upload-btn');
+  if (uploadBtn) {
+    uploadBtn.style.display = '';
+    window._detailAppId = id;
+    window._detailAppCompany = a.company;
+    window._detailAppRole = a.job_title;
+  }
+
+  // Load linked uploaded documents and related contacts
+  loadDetailDocs(id);
+  loadDetailContacts(a.company, id);
   openModal('modal-detail');
+}
+
+async function loadDetailContacts(company, appId) {
+  if (!company) return;
+  try {
+    // Load contacts from DB if not yet loaded
+    if (!allContacts.length) {
+      const data = await dbGet('contacts', 'select=*&order=name.asc&limit=2000');
+      allContacts = Array.isArray(data) ? data : [];
+    }
+    // Find contacts at same company OR explicitly linked to this app
+    const companyLower = company.toLowerCase().trim();
+    var related = allContacts.filter(function(c) {
+      return (c.company && c.company.toLowerCase().includes(companyLower)) ||
+             (appId && c.linked_application_id === appId);
+    });
+    // Deduplicate
+    var seenIds = {}; related = related.filter(function(c) { if(seenIds[c.id]) return false; seenIds[c.id]=1; return true; });
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+
+    const section = document.createElement('div');
+    section.className = 'detail-section';
+    section.id = 'app-contacts-section';
+
+    var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+      '<div class="detail-section-title" style="margin:0">Contacts at ' + company + ' (' + related.length + ')</div>' +
+      (appId ? '<button class="btn btn-secondary btn-sm" data-aid="' + appId + '" onclick="openLinkContactToApp(this.dataset.aid)">+ Link Contact</button>' : '') +
+    '</div>';
+
+    var contactsHtml = related.length === 0
+      ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No contacts at this company yet.</div>'
+      : related.map(function(c) {
+          const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+          var linkedInHtml = c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
+          return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<div style="flex:1">' +
+              '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
+              '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title||'') + '</div>' +
+              (linkedInHtml ? '<div>' + linkedInHtml + '</div>' : '') +
+            '</div>' +
+            '<span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span>' +
+            '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
+          '<button class="action-btn danger" data-cid="' + c.id + '" data-aid="' + (appId||'') + '" onclick="unlinkContactFromApp(this.dataset.cid, this.dataset.aid)" title="Remove">✕</button>' +
+          '</div>';
+        }).join('');
+
+    section.innerHTML = headerHtml + contactsHtml;
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load contacts:', e.message);
+  }
+}
+
+async function unlinkContactFromApp(contactId, appId) {
+  if (!confirm('Remove this contact link?')) return;
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: null });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = null;
+    toast('Contact unlinked.', 'success');
+    var section = document.getElementById('app-contacts-section');
+    if (section) section.remove();
+    var app = allApps.find(function(a) { return a.id === appId; });
+    if (app) loadDetailContacts(app.company, appId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function openLinkContactToApp(appId) {
+  // Fetch all contacts with pagination for the dropdown
+  var allC = [], cOffset = 0;
+  while (true) {
+    var batch = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000&offset=' + cOffset);
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    allC = allC.concat(batch);
+    if (batch.length < 1000) break;
+    cOffset += 1000;
+  }
+  if (allC.length > 0) allContacts = allC;
+  var div = document.createElement('div');
+  div.id = 'link-contact-overlay';
+  div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
+  var selHtml = '<select id="link-contact-sel" class="form-select" style="margin-bottom:12px;width:100%"><option value="">— Select contact —</option>' +
+    allContacts.map(function(c) { return '<option value="' + c.id + '">' + c.name + (c.company ? ' — ' + c.company : '') + '</option>'; }).join('') +
+  '</select>';
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelB = document.createElement('button');
+  cancelB.className = 'btn btn-secondary';
+  cancelB.textContent = 'Cancel';
+  cancelB.onclick = function() { div.remove(); var b=document.getElementById('link-contact-backdrop'); if(b) b.remove(); };
+  var saveB = document.createElement('button');
+  saveB.className = 'btn btn-primary';
+  saveB.textContent = 'Link Contact';
+  saveB.onclick = function() { saveLinkContactToApp(appId); };
+  btns.appendChild(cancelB); btns.appendChild(saveB);
+  div.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Link Contact to Application</h3>' + selHtml;
+  div.appendChild(btns);
+  var backdrop = document.createElement('div');
+  backdrop.id = 'link-contact-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = function() { div.remove(); backdrop.remove(); };
+  document.body.appendChild(backdrop);
+  document.body.appendChild(div);
+}
+
+async function saveLinkContactToApp(appId) {
+  var contactId = document.getElementById('link-contact-sel').value;
+  if (!contactId) { toast('Select a contact first.', 'error'); return; }
+  // Check for duplicate by querying DB directly
+  var existingLinks = await dbGet('contacts', 'select=id&linked_application_id=eq.' + appId);
+  var alreadyLinked = Array.isArray(existingLinks) && existingLinks.find(function(c) { return c.id === contactId; });
+  if (alreadyLinked) { toast('This contact is already linked to this application.', 'error'); return; }
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: appId });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = appId;
+    var div = document.getElementById('link-contact-overlay');
+    var bk = document.getElementById('link-contact-backdrop');
+    if (div) div.remove(); if (bk) bk.remove();
+    toast('Contact linked to application.', 'success');
+    var section = document.getElementById('app-contacts-section');
+    if (section) section.remove();
+    var app = allApps.find(function(a) { return a.id === appId; });
+    if (app) loadDetailContacts(app.company, appId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function loadDetailDocs(appId) {
+  try {
+    const data = await dbGet('uploaded_documents', 'select=*&linked_application_id=eq.' + appId + '&order=created_at.desc');
+    const docs = Array.isArray(data) ? data : [];
+    if (docs.length === 0) return;
+
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+
+    const docSection = document.createElement('div');
+    docSection.className = 'detail-section';
+    docSection.innerHTML =
+      '<div class="detail-section-title">Uploaded Documents (' + docs.length + ')</div>' +
+      docs.map(function(d) {
+        const ext = (d.file_name || '').split('.').pop().toLowerCase();
+        const icon = ext === 'pdf' ? '📕' : '📘';
+        const size = d.file_size ? (d.file_size > 1024*1024 ? (d.file_size/1024/1024).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:20px">' + icon + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (d.file_name || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + (d.doc_type || '') + (size ? ' · ' + size : '') + ' · ' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</div>' +
+          '</div>' +
+          '<button class="btn btn-secondary btn-sm" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(null, this.dataset.path)">⬇</button> ' +
+          '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
+        '</div>';
+      }).join('');
+    detailBody.appendChild(docSection);
+  } catch(e) {
+    console.warn('Could not load docs for application:', e.message);
+  }
+}
+
+async function openUploadFromDetail() {
+  const appId = window._detailAppId;
+  const company = window._detailAppCompany || '';
+  const role = window._detailAppRole || '';
+  closeModal('modal-detail');
+
+  // Open upload modal pre-filled for this application
+  await openUploadModal();
+  setTimeout(function() {
+    // Pre-select doc type and link to this application
+    const docType = document.getElementById('upload-doc-type');
+    if (docType) docType.value = 'Resume';
+
+    const appSel = document.getElementById('upload-link-app');
+    if (appSel && appId) appSel.value = appId;
+
+    const companyEl = document.getElementById('upload-company');
+    if (companyEl && company) companyEl.value = company;
+
+    const roleEl = document.getElementById('upload-role');
+    if (roleEl && role) roleEl.value = role;
+  }, 150);
 }
 
 // ── CONTACTS ───────────────────────────────────────────────────────────
@@ -3119,6 +3647,25 @@ const CONTACT_TYPE_BADGE = {
   'Networking': 'badge-outreach',
 };
 
+async function migrateContactEmails() {
+  // One-time migration: extract emails from notes field into email field
+  // Run silently in background — don't block page render
+  var toMigrate = allContacts.filter(function(c) {
+    return !c.email && c.notes && c.notes.includes('Email: ');
+  });
+  if (toMigrate.length === 0) return;
+  console.log('Migrating emails for', toMigrate.length, 'contacts in background...');
+  // Fire and forget — don't await individual patches
+  toMigrate.forEach(function(c) {
+    var emailMatch = c.notes ? c.notes.match(/Email:\s*([^\s,;<]+@[^\s,;<]+)/) : null;
+    if (!emailMatch) return;
+    var email = emailMatch[1];
+    var newNotes = c.notes.replace('Email: ' + email, '').trim() || null;
+    c.email = email; // update in memory immediately
+    dbPatch('contacts', c.id, { email: email, notes: newNotes }); // fire without await
+  });
+}
+
 async function loadContacts() {
   // Paginate through all contacts — Supabase caps at 1000 per request
   const PAGE = 1000;
@@ -3136,6 +3683,7 @@ async function loadContacts() {
 
   allContacts = allData;
   filteredContacts = allContacts;
+  migrateContactEmails(); // non-blocking background migration
   renderContactsTable();
   updateContactCount();
 }
@@ -3150,6 +3698,8 @@ function updateContactCount() {
 
 function filterContacts() {
   const q = document.getElementById('contact-search').value.toLowerCase();
+  var clearBtn = document.getElementById('contact-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
   const type = document.getElementById('contact-type-filter').value;
   filteredContacts = allContacts.filter(c => {
     const text = (c.name + ' ' + (c.company||'') + ' ' + (c.title||'') + ' ' + (c.notes||'')).toLowerCase();
@@ -3172,7 +3722,10 @@ function renderContactsTable() {
     const overdueStyle = isOverdue(c.next_action_date) && c.next_action_date ? 'color:var(--burgundy);font-weight:600' : '';
     const hubspotLinked = c.hubspot_contact_id ? '<span title="Linked to HubSpot" style="color:#f97316;font-size:11px;margin-left:4px">● HS</span>' : '';
     return '<tr>' +
-      '<td><strong>' + c.name + '</strong>' + hubspotLinked + '</td>' +
+      '<td>' +
+        '<div style="font-weight:600">' + c.name + hubspotLinked + '</div>' +
+        (c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy);font-size:11px" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '') +
+      '</td>' +
       '<td>' + (c.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></td>' +
@@ -3180,6 +3733,7 @@ function renderContactsTable() {
       '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.next_action||'—') + '</td>' +
       '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
       '<td><div class="table-actions">' +
+
         '<button class="action-btn" onclick="viewContact(\'' + c.id + '\')" title="View">👁</button>' +
         '<button class="action-btn" onclick="editContact(\'' + c.id + '\')" title="Edit">✏️</button>' +
         '<button class="action-btn danger" onclick="deleteContact(\'' + c.id + '\')" title="Delete">🗑</button>' +
@@ -3188,56 +3742,283 @@ function renderContactsTable() {
   }).join('');
 }
 
+function buildContactDetailHTML(c) {
+  // Shared HTML builder used by both viewContact and related contacts popup
+  const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+  const touches = [
+    {l:'Touch 1', type:c.outreach_1_type, s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
+    {l:'Touch 2', type:c.outreach_2_type, s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
+    {l:'Touch 3', type:c.outreach_3_type, s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
+  ];
+  return '<div class="detail-section">' +
+    '<div class="detail-section-title">Contact Info</div>' +
+    '<div class="detail-grid">' +
+      '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
+      (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
+      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+      (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
+      (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
+    '</div>' +
+  '</div>' +
+  '<div class="detail-section">' +
+    '<div class="detail-section-title">Outreach Log</div>' +
+    '<div class="outreach-track" style="grid-template-columns:repeat(3,1fr)">' +
+      touches.map(function(t) {
+        return '<div class="outreach-touch">' +
+          '<div class="touch-label">' + t.l + '</div>' +
+          (t.type ? '<div style="font-size:10px;color:var(--burgundy);font-weight:600;text-transform:uppercase">' + t.type + '</div>' : '') +
+          '<div class="touch-status">' + (t.s||'—') + '</div>' +
+          '<div class="touch-date">' + fmt(t.d) + '</div>' +
+          (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
+        '</div>';
+      }).join('') +
+    '</div>' +
+  '</div>' +
+  (c.hubspot_contact_id ? 
+    '<div class="detail-section" id="hs-activity-section-' + c.id + '">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div class="detail-section-title" style="margin:0">HubSpot Activity</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" data-hsid="' + c.hubspot_contact_id + '" onclick="loadContactHubSpotActivity(this.dataset.cid,this.dataset.hsid)">⟳ Load</button>' +
+          '<a href="https://app.hubspot.com/contacts/242599414/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' +
+        '</div>' +
+      '</div>' +
+      '<div id="hs-activity-' + c.id + '" style="font-size:12px;color:var(--text-secondary)">Click Load to fetch latest HubSpot activity.</div>' +
+    '</div>'
+  : '');
+}
+
 function viewContact(id) {
   const c = allContacts.find(x => x.id === id);
   if (!c) return;
-  const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
   document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
-  const touches = [
-    {l:'Touch 1', s:c.outreach_1_status, d:c.outreach_1_date, n:c.outreach_1_notes},
-    {l:'Touch 2', s:c.outreach_2_status, d:c.outreach_2_date, n:c.outreach_2_notes},
-    {l:'Touch 3', s:c.outreach_3_status, d:c.outreach_3_date, n:c.outreach_3_notes},
-  ];
-  document.getElementById('detail-body').innerHTML =
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Contact Info</div>' +
-      '<div class="detail-grid">' +
-        '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
-        '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
-        (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
-        (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
-        (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
-      '</div>' +
-    '</div>' +
-    '<div class="detail-section">' +
-      '<div class="detail-section-title">Outreach Log</div>' +
-      '<div class="outreach-track" style="grid-template-columns:repeat(3,1fr)">' +
-        touches.map(t =>
-          '<div class="outreach-touch">' +
-            '<div class="touch-label">' + t.l + '</div>' +
-            '<div class="touch-status">' + (t.s||'—') + '</div>' +
-            '<div class="touch-date">' + fmt(t.d) + '</div>' +
-            (t.n ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">' + t.n + '</div>' : '') +
-          '</div>'
-        ).join('') +
-      '</div>' +
-    '</div>';
-  document.getElementById('detail-edit-btn').style.display = '';
+  document.getElementById('detail-body').innerHTML = buildContactDetailHTML(c);
+  document.getElementById('detail-edit-btn').textContent = '✏️ Edit';
   document.getElementById('detail-edit-btn').onclick = function() { closeModal('modal-detail'); editContact(id); };
+  var uploadBtn = document.getElementById('detail-upload-btn');
+  if (uploadBtn) uploadBtn.style.display = 'none';
+  // Show email button and store contact for Gmail compose
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) {
+    emailBtn.style.display = c.email ? '' : 'none';
+    window._detailContact = c;
+  }
+  // Load docs linked to this contact
+  loadContactDocs(id);
+  // Load related applications from same company
+  if (c.company) loadContactRelatedApps(c.company, c.linked_application_id, id);
   openModal('modal-detail');
+}
+
+async function loadContactRelatedApps(company, linkedAppId, contactId) {
+  if (!company) return;
+  try {
+    if (!allApps.length) {
+      const data = await dbGet('applications', 'select=id,company,job_title,date_applied,status&order=date_applied.desc&limit=5000');
+      allApps = Array.isArray(data) ? data : [];
+    }
+    var companyLower = company.toLowerCase().trim();
+    var related = allApps.filter(function(a) {
+      // Show apps at same company OR the explicitly linked app
+      return (a.company && a.company.toLowerCase().includes(companyLower)) ||
+             (linkedAppId && a.id === linkedAppId);
+    });
+    // Deduplicate
+    var seenA = {}; related = related.filter(function(a) { if(seenA[a.id]) return false; seenA[a.id]=1; return true; });
+
+    var detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+    var section = document.createElement('div');
+    section.className = 'detail-section';
+    section.id = 'contact-apps-section';
+
+    var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+      '<div class="detail-section-title" style="margin:0">Applications at ' + company + ' (' + related.length + ')</div>' +
+      (contactId ? '<button class="btn btn-secondary btn-sm" data-cid="' + contactId + '" onclick="openLinkAppToContact(this.dataset.cid)">+ Link App</button>' : '') +
+    '</div>';
+
+    var rows = related.length === 0
+      ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No applications at this company.</div>'
+      : related.map(function(a) {
+          var isLinked = a.id === linkedAppId;
+          return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<div style="flex:1">' +
+              '<div style="font-size:13px;font-weight:600">' + (a.job_title||'—') + (isLinked ? ' <span style="font-size:10px;color:var(--burgundy);font-weight:700">● LINKED</span>' : '') + '</div>' +
+              '<div style="font-size:11px;color:var(--text-secondary)">' + fmt(a.date_applied) + '</div>' +
+            '</div>' +
+            badge(a.status) +
+            '<button class="btn btn-secondary btn-sm" data-aid="' + a.id + '" onclick="closeModal(&quot;modal-detail&quot;);viewApp(this.dataset.aid)">View</button>' +
+            (contactId && !isLinked ? ' <button class="btn btn-secondary btn-sm" data-aid="' + a.id + '" data-cid="' + contactId + '" onclick="quickLinkAppToContact(this.dataset.cid,this.dataset.aid)">Link</button>' : '') +
+            (contactId && isLinked ? ' <button class="action-btn danger" data-cid="' + contactId + '" onclick="unlinkAppFromContact(this.dataset.cid)" title="Unlink">✕</button>' : '') +
+          '</div>';
+        }).join('');
+
+    section.innerHTML = header + rows;
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load related apps:', e.message);
+  }
+}
+
+async function quickLinkAppToContact(contactId, appId) {
+  if (!appId) { toast('Select an application first.', 'error'); return; }
+  // Check for duplicate
+  var c = allContacts.find(function(x) { return x.id === contactId; });
+  if (c && c.linked_application_id === appId) { toast('This application is already linked to this contact.', 'error'); return; }
+  try {
+    await dbPatch('contacts', contactId, { linked_application_id: appId });
+    var c = allContacts.find(function(x) { return x.id === contactId; });
+    if (c) c.linked_application_id = appId;
+    toast('Application linked.', 'success');
+    var section = document.getElementById('contact-apps-section');
+    if (section) section.remove();
+    if (c) loadContactRelatedApps(c.company, appId, contactId);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function unlinkAppFromContact(contactId) {
+  if (!confirm('Remove linked application?')) return;
+  await dbPatch('contacts', contactId, { linked_application_id: null });
+  var c = allContacts.find(function(x) { return x.id === contactId; });
+  if (c) {
+    var company = c.company;
+    c.linked_application_id = null;
+    var section = document.getElementById('contact-apps-section');
+    if (section) section.remove();
+    loadContactRelatedApps(company, null, contactId);
+  }
+  toast('Application unlinked.', 'success');
+}
+
+function openLinkAppToContact(contactId) {
+  if (!allApps.length) { toast('Loading...', ''); loadApps().then(function() { openLinkAppToContact(contactId); }); return; }
+  var div = document.createElement('div');
+  div.id = 'link-app-overlay';
+  div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:380px;max-width:500px';
+  var selHtml = '<select id="link-app-sel" class="form-select" style="margin-bottom:12px;width:100%"><option value="">— Select application —</option>' +
+    allApps.map(function(a) {
+      var dp = a.date_applied ? a.date_applied.slice(0,10).split('-') : null;
+      var dateStr = dp ? ' (' + parseInt(dp[1]) + '/' + parseInt(dp[2]) + '/' + dp[0] + ')' : '';
+      return '<option value="' + a.id + '">' + (a.company||'') + (a.job_title ? ' — ' + a.job_title : '') + dateStr + '</option>';
+    }).join('') + '</select>';
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelB = document.createElement('button'); cancelB.className = 'btn btn-secondary'; cancelB.textContent = 'Cancel';
+  cancelB.onclick = function() { div.remove(); var b=document.getElementById('link-app-backdrop'); if(b) b.remove(); };
+  var saveB = document.createElement('button'); saveB.className = 'btn btn-primary'; saveB.textContent = 'Link Application';
+  saveB.onclick = function() {
+    var appId = document.getElementById('link-app-sel').value;
+    quickLinkAppToContact(contactId, appId);
+    div.remove(); var b=document.getElementById('link-app-backdrop'); if(b) b.remove();
+  };
+  btns.appendChild(cancelB); btns.appendChild(saveB);
+  div.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Link Application to Contact</h3>' + selHtml;
+  div.appendChild(btns);
+  var backdrop = document.createElement('div'); backdrop.id = 'link-app-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = function() { div.remove(); backdrop.remove(); };
+  document.body.appendChild(backdrop); document.body.appendChild(div);
+}
+
+async function loadContactDocs(contactId) {
+  try {
+    const data = await dbGet('uploaded_documents', 'select=*&linked_contact_id=eq.' + contactId + '&order=created_at.desc');
+    const docs = Array.isArray(data) ? data : [];
+    if (docs.length === 0) return;
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+    const section = document.createElement('div');
+    section.className = 'detail-section';
+    section.innerHTML =
+      '<div class="detail-section-title">Uploaded Documents (' + docs.length + ')</div>' +
+      docs.map(function(d) {
+        const ext = (d.file_name || '').split('.').pop().toLowerCase();
+        const icon = ext === 'pdf' ? '📕' : '📘';
+        const size = d.file_size ? (d.file_size > 1048576 ? (d.file_size/1048576).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:20px">' + icon + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (d.file_name||'—') + '</div>' +
+            '<div style="font-size:11px;color:var(--text-secondary)">' + (d.doc_type||'') + (size ? ' · ' + size : '') + '</div>' +
+          '</div>' +
+          '<button class="btn btn-secondary btn-sm" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(null, this.dataset.path)">⬇</button>' +
+          '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
+        '</div>';
+      }).join('');
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load contact docs:', e.message);
+  }
+}
+
+function viewContactFromApp(contactId) {
+  var appId = window._detailAppId;
+  dbGet('contacts', 'select=*&id=eq.' + contactId).then(function(data) {
+    var c = Array.isArray(data) ? data[0] : data;
+    if (!c) { toast('Contact not found.', 'error'); return; }
+
+    // Store in allContacts if needed
+    if (!allContacts.find(function(x) { return x.id === contactId; })) allContacts.push(c);
+
+    // Swap modal-detail content with contact info + Back button
+    document.getElementById('detail-title').textContent = c.name + (c.company ? ' — ' + c.company : '');
+    var badgeCls = c.contact_type === 'Recruiter' ? 'badge-interview-recruiter' :
+                   c.contact_type === 'Hiring Manager' ? 'badge-inprogress' : 'badge-outreach';
+    document.getElementById('detail-body').innerHTML =
+      '<div class="detail-section">' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + (c.next_action||'—') + '</span></div>' +
+          (c.email ? '<div class="detail-field"><span class="detail-field-label">Email</span><span class="detail-field-value"><a href="mailto:' + c.email + '" style="color:var(--burgundy)">' + c.email + '</a></span></div>' : '') +
+        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+          (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
+        '</div>' +
+      '</div>';
+
+    // Replace footer buttons
+    var editBtn = document.getElementById('detail-edit-btn');
+    if (editBtn) {
+      editBtn.textContent = '← Back to Application';
+      editBtn.onclick = function() { if (appId) viewApp(appId); };
+    }
+  }).catch(function(e) {
+    toast('Could not load contact: ' + e.message, 'error');
+  });
+}
+
+function populateContactAppDropdown(selectedId) {
+  var sel = document.getElementById('cf-linked-app');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>';
+  allApps.slice(0, 500).forEach(function(a) {
+    if (!a.company) return;
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    var dp = a.date_applied ? a.date_applied.slice(0,10).split('-') : null;
+    var dateStr = dp ? ' (' + parseInt(dp[1]) + '/' + parseInt(dp[2]) + '/' + dp[0] + ')' : '';
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '') + dateStr;
+    sel.appendChild(opt);
+  });
+  if (selectedId) sel.value = selectedId;
 }
 
 function openAddContact(defaultType) {
   editingId = null;
   document.getElementById('modal-contact-title').textContent = 'Add Contact';
-  ['cf-name','cf-company','cf-title','cf-notes','cf-next-action','cf-o1n','cf-o2n','cf-o3n'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  ['cf-name','cf-company','cf-title','cf-email','cf-notes','cf-next-action','cf-linkedin','cf-o1n','cf-o2n','cf-o3n','cf-o1t','cf-o2t','cf-o3t'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-o1s','cf-o2s','cf-o3s'].forEach(function(id) { var e=document.getElementById(id); if(e) e.selectedIndex=0; });
   if (defaultType) { var el=document.getElementById('cf-type'); if(el) el.value=defaultType; }
+  populateContactAppDropdown(null);
   openModal('modal-contact');
 }
 
@@ -3250,10 +4031,11 @@ function editContact(id) {
   sv('cf-name', c.name); sv('cf-company', c.company); sv('cf-title', c.title);
   sv('cf-type', c.contact_type); sv('cf-source', c.connection_source);
   sv('cf-last-date', c.last_contact_date); sv('cf-next-action', c.next_action);
-  sv('cf-next-date', c.next_action_date); sv('cf-notes', c.notes);
-  sv('cf-o1s', c.outreach_1_status); sv('cf-o1d', c.outreach_1_date); sv('cf-o1n', c.outreach_1_notes);
-  sv('cf-o2s', c.outreach_2_status); sv('cf-o2d', c.outreach_2_date); sv('cf-o2n', c.outreach_2_notes);
-  sv('cf-o3s', c.outreach_3_status); sv('cf-o3d', c.outreach_3_date); sv('cf-o3n', c.outreach_3_notes);
+  sv('cf-next-date', c.next_action_date); sv('cf-email', c.email); sv('cf-linkedin', c.linkedin_url); sv('cf-notes', c.notes);
+  populateContactAppDropdown(c.linked_application_id || null);
+  sv('cf-o1t', c.outreach_1_type); sv('cf-o1s', c.outreach_1_status); sv('cf-o1d', c.outreach_1_date); sv('cf-o1n', c.outreach_1_notes);
+  sv('cf-o2t', c.outreach_2_type); sv('cf-o2s', c.outreach_2_status); sv('cf-o2d', c.outreach_2_date); sv('cf-o2n', c.outreach_2_notes);
+  sv('cf-o3t', c.outreach_3_type); sv('cf-o3s', c.outreach_3_status); sv('cf-o3d', c.outreach_3_date); sv('cf-o3n', c.outreach_3_notes);
   openModal('modal-contact');
 }
 
@@ -3262,14 +4044,17 @@ async function saveContact() {
   if (!name) { toast('Name is required.', 'error'); return; }
   const payload = {
     name, company: getVal('cf-company'), title: getVal('cf-title'),
+    linked_application_id: getVal('cf-linked-app') || null,
     contact_type: getVal('cf-type'), connection_source: getVal('cf-source'),
     last_contact_date: getVal('cf-last-date') || null,
     next_action: getVal('cf-next-action'),
     next_action_date: getVal('cf-next-date') || null,
+    email: getVal('cf-email'),
+    linkedin_url: getVal('cf-linkedin'),
     notes: getVal('cf-notes'),
-    outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
-    outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d') || null, outreach_2_notes: getVal('cf-o2n'),
-    outreach_3_status: getVal('cf-o3s'), outreach_3_date: getVal('cf-o3d') || null, outreach_3_notes: getVal('cf-o3n'),
+    outreach_1_type: getVal('cf-o1t'), outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
+    outreach_2_type: getVal('cf-o2t'), outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d') || null, outreach_2_notes: getVal('cf-o2n'),
+    outreach_3_type: getVal('cf-o3t'), outreach_3_status: getVal('cf-o3s'), outreach_3_date: getVal('cf-o3d') || null, outreach_3_notes: getVal('cf-o3n'),
   };
   try {
     if (editingId) {
@@ -3277,22 +4062,51 @@ async function saveContact() {
       const idx = allContacts.findIndex(x => x.id === editingId);
       if (idx >= 0) allContacts[idx] = { ...allContacts[idx], ...payload };
       toast('Contact updated.', 'success');
+      // Ensure hubspot_contact_id is preserved from the original record
+      if (idx >= 0 && !allContacts[idx].hubspot_contact_id) {
+        var fresh = await dbGet('contacts', 'select=hubspot_contact_id&id=eq.' + editingId);
+        if (Array.isArray(fresh) && fresh[0]?.hubspot_contact_id) {
+          allContacts[idx].hubspot_contact_id = fresh[0].hubspot_contact_id;
+        }
+      }
     } else {
       const result = await dbPost('contacts', payload);
-      allContacts.unshift(Array.isArray(result) ? result[0] : result);
+      const saved = Array.isArray(result) ? result[0] : result;
+      if (saved) allContacts.unshift(saved);
       toast('Contact added.', 'success');
+      closeModal('modal-contact');
+      filterContacts();
+      // Push to HubSpot now that we have the saved contact with its DB id
+      if (saved) await pushContactToHubSpot(saved);
+      return;
     }
     closeModal('modal-contact');
     filterContacts();
+    // Sync to HubSpot for updates — use the merged contact with hubspot_contact_id
+    var savedContact = allContacts.find(function(c) { return c.id === editingId; });
+    if (savedContact) await pushContactToHubSpot(savedContact);
+    return;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function deleteContact(id) {
-  if (!confirm('Delete this contact?')) return;
+  if (!confirm('Delete this contact? This will also remove them from HubSpot.')) return;
+  var c = allContacts.find(function(x) { return x.id === id; });
   await dbDelete('contacts', id);
   allContacts = allContacts.filter(x => x.id !== id);
   filterContacts();
-  toast('Contact deleted.');
+  toast('Contact deleted.', 'success');
+  // Delete from HubSpot in background if they have a HubSpot ID
+  if (c && c.hubspot_contact_id) {
+    try {
+      await fetch(WORKER_URL + '/hubspot/contact/' + c.hubspot_contact_id, {
+        method: 'DELETE',
+        headers: { 'Origin': location.origin }
+      });
+    } catch(e) {
+      console.warn('HubSpot delete failed:', e.message);
+    }
+  }
 }
 
 // ── RECRUITER IMPORT ────────────────────────────────────────────────────
@@ -3325,6 +4139,12 @@ async function syncHubSpot() {
   if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
 
   try {
+    // Ensure all contacts are loaded from DB before matching
+    if (allContacts.length < 100) {
+      if (btn) btn.textContent = '⟳ Loading contacts...';
+      await loadContacts();
+    }
+
     // Paginate through all HubSpot contacts (100 per page)
     let allHsContacts = [];
     let after = '';
@@ -3366,8 +4186,8 @@ async function syncHubSpot() {
       after = nextAfter;
       page++;
 
-      // Safety limit — stop at 2000 contacts
-      if (allHsContacts.length >= 2000) break;
+      // Safety limit — stop at 10000 contacts
+      if (allHsContacts.length >= 10000) break;
     }
 
     if (allHsContacts.length === 0) {
@@ -3385,6 +4205,27 @@ async function syncHubSpot() {
       const name = ((hc.properties?.firstname || '') + ' ' + (hc.properties?.lastname || '')).trim();
       if (!name) continue;
       const hsId = String(hc.id);
+      // Extract LinkedIn URL from HubSpot — try all known property names
+      var rawLinkedIn = hc.properties?.hs_linkedin_url ||
+                        hc.properties?.linkedin_url ||
+                        hc.properties?.hs_linkedinbio ||
+                        hc.properties?.hs_linkedin_bio ||
+                        hc.properties?.linkedin_bio ||
+                        hc.properties?.linkedinbio ||
+                        hc.properties?.linkedinid ||
+                        hc.properties?.hs_linkedinid || null;
+      // Clean and build LinkedIn URL
+      var linkedInUrl = null;
+      if (rawLinkedIn) {
+        // Strip HubSpot formatting underscores e.g. __https://...__ 
+        rawLinkedIn = rawLinkedIn.replace(/^_+|_+$/g, '').trim();
+        if (rawLinkedIn.startsWith('http')) {
+          linkedInUrl = rawLinkedIn;
+        } else if (rawLinkedIn.length > 0) {
+          linkedInUrl = 'https://linkedin.com/in/' + rawLinkedIn;
+        }
+      }
+
       const payload = {
         name,
         company: hc.properties?.company || null,
@@ -3392,7 +4233,9 @@ async function syncHubSpot() {
         contact_type: 'Recruiter',
         connection_source: 'HubSpot',
         hubspot_contact_id: hsId,
-        notes: hc.properties?.email ? 'Email: ' + hc.properties.email : null,
+        email: hc.properties?.email || null,
+        linkedin_url: linkedInUrl,
+        notes: null,
         last_contact_date: hc.properties?.lastmodifieddate
           ? hc.properties.lastmodifieddate.split('T')[0] : null,
       };
@@ -3404,25 +4247,35 @@ async function syncHubSpot() {
       }
     }
 
-    // Batch insert new contacts in groups of 50
-    let created = 0;
-    const BATCH = 50;
-    for (let i = 0; i < toCreate.length; i += BATCH) {
-      const batch = toCreate.slice(i, i + BATCH);
-      const result = await fetch(WORKER_URL + '/db/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body: JSON.stringify(batch)
-      });
-      if (result.ok) created += batch.length;
-      await new Promise(res => setTimeout(res, 300));
-    }
+    // Batch UPSERT all contacts using hubspot_contact_id as the conflict key
+    // This handles both new and existing contacts in one operation
+    const BATCH = 100;
+    let created = 0, updated = 0;
+    const allPayloads = [...toCreate, ...toUpdate.map(function(u) {
+      return Object.assign({}, u.payload, { id: u.id });
+    })];
 
-    // Update existing contacts one at a time (small number expected)
-    let updated = 0;
-    for (const { id, payload } of toUpdate) {
-      await dbPatch('contacts', id, payload);
-      updated++;
+    if (btn) btn.textContent = '⟳ Saving ' + allPayloads.length + ' contacts...';
+
+    for (let i = 0; i < allPayloads.length; i += BATCH) {
+      const batch = allPayloads.slice(i, i + BATCH);
+      if (btn) btn.textContent = '⟳ Saving ' + i + '/' + allPayloads.length + '...';
+      try {
+        const result = await fetch(WORKER_URL + '/db/contacts?on_conflict=hubspot_contact_id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Origin': location.origin,
+                     'Prefer': 'resolution=merge-duplicates' },
+          body: JSON.stringify(batch)
+        });
+        if (result.ok) {
+          const data = await result.json();
+          created += batch.filter(function(b) { return !b.id; }).length;
+          updated += batch.filter(function(b) { return !!b.id; }).length;
+        }
+      } catch(batchErr) {
+        console.warn('Batch error:', batchErr.message);
+      }
+      await new Promise(function(res) { setTimeout(res, 200); });
     }
 
     // Reload contacts from DB to get full fresh list
@@ -3483,6 +4336,367 @@ function showHubSpotSetupGuide() {
 
 
 // Push a contact to HubSpot when saved
+// ── EMAIL TEMPLATES ────────────────────────────────────────────────────
+
+let allTemplates = [];
+let filteredTemplates = [];
+let templateSortField = 'name';
+let templateSortDir = 'asc';
+
+async function loadTemplates() {
+  const data = await dbGet('email_templates', 'select=*&order=name.asc');
+  allTemplates = Array.isArray(data) ? data : [];
+  filteredTemplates = allTemplates;
+  renderTemplatesTable();
+  updateTemplateCount();
+}
+
+function updateTemplateCount() {
+  const el = document.getElementById('template-count');
+  if (el) el.textContent = filteredTemplates.length + ' of ' + allTemplates.length + ' templates';
+}
+
+function filterTemplates() {
+  const q = (document.getElementById('template-search').value || '').toLowerCase();
+  const type = document.getElementById('template-type-filter').value;
+  filteredTemplates = allTemplates.filter(function(t) {
+    const text = ((t.name||'') + ' ' + (t.subject||'') + ' ' + (t.body||'')).toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (type && t.type !== type) return false;
+    return true;
+  });
+  updateTemplateCount();
+  renderTemplatesTable();
+}
+
+function sortTemplates(field) {
+  if (templateSortField === field) templateSortDir = templateSortDir === 'asc' ? 'desc' : 'asc';
+  else { templateSortField = field; templateSortDir = 'asc'; }
+  filteredTemplates.sort(function(a, b) {
+    var av = (a[field]||'').toLowerCase(), bv = (b[field]||'').toLowerCase();
+    return templateSortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  renderTemplatesTable();
+}
+
+function renderTemplatesTable() {
+  const tbody = document.getElementById('templates-tbody');
+  if (!tbody) return;
+  if (filteredTemplates.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><h3>No templates yet</h3><p>Add your first email template to get started.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filteredTemplates.map(function(t) {
+    var preview = (t.body || '').replace(/\n/g, ' ').slice(0, 80);
+    return '<tr>' +
+      '<td><strong>' + (t.name||'—') + '</strong>' + (t.notes ? '<div style="font-size:11px;color:var(--text-secondary)">' + t.notes + '</div>' : '') + '</td>' +
+      '<td><span class="badge badge-applied">' + (t.type||'—') + '</span></td>' +
+      '<td style="font-size:12px">' + (t.subject||'—') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + preview + '</td>' +
+      '<td><div class="table-actions">' +
+        '<button class="action-btn" data-tid="' + t.id + '" onclick="editTemplate(this.dataset.tid)" title="Edit">✏️</button>' +
+        '<button class="action-btn danger" data-tid="' + t.id + '" onclick="deleteTemplate(this.dataset.tid)" title="Delete">🗑</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openAddTemplate() {
+  window._editingTemplateId = null;
+  document.getElementById('modal-template-title').textContent = 'Add Template';
+  ['tmpl-name','tmpl-subject','tmpl-body','tmpl-notes'].forEach(function(id) {
+    var e = document.getElementById(id); if(e) e.value = '';
+  });
+  var sel = document.getElementById('tmpl-type'); if(sel) sel.selectedIndex = 0;
+  openModal('modal-template');
+}
+
+function editTemplate(id) {
+  var t = allTemplates.find(function(x) { return x.id === id; });
+  if (!t) return;
+  window._editingTemplateId = id;
+  document.getElementById('modal-template-title').textContent = 'Edit Template';
+  var sv = function(fid, val) { var e=document.getElementById(fid); if(e) e.value=val||''; };
+  sv('tmpl-name', t.name); sv('tmpl-subject', t.subject);
+  sv('tmpl-body', t.body); sv('tmpl-notes', t.notes);
+  var sel = document.getElementById('tmpl-type'); if(sel && t.type) sel.value = t.type;
+  openModal('modal-template');
+}
+
+async function saveTemplate() {
+  var name = (document.getElementById('tmpl-name').value||'').trim();
+  if (!name) { toast('Template name required.', 'error'); return; }
+  var payload = {
+    name,
+    type: document.getElementById('tmpl-type').value,
+    subject: (document.getElementById('tmpl-subject').value||'').trim(),
+    body: (document.getElementById('tmpl-body').value||'').trim(),
+    notes: (document.getElementById('tmpl-notes').value||'').trim() || null,
+  };
+  try {
+    if (window._editingTemplateId) {
+      await dbPatch('email_templates', window._editingTemplateId, payload);
+      var idx = allTemplates.findIndex(function(x) { return x.id === window._editingTemplateId; });
+      if (idx >= 0) allTemplates[idx] = Object.assign({}, allTemplates[idx], payload);
+      toast('Template updated.', 'success');
+    } else {
+      var result = await dbPost('email_templates', payload);
+      var saved = Array.isArray(result) ? result[0] : result;
+      if (saved) allTemplates.unshift(saved);
+      toast('Template saved.', 'success');
+    }
+    filteredTemplates = allTemplates;
+    closeModal('modal-template');
+    renderTemplatesTable();
+    updateTemplateCount();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  await dbDelete('email_templates', id);
+  allTemplates = allTemplates.filter(function(t) { return t.id !== id; });
+  filteredTemplates = filteredTemplates.filter(function(t) { return t.id !== id; });
+  renderTemplatesTable();
+  updateTemplateCount();
+  toast('Template deleted.');
+}
+
+async function fetchHubSpotTemplates() {
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } });
+    const data = await r.json();
+    var results = data.results || [];
+    // Sort by name for easier browsing
+    results.sort(function(a, b) { return (a.name||'').localeCompare(b.name||''); });
+    return results.map(function(t) {
+      // Extract plain text from HubSpot template
+      var name = t.name || 'Untitled';
+      var subject = t.content?.emailBody?.subject || t.subject || '';
+      // Get plain text body from HubSpot template structure
+      var body = '';
+      try {
+        var c2 = t.content || {};
+        // Try widgets object (Sales templates store content here)
+        if (c2.widgets) {
+          Object.values(c2.widgets).forEach(function(w) {
+            var html = (w.body && w.body.html) || (w.content && w.content.html) || '';
+            if (html) body += html + '\n';
+          });
+        }
+        // Try emailBody
+        if (!body && c2.emailBody && c2.emailBody.body) {
+          body = c2.emailBody.body;
+        }
+        // Try flexAreas widgets
+        if (!body && c2.flexAreas) {
+          Object.values(c2.flexAreas).forEach(function(area) {
+            (area.sections || []).forEach(function(sec) {
+              (sec.columns || []).forEach(function(col) {
+                (col.widgets || []).forEach(function(w) {
+                  var html = (w.body && w.body.html) || '';
+                  if (html) body += html + '\n';
+                });
+              });
+            });
+          });
+        }
+        if (body) {
+          body = body
+            .replace(/<br[^>]*>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<\/div>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        }
+        // Convert HubSpot merge tags
+        var fixMerge = function(s) {
+          return (s || '')
+            .replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}')
+            .replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}')
+            .replace(/\{\{\s*contact\.fullname\s*\}\}/g, '{{name}}');
+        };
+        subject = fixMerge(subject);
+        body = fixMerge(body);
+      } catch(e) { console.warn('Template parse error:', e.message); }
+            return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
+    });
+  } catch(e) {
+    console.warn('Could not fetch HubSpot templates:', e.message);
+    return [];
+  }
+}
+
+function getTemplatesForDropdown() {
+  return allTemplates;
+}
+
+async function openGmailCompose() {
+  var c = window._detailContact;
+  if (!c || !c.email) { toast('No email address for this contact.', 'error'); return; }
+
+  // Load HubSpot templates + local templates
+  var emailBtn = document.getElementById('detail-email-btn');
+  if (emailBtn) { emailBtn.disabled = true; emailBtn.textContent = '⏳ Loading...'; }
+
+  var hsTemplates = await fetchHubSpotTemplates();
+  var localTemplates = getTemplatesForDropdown();
+  var allTmpls = hsTemplates.concat(localTemplates);
+
+  if (emailBtn) { emailBtn.disabled = false; emailBtn.textContent = '✉️ Email'; }
+
+  var opts = '<option value="">✦ AI-generate email</option>';
+  hsTemplates.forEach(function(t) {
+    opts += '<option value="' + t.id + '">📧 ' + t.name + '</option>';
+  });
+  if (localTemplates.length > 0) {
+    opts += '<optgroup label="── My Templates ──">' +
+      localTemplates.map(function(t) { return '<option value="' + t.id + '">📋 ' + t.name + (t.type ? ' (' + t.type + ')' : '') + '</option>'; }).join('') +
+      '</optgroup>';
+  }
+  window._allEmailTemplates = allTmpls;
+
+  var picker = document.createElement('div');
+  picker.id = 'email-compose-picker';
+  picker.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;min-width:360px;max-width:480px';
+  var pickerInner = document.createElement('div');
+  pickerInner.innerHTML = '<h3 style="font-family:var(--font-display);font-size:18px;margin-bottom:16px">Email ' + c.name + '</h3>' +
+    '<div class="form-group" style="margin-bottom:16px">' +
+      '<label class="form-label">Choose template or AI-generate</label>' +
+      '<select class="form-select" id="email-template-picker">' + opts + '</select>' +
+    '</div>';
+  var pickerFooter = document.createElement('div');
+  pickerFooter.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-secondary';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = closeEmailPicker;
+  var hsBtn = document.createElement('button');
+  hsBtn.className = 'btn btn-secondary';
+  hsBtn.textContent = 'Send via HubSpot ↗';
+  hsBtn.onclick = openHubSpotCompose;
+  var sendBtn = document.createElement('button');
+  sendBtn.id = 'gmail-compose-btn';
+  sendBtn.className = 'btn btn-primary';
+  sendBtn.textContent = 'Open Gmail ↗';
+  sendBtn.onclick = executeGmailCompose;
+  pickerFooter.appendChild(cancelBtn);
+  pickerFooter.appendChild(hsBtn);
+  pickerFooter.appendChild(sendBtn);
+  picker.appendChild(pickerInner);
+  picker.appendChild(pickerFooter);
+
+  // Backdrop
+  var backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = closeEmailPicker;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(picker);
+  window._gmailBackdrop = backdrop;
+}
+
+function closeEmailPicker() {
+  var p = document.getElementById('email-compose-picker');
+  if (p) p.remove();
+  if (window._gmailBackdrop) { window._gmailBackdrop.remove(); window._gmailBackdrop = null; }
+}
+
+function openHubSpotCompose() {
+  var c = window._detailContact;
+  if (!c) return;
+  var portalId = window._hubspotPortalId || '242599414';
+  var hsBase = 'https://app-na2.hubspot.com';
+  var hsUrl = c.hubspot_contact_id
+    ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id
+    : hsBase + '/contacts/' + portalId + '/objects/0-1/views/all/list';
+  // Open first, then close picker
+  window.open(hsUrl, '_blank');
+  closeEmailPicker();
+  toast('Opening HubSpot...', 'success');
+}
+
+async function executeGmailCompose() {
+  var c = window._detailContact;
+  if (!c) return;
+  var sel = document.getElementById('email-template-picker');
+  var templateId = sel ? sel.value : '';
+  var picker = sel ? sel.closest('div[style]') : null;
+  var backdrop = window._gmailBackdrop;
+
+  var subject = '', body = '';
+
+  if (templateId) {
+    // Use selected template with merge fields
+    var t = (window._allEmailTemplates || allTemplates).find(function(x) { return x.id === templateId; });
+    if (t) {
+      subject = (t.subject || '').replace(/{{name}}/g, c.name).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
+      body = (t.body || '').replace(/{{name}}/g, (c.name||'').split(' ')[0]).replace(/{{company}}/g, c.company||'').replace(/{{role}}/g, c.title||'');
+    }
+  } else {
+    // AI-generate
+    if (picker) picker.querySelector('.btn-primary').textContent = '⏳ Generating...';
+    try {
+      var prompt = 'Write a brief, professional outreach email from Jay Wadhwa to ' + c.name +
+        (c.title ? ', ' + c.title : '') + (c.company ? ' at ' + c.company : '') +
+        '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created "programmable privacy" category). ' +
+        'Under 100 words. Peer-to-peer tone. One relevant credential. Clear ask for a call. Close with Cheers, Jay. No subject line in body.';
+      body = await callAI([{role:'user', content: prompt}], 'Write concise human outreach emails for Jay Wadhwa. No AI language. Direct and warm.');
+      subject = 'Connecting — Jay Wadhwa';
+    } catch(e) {
+      toast('Could not generate email: ' + e.message, 'error');
+      if (picker) picker.querySelector('.btn-primary').textContent = 'Open Gmail ↗';
+      return;
+    }
+  }
+
+  closeEmailPicker();
+  if (backdrop) backdrop.remove();
+
+  var gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
+    '&to=' + encodeURIComponent(c.email) +
+    '&su=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
+  window.open(gmailUrl, '_blank');
+}
+
+async function loadContactHubSpotActivity(contactId, hubspotId) {
+  var el = document.getElementById('hs-activity-' + contactId);
+  if (!el) return;
+  el.textContent = 'Loading...';
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/contact-activity/' + hubspotId, {
+      headers: { 'Origin': location.origin }
+    });
+    if (!r.ok) { el.textContent = 'Could not load activity.'; return; }
+    const data = await r.json();
+    const results = data.results || [];
+    if (results.length === 0) { el.textContent = 'No activity found in HubSpot.'; return; }
+    const typeIcons = { EMAIL:'📧', CALL:'📞', MEETING:'📅', NOTE:'📝', TASK:'✅' };
+    el.innerHTML = results.slice(0, 10).map(function(a) {
+      var props = a.properties || {};
+      var type = (props.hs_activity_type || a.type || 'NOTE').toUpperCase();
+      var icon = typeIcons[type] || '📌';
+      var title = props.hs_email_subject || props.hs_call_title || props.hs_meeting_title || props.hs_note_body || props.subject || 'Activity';
+      var date = props.hs_timestamp ? new Date(props.hs_timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
+        '<span style="font-size:14px;flex-shrink:0">' + icon + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</div>' +
+          '<div style="font-size:11px;color:var(--text-light)">' + type + (date ? ' · ' + date : '') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    if (el) el.textContent = 'Error: ' + e.message;
+  }
+}
+
 async function pushContactToHubSpot(contact) {
   try {
     const properties = {
@@ -3490,10 +4704,16 @@ async function pushContactToHubSpot(contact) {
       lastname: contact.name.split(' ').slice(1).join(' ') || '',
       company: contact.company || '',
       jobtitle: contact.title || '',
+      email: contact.email || '',
     };
-    const body = contact.hubspot_contact_id
-      ? { id: contact.hubspot_contact_id, properties }
-      : { properties };
+    // Always fetch fresh hubspot_contact_id from DB to avoid stale memory
+    var hsId = contact.hubspot_contact_id;
+    if (!hsId && contact.id) {
+      var fresh = await dbGet('contacts', 'select=hubspot_contact_id&id=eq.' + contact.id);
+      if (Array.isArray(fresh) && fresh[0]?.hubspot_contact_id) hsId = fresh[0].hubspot_contact_id;
+    }
+    const body = hsId ? { id: hsId, properties } : { properties };
+    console.log('HubSpot push:', hsId ? 'UPDATE ' + hsId : 'CREATE', contact.name);
     const r = await fetch(WORKER_URL + '/hubspot/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
@@ -3501,9 +4721,15 @@ async function pushContactToHubSpot(contact) {
     });
     if (r.ok) {
       const data = await r.json();
-      if (data.id && !contact.hubspot_contact_id) {
-        // Save the new HubSpot ID back to our database
-        await dbPatch('contacts', contact.id, { hubspot_contact_id: String(data.id) });
+      if (data.id) {
+        if (!hsId) {
+          // New contact — save HubSpot ID back to DB and memory
+          await dbPatch('contacts', contact.id, { hubspot_contact_id: String(data.id) });
+          contact.hubspot_contact_id = String(data.id);
+          var idx = allContacts.findIndex(function(c) { return c.id === contact.id; });
+          if (idx >= 0) allContacts[idx].hubspot_contact_id = String(data.id);
+        }
+        console.log('HubSpot push success:', data.id);
       }
     }
   } catch(e) {
@@ -3986,6 +5212,145 @@ function editResource(id) {
   openModal('modal-resource');
 }
 
+function openUploadResource() {
+  var inp = document.getElementById('rsf-file-input');
+  if (inp) inp.value = '';
+  var fi = document.getElementById('rsf-file-info');
+  if (fi) fi.style.display = 'none';
+  ['rsf-upload-title','rsf-upload-notes'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
+  var cat = document.getElementById('rsf-upload-cat'); if(cat) cat.selectedIndex = 0;
+  var prog = document.getElementById('rsf-upload-progress'); if(prog) prog.style.display = 'none';
+  var btn = document.getElementById('rsf-submit-btn'); if(btn) { btn.disabled = false; btn.textContent = '⬆ Upload File'; }
+  window._resourceFile = null;
+  openModal('modal-upload-resource');
+}
+
+function handleResourceFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('rsf-dropzone').style.borderColor = 'var(--border-strong)';
+  var file = e.dataTransfer.files[0];
+  if (file) setResourceFile(file);
+}
+
+function handleResourceFileSelect(e) {
+  var file = e.target.files[0];
+  if (file) setResourceFile(file);
+}
+
+function setResourceFile(file) {
+  window._resourceFile = file;
+  var fi = document.getElementById('rsf-file-info');
+  var fn = document.getElementById('rsf-file-name');
+  if (fi) fi.style.display = 'block';
+  if (fn) fn.textContent = file.name + ' (' + (file.size > 1048576 ? (file.size/1048576).toFixed(1)+'MB' : Math.round(file.size/1024)+'KB') + ')';
+  // Auto-fill title if empty
+  var title = document.getElementById('rsf-upload-title');
+  if (title && !title.value) title.value = file.name.replace(/\.[^.]+$/, '');
+}
+
+async function submitResourceUpload() {
+  if (!window._resourceFile) { toast('Select a file first.', 'error'); return; }
+  var title = (document.getElementById('rsf-upload-title').value || '').trim();
+  if (!title) { toast('Title required.', 'error'); return; }
+  var category = document.getElementById('rsf-upload-cat').value;
+  var notes = (document.getElementById('rsf-upload-notes').value || '').trim();
+  var btn = document.getElementById('rsf-submit-btn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  document.getElementById('rsf-upload-progress').style.display = 'block';
+  document.getElementById('rsf-progress-bar').style.width = '30%';
+  document.getElementById('rsf-progress-text').textContent = 'Uploading file...';
+  try {
+    var file = window._resourceFile;
+    var timestamp = Date.now();
+    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    var storagePath = 'resources/' + timestamp + '_' + safeName;
+    var uploadRes = await fetch(WORKER_URL + '/storage/upload/' + encodeURIComponent(storagePath), {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream', 'Origin': location.origin },
+      body: file
+    });
+    if (!uploadRes.ok) { var err = await uploadRes.json().catch(function(){return{};}); throw new Error(err.message || 'Upload failed'); }
+    document.getElementById('rsf-progress-bar').style.width = '70%';
+    document.getElementById('rsf-progress-text').textContent = 'Saving record...';
+    var record = { title, category, notes: notes || null, storage_path: storagePath, file_type: file.name.split('.').pop().toUpperCase(), file_size: file.size };
+    var result = await dbPost('resources', record);
+    var saved = Array.isArray(result) ? result[0] : result;
+    if (saved) { allResources.unshift(saved); filteredResources = allResources; }
+    document.getElementById('rsf-progress-bar').style.width = '100%';
+    document.getElementById('rsf-progress-text').textContent = 'Upload complete.';
+    closeModal('modal-upload-resource');
+    renderResourcesTable();
+    updateResourceCount();
+    toast(file.name + ' uploaded.', 'success');
+  } catch(e) {
+    document.getElementById('rsf-progress-text').textContent = 'Error: ' + e.message;
+    toast('Upload failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = '⬆ Upload File';
+  }
+}
+
+async function downloadResource(storagePath) {
+  if (!storagePath) { toast('No file path.', 'error'); return; }
+  toast('Preparing download...', '');
+  try {
+    var r = await fetch(WORKER_URL + '/storage/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
+    });
+    var data = await r.json();
+    var signedUrl = data.signedURL || data.signedUrl || '';
+    if (signedUrl) {
+      if (!signedUrl.startsWith('http')) signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co/storage/v1' + signedUrl;
+      window.open(signedUrl, '_blank');
+    } else {
+      toast('Could not generate download link.', 'error');
+    }
+  } catch(e) { toast('Download error: ' + e.message, 'error'); }
+}
+
+function populateAIResourcePicker() {
+  var picker = document.getElementById('ai-resource-picker');
+  if (!picker) return;
+  picker.innerHTML = '<option value="">📎 Attach Resource...</option>';
+  allResources.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = (r.storage_path ? '📄 ' : '🔗 ') + r.title + (r.category ? ' (' + r.category + ')' : '');
+    picker.appendChild(opt);
+  });
+}
+
+function attachResourceContext(id) {
+  if (!id) return;
+  var r = allResources.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var panel = document.getElementById('ai-resource-panel');
+  var textEl = document.getElementById('ai-resource-context-text');
+  if (!panel || !textEl) return;
+  var ctx = 'Resource: ' + r.title;
+  if (r.category) ctx += ' [' + r.category + ']';
+  if (r.url) ctx += ' — ' + r.url;
+  if (r.notes) ctx += '\n' + r.notes;
+  if (r.storage_path) ctx += ' (uploaded file: ' + r.storage_path.split('/').pop() + ')';
+  window._aiResourceContext = ctx;
+  textEl.textContent = ctx;
+  panel.style.display = 'block';
+  // Reset picker
+  var picker = document.getElementById('ai-resource-picker');
+  if (picker) picker.value = '';
+}
+
+function clearResourceContext() {
+  window._aiResourceContext = null;
+  var panel = document.getElementById('ai-resource-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function getResourceContext() {
+  return window._aiResourceContext || '';
+}
+
 async function saveResource() {
   const title = getVal('rsf-title');
   if (!title) { toast('Title required.', 'error'); return; }
@@ -4310,7 +5675,7 @@ function useExtracted(data) {
 
 async function tailorResume() {
   const jd = document.getElementById('ai-jd-text').value.trim();
-  if (!jd) { toast('Paste a job description first.', 'error'); return; }
+  // JD optional — proceed without if empty
 
   const reqKw = document.getElementById('ai-keywords-required').value;
   const niceKw = document.getElementById('ai-keywords-nice').value;
@@ -4775,6 +6140,81 @@ function loadInterviewPrepPage() {
   });
 }
 
+// File upload handlers for AI tools
+// ── UNIFIED FILE UPLOAD HANDLER ─────────────────────────────────────────
+
+async function extractFileText(file) {
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'txt') {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }
+  if (ext === 'docx') {
+    if (typeof mammoth === 'undefined') throw new Error('mammoth.js not loaded — refresh the page and try again.');
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        mammoth.extractRawText({ arrayBuffer: e.target.result })
+          .then(function(result) { resolve(result.value); })
+          .catch(reject);
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  if (ext === 'pdf') {
+    if (typeof pdfjsLib === 'undefined') throw new Error('pdf.js not loaded — refresh the page and try again.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        pdfjsLib.getDocument({ data: e.target.result }).promise.then(function(pdf) {
+          var pageNums = [];
+          for (var i = 1; i <= pdf.numPages; i++) pageNums.push(i);
+          return Promise.all(pageNums.map(function(n) {
+            return pdf.getPage(n).then(function(page) {
+              return page.getTextContent().then(function(tc) {
+                return tc.items.map(function(item) { return item.str; }).join(' ');
+              });
+            });
+          }));
+        }).then(function(pages) { resolve(pages.join('\n\n')); })
+          .catch(reject);
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  throw new Error('Unsupported format. Use .docx, .pdf, or .txt');
+}
+
+async function handleJDFileUpload(event, inputId, labelId) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var label = document.getElementById(labelId);
+  if (label) label.textContent = '⏳ Reading...';
+  try {
+    var text = await extractFileText(file);
+    var el = document.getElementById(inputId);
+    if (el) el.value = text;
+    if (label) label.textContent = '✓ ' + file.name;
+    toast('File loaded.', 'success');
+  } catch(e) {
+    if (label) label.textContent = '';
+    toast('Could not read file: ' + e.message, 'error');
+  }
+}
+
+function handleIPFileUpload(event)     { handleJDFileUpload(event, 'ip-jd',       'ip-jd-file-name'); }
+function handleRTFileUploadPage(event) { handleJDFileUpload(event, 'rt-jd',        'rt-jd-file-page-name'); }
+function handleCLGFileUpload(event)    { handleJDFileUpload(event, 'clg-jd',       'clg-jd-file-name'); }
+function handleRTFileUpload(event)     { handleJDFileUpload(event, 'ai-jd-text',   'rt-jd-file-name'); }
+function handleCLFileUpload(event)     { handleJDFileUpload(event, 'ai-gen-jd',    'cl-jd-file-name'); }
+
 async function runInterviewPrep() {
   const company = (document.getElementById('ip-company').value || '').trim();
   const role = (document.getElementById('ip-role').value || '').trim();
@@ -4784,7 +6224,7 @@ async function runInterviewPrep() {
   const intTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
-  if (!jd) { toast('Paste the job description to get the best results.', 'error'); return; }
+  // JD is optional — note it if missing but continue
 
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
@@ -4803,11 +6243,11 @@ async function runInterviewPrep() {
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
   contentEl.textContent = 'Step 1 of 2 — Generating Company Research, SWOT, Niche Analysis, and 30-60-90 Day Plan...';
 
-  const prompt1 = 'You are a strategy and career-docs expert creating an interview prep pack for a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\nFounded, HQ, employees, revenue estimates, valuation with sources. Products, services, target customers. Leadership structure. Key milestones, funding, deals. Market position. Positioning and core products. Top 3-5 competitors. 3-4 biggest opportunities and risks. Key recent news.\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\nSWOT table (markdown table format). Competitor grid comparing 3-5 peers. Pros/cons vs target company. Market share, growth, differentiators.\n\n## DOC 03: TARGET NICHE ANALYSIS\nCore customer niches. Unmet needs and market gaps. Where company can win. High-growth micro-segments.\n\n## DOC 04: 30-60-90 DAY PLAN\nDays 0-30: Learn and audit. Days 31-60: Test and build. Days 61-90: Scale and optimize. Cover brand, content, partnerships, demand generation. Senior-level, practical, actionable.\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes.';
+  const prompt1 = 'You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and attached resume.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- What they do: products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\nFORMAT: Use **bold** for stats and key data. Use markdown tables for SWOT and competitor grids. Sentences 15 words or fewer. Active voice. No em dashes.';
 
   let result1 = '';
   try {
-    result1 = await callAI([{ role: 'user', content: prompt1 }], sysPrompt);
+    result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt);
   } catch(e) {
     contentEl.textContent = 'Error on Step 1: ' + e.message;
     toast('Generation failed: ' + e.message, 'error');
@@ -4817,11 +6257,11 @@ async function runInterviewPrep() {
   contentEl.textContent = 'Step 1 complete. Step 2 of 2 — Generating Fit Analysis, Executive Summary, Strategic Questions, and Q&A Guide...';
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
-  const prompt2 = 'You are a strategy and career-docs expert creating an interview prep pack for Jay Wadhwa, a senior marketing executive.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\nSide-by-side markdown table: Company Need | Jay Experience | Evidence/Metric. At least 8 rows. Below the table: key overlap narrative, how multi-industry background (ESPN, NBCUniversal, Web3, SaaS, nonprofits) is an advantage, short fit summary paragraph.\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\nBULLET POINTS ONLY — no tables. Company snapshot bullets (founded, size, revenue, market position, top competitor). Key strengths and risks bullets. Primary growth paths bullets. Role fit bullets. Bottom-line takeaway (2-3 sentences). This doc must stand alone — do not reference Doc 01.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER' + (intName ? ' / ' + intName : '') + '\nQUESTIONS ONLY — no answers. Minimum 3 questions per category:\nTeam Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture' + (intName ? '\nAlso include 3 questions specifically for ' + intName + (intTitle ? ' as ' + intTitle : '') + '.' : '') + '\n\n## DOC 08: INTERVIEW Q&A GUIDE\n12 common interview questions with prepared answers for Jay. Each answer: lead with a specific metric or result, tie to this company and role, 3-5 sentences, peer-to-peer tone, no banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager).\n\nFORMAT: Use **bold** for stats. Use markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes.';
+  const prompt2 = 'You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role.\n\n' + context + '\n\nCreate EXACTLY these 4 documents. Use these EXACT headers:\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: Company Need | Jay Experience | Evidence/Metric (at least 8 rows)\n- Highlight overlaps and strengths\n- Explain how multi-industry background (ESPN, NBCUniversal, Web3, SaaS, nonprofits) is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\nCompany snapshot as BULLET POINTS ONLY — no tables:\n- Company snapshot bullets (founded, size, revenue, market position, top competitor)\n- Key strengths and risks bullets\n- Primary growth paths bullets\n- Role fit bullets\n- Bottom-line takeaway (2-3 sentences)\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER' + (intName ? ' / ' + intName : '') + '\nPure questions only (no answers). Minimum 3 questions per category:\n- Team Dynamics\n- Strategic Priorities\n- Measurement and Success\n- Budget and Resources\n- Culture\nDemonstrates research depth and strategic thinking. Helps gather intelligence for deeper rounds.' + (intName ? '\nAlso include 3 questions specifically for ' + intName + (intTitle ? ' as ' + intTitle : '') + '.' : '') + '\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused responses\n- Structured for easy memorization\n- Peer-to-peer tone. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager)\n\nFORMAT: Use **bold** for stats. Use markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes.';
 
   let result2 = '';
   try {
-    result2 = await callAI([{ role: 'user', content: prompt2 }], sysPrompt);
+    result2 = await callAILong([{ role: 'user', content: prompt2 }], sysPrompt);
   } catch(e) {
     contentEl.textContent = result1 + '\n\n[Error on Step 2: ' + e.message + ']';
     toast('Step 2 failed: ' + e.message, 'error');
@@ -4871,14 +6311,14 @@ function parseIPSections(text, company, role) {
 
   // Ordered keyword groups — each MUST appear after the previous one
   var kws = [
-    ['## DOC 01', '## DOC 1:', 'DOC 01:', 'DOC 1:', 'COMPANY OVERVIEW'],
-    ['## DOC 02', '## DOC 2:', 'DOC 02:', 'DOC 2:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
-    ['## DOC 03', '## DOC 3:', 'DOC 03:', 'DOC 3:', 'TARGET NICHE'],
-    ['## DOC 04', '## DOC 4:', 'DOC 04:', 'DOC 4:', '30-60-90 DAY', '30/60/90 DAY'],
-    ['## DOC 05', '## DOC 5:', 'DOC 05:', 'DOC 5:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
-    ['## DOC 06', '## DOC 6:', 'DOC 06:', 'DOC 6:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
-    ['## DOC 07', '## DOC 7:', 'DOC 07:', 'DOC 7:', 'STRATEGIC QUESTIONS FOR'],
-    ['## DOC 08', '## DOC 8:', 'DOC 08:', 'DOC 8:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
+    ['# DOC 01', '## DOC 01', 'DOC 01:', 'DOC 1:', 'COMPANY OVERVIEW'],
+    ['# DOC 02', '## DOC 02', 'DOC 02:', 'DOC 2:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
+    ['# DOC 03', '## DOC 03', 'DOC 03:', 'DOC 3:', 'TARGET NICHE'],
+    ['# DOC 04', '## DOC 04', 'DOC 04:', 'DOC 4:', '30-60-90 DAY', '30/60/90 DAY'],
+    ['# DOC 05', '## DOC 05', 'DOC 05:', 'DOC 5:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
+    ['# DOC 06', '## DOC 06', 'DOC 06:', 'DOC 6:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
+    ['# DOC 07', '## DOC 07', 'DOC 07:', 'DOC 7:', 'STRATEGIC QUESTIONS FOR'],
+    ['# DOC 08', '## DOC 08', 'DOC 08:', 'DOC 8:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
   ];
 
   var positions = [];
@@ -4919,14 +6359,14 @@ function debugIPSections() {
   if (!ipOutput) { toast('Generate the prep pack first.', 'error'); return; }
   var upper = ipOutput.toUpperCase();
   var kws = [
-    ['## DOC 01', 'DOC 01:', 'COMPANY OVERVIEW'],
-    ['## DOC 02', 'DOC 02:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
-    ['## DOC 03', 'DOC 03:', 'TARGET NICHE'],
-    ['## DOC 04', 'DOC 04:', '30-60-90 DAY'],
-    ['## DOC 05', 'DOC 05:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
-    ['## DOC 06', 'DOC 06:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
-    ['## DOC 07', 'DOC 07:', 'STRATEGIC QUESTIONS FOR'],
-    ['## DOC 08', 'DOC 08:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
+    ['# DOC 01', '## DOC 01', 'DOC 01:', 'COMPANY OVERVIEW'],
+    ['# DOC 02', '## DOC 02', 'DOC 02:', 'SWOT + COMPETITIVE', 'SWOT+COMPETITIVE'],
+    ['# DOC 03', '## DOC 03', 'DOC 03:', 'TARGET NICHE'],
+    ['# DOC 04', '## DOC 04', 'DOC 04:', '30-60-90 DAY'],
+    ['# DOC 05', '## DOC 05', 'DOC 05:', 'RESUME-TO-ROLE FIT', 'RESUME TO ROLE'],
+    ['# DOC 06', '## DOC 06', 'DOC 06:', 'ONE-PAGE EXECUTIVE', 'EXECUTIVE SUMMARY'],
+    ['# DOC 07', '## DOC 07', 'DOC 07:', 'STRATEGIC QUESTIONS FOR'],
+    ['# DOC 08', '## DOC 08', 'DOC 08:', 'INTERVIEW Q&A GUIDE', 'Q&A GUIDE'],
   ];
 
   var lines = [];
@@ -5348,6 +6788,10 @@ function _ppr(opts) {
   return x ? '<w:pPr>' + x + '</w:pPr>' : '';
 }
 
+function _pageBreak() {
+  return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+}
+
 function _h1(text) {
   // Burgundy, bold, 14pt, with bottom border, Calibri
   var ppr = _ppr({ spacing_before: 160, spacing_after: 80, border_bottom: true });
@@ -5418,17 +6862,17 @@ function _tableXml(rows) {
         ? '<w:shd w:val="clear" w:color="auto" w:fill="972B32"/>'
         : (ri % 2 === 1 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
 
-      var cellTxt = cell.trim().replace(/\*\*([^*]+)\*\*/g, '$1');
-      var rprOpts = isHeader
-        ? { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' }
-        : { sz: 20, font: 'Calibri' };
-
+      var cellTxt = cell.trim();
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
       tbl += '<w:vAlign w:val="center"/>';
       tbl += '</w:tcPr>';
       tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
-      tbl += _run(cellTxt, rprOpts);
+      if (isHeader) {
+        tbl += _run(cellTxt.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
+      } else {
+        tbl += _inlineRuns(cellTxt);
+      }
       tbl += '</w:p></w:tc>';
     });
     tbl += '</w:tr>';
@@ -5472,12 +6916,19 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId) {
 
     // Headings
     if (t.startsWith('# '))   { parts.push(_h1(t.slice(2)));  continue; }
+    // DOC XX headers get treated as H1 with page break before (except first)
+    if (t.startsWith('## DOC ') || t.startsWith('## Doc ') || t.startsWith('# DOC ') || t.startsWith('# Doc ')) {
+      if (parts.length > 0) parts.push(_pageBreak());
+      var docTitle = t.startsWith('## ') ? t.slice(3) : t.slice(2);
+      parts.push(_h1(docTitle)); continue;
+    }
     if (t.startsWith('## '))  { parts.push(_h2(t.slice(3)));  continue; }
     if (t.startsWith('### ')) { parts.push(_h3(t.slice(4)));  continue; }
+    if (t.startsWith('#### ')) { parts.push(_h3(t.slice(5))); continue; }
 
-    // ALL CAPS section header
+    // ALL CAPS section header (e.g. STRENGTHS, OPPORTUNITIES)
     if (t === t.toUpperCase() && t.length > 4 && t.length < 90 && /[A-Z]{3}/.test(t) && !/[.!?]$/.test(t) && !t.includes('|')) {
-      parts.push(_h1(t)); continue;
+      parts.push(_h2(t)); continue;
     }
 
     // Bullet
@@ -5795,7 +7246,7 @@ async function loadDocsPage() {
   const contactSel = document.getElementById('upload-link-contact');
   if (contactSel) {
     contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-    allContacts.slice(0, 200).forEach(function(c) {
+    allContacts.forEach(function(c) {
       if (!c.name) return;
       const opt = document.createElement('option');
       opt.value = c.id;
@@ -5807,7 +7258,7 @@ async function loadDocsPage() {
 }
 
 async function refreshDocs() {
-  const data = await dbGet('uploaded_documents', 'select=*,applications(company,job_title),contacts(name)&order=created_at.desc&limit=500');
+  const data = await dbGet('uploaded_documents', 'select=*,applications!uploaded_documents_linked_application_id_fkey(company,job_title),contacts!uploaded_documents_linked_contact_id_fkey(name)&order=created_at.desc&limit=500');
   allDocs = Array.isArray(data) ? data : [];
   filteredDocs = allDocs;
   renderDocsTable();
@@ -5861,23 +7312,26 @@ function renderDocsTable() {
   }
   tbody.innerHTML = filteredDocs.map(function(d) {
     const badgeCls = DOC_TYPE_BADGE[d.doc_type] || 'badge-other';
-    const appName = d.applications ? (d.applications.company || '') : '';
-    const contactName = d.contacts ? (d.contacts.name || '') : '';
+    const appName = (d.applications && d.applications.company) ? d.applications.company : (d.linked_application_id ? '(linked)' : '');
+    const contactName = (d.contacts && d.contacts.name) ? d.contacts.name : (d.linked_contact_id ? '(linked)' : '');
     const fileSizeStr = d.file_size ? (d.file_size > 1024*1024 ? (d.file_size/1024/1024).toFixed(1)+'MB' : Math.round(d.file_size/1024)+'KB') : '';
     const ext = (d.file_name || '').split('.').pop().toLowerCase();
     const icon = ext === 'pdf' ? '📕' : '📘';
+    var hasPath = !!(d.storage_path);
     return '<tr>' +
       '<td>' + icon + ' <strong>' + (d.file_name||'—') + '</strong>' +
         (fileSizeStr ? '<div style="font-size:11px;color:var(--text-light)">' + fileSizeStr + '</div>' : '') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (d.doc_type||'—') + '</span></td>' +
-      '<td>' + (d.company||'—') + '</td>' +
-      '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role||'—') + '</td>' +
+      '<td>' + (d.company || '—') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role || '—') + '</td>' +
       '<td style="font-size:12px">' + (appName || '—') + '</td>' +
       '<td style="font-size:12px">' + (contactName || '—') + '</td>' +
       '<td style="font-size:12px">' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</td>' +
       '<td><div class="table-actions">' +
-        '<button class="action-btn" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>' +
-        '<button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
+        (hasPath
+          ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
+          : '<span style="font-size:11px;color:var(--text-light)">No file</span>') +
+        ' <button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
@@ -5886,16 +7340,23 @@ function renderDocsTable() {
 
 async function downloadDoc(id, storagePath) {
   try {
+    if (!storagePath) { toast('No file path found.', 'error'); return; }
     toast('Preparing download...', '');
-    const r = await fetch(WORKER_URL + '/storage/url/' + encodeURIComponent(storagePath), {
+    // Send path as a POST body to avoid URL encoding issues
+    const r = await fetch(WORKER_URL + '/storage/url', {
       method: 'POST',
-      headers: { 'Origin': location.origin }
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
     });
     const data = await r.json();
-    if (data.signedURL) {
-      window.open(data.signedURL, '_blank');
+    var signedUrl = data.signedURL || data.signedUrl || '';
+    if (signedUrl) {
+      if (!signedUrl.startsWith('http')) {
+        signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co/storage/v1' + signedUrl;
+      }
+      window.open(signedUrl, '_blank');
     } else {
-      toast('Could not generate download link.', 'error');
+      toast('Download error: ' + (data.error || data.message || 'Could not generate link'), 'error');
     }
   } catch(e) { toast('Download error: ' + e.message, 'error'); }
 }
@@ -5910,10 +7371,10 @@ async function deleteDoc(id, storagePath) {
   toast('Document deleted.', 'success');
 }
 
-function editDocRecord(id) {
+async function editDocRecord(id) {
   const d = allDocs.find(function(x) { return x.id === id; });
   if (!d) return;
-  openUploadModal();
+  await openUploadModal();
   setTimeout(function() {
     document.getElementById('upload-company').value = d.company || '';
     document.getElementById('upload-role').value = d.role || '';
@@ -5945,7 +7406,24 @@ async function saveDocEdits(id) {
 }
 
 // ── UPLOAD MODAL ─────────────────────────────────────────────────────────
-function openUploadModal() {
+async function openUploadDoc(docType) {
+  // Ensure apps and contacts are loaded for the dropdowns
+  if (!allApps.length) {
+    const data = await dbGet('applications', 'select=id,company,job_title&order=date_applied.desc&limit=500');
+    allApps = Array.isArray(data) ? data : [];
+  }
+  if (!allContacts.length) {
+    const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=500');
+    allContacts = Array.isArray(data) ? data : [];
+  }
+  await openUploadModal();
+  setTimeout(function() {
+    const el = document.getElementById('upload-doc-type');
+    if (el && docType) el.value = docType;
+  }, 200);
+}
+
+async function openUploadModal() {
   uploadFile = null;
   clearUploadFile();
   document.getElementById('upload-doc-type').value = 'Resume';
@@ -5958,26 +7436,55 @@ function openUploadModal() {
   document.getElementById('upload-submit-btn').textContent = 'Upload Document';
   document.getElementById('upload-submit-btn').onclick = submitUpload;
 
-  // Populate dropdowns
-  const appSel = document.getElementById('upload-link-app');
+  // Show modal immediately with loading state in dropdowns
+  var appSel = document.getElementById('upload-link-app');
+  var contactSel = document.getElementById('upload-link-contact');
+  appSel.innerHTML = "<option value=''>Loading applications...</option>";
+  contactSel.innerHTML = "<option value=''>Loading contacts...</option>";
+  openModal('modal-upload');
+
+  // Always reset arrays before fetching to prevent duplicates
+  allApps = [];
+  allContacts = [];
+
+  var appsData = await dbGet('applications', 'select=id,company,job_title,date_applied&order=company.asc&limit=1000');
+  allApps = Array.isArray(appsData) ? appsData : [];
+
+  var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
+  allContacts = Array.isArray(contactsData) ? contactsData : [];
+
+  // Deduplicate by ID
+  var seen = {};
+  allApps = allApps.filter(function(a) { if (!a.id || seen[a.id]) return false; seen[a.id]=1; return true; });
+  var seenC = {};
+  allContacts = allContacts.filter(function(c) { if (!c.id || seenC[c.id]) return false; seenC[c.id]=1; return true; });
+  var uniqueApps = {}; allApps.forEach(function(a) { uniqueApps[a.id] = a; });
+  var uniqueContacts = {}; allContacts.forEach(function(c) { uniqueContacts[c.id] = c; });
+
+  // Populate application dropdown
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0, 200).forEach(function(a) {
+  Object.values(uniqueApps).forEach(function(a) {
     if (!a.company) return;
-    const opt = document.createElement('option');
-    opt.value = a.id; opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    var dateStr = '';
+    if (a.date_applied) {
+      var dp = a.date_applied.slice(0,10).split('-');
+      dateStr = ' (' + parseInt(dp[1]) + '/' + parseInt(dp[2]) + '/' + dp[0] + ')';
+    }
+    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '') + dateStr;
     appSel.appendChild(opt);
   });
 
-  const contactSel = document.getElementById('upload-link-contact');
+  // Populate contact dropdown
   contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-  allContacts.slice(0, 200).forEach(function(c) {
+  Object.values(uniqueContacts).forEach(function(c) {
     if (!c.name) return;
-    const opt = document.createElement('option');
-    opt.value = c.id; opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
     contactSel.appendChild(opt);
   });
-
-  openModal('modal-upload');
 }
 
 function handleFileDrop(event) {
@@ -6090,18 +7597,16 @@ async function submitUpload() {
     document.getElementById('upload-progress-text').textContent = 'Upload complete.';
 
     closeModal('modal-upload');
-    await refreshDocs();
-
-    // If we're not on the uploads page, switch to it
-    const uploadsPage = document.getElementById('page-uploads');
-    if (uploadsPage && !uploadsPage.classList.contains('active')) {
-      document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
-      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-      document.querySelector('[data-page="uploads"]').classList.add('active');
-      uploadsPage.classList.add('active');
-    }
-
     toast(uploadFile.name + ' uploaded successfully.', 'success');
+
+    // Refresh docs table if already on uploads page, otherwise navigate there
+    const uploadsPage = document.getElementById('page-uploads');
+    if (uploadsPage && uploadsPage.classList.contains('active')) {
+      await loadDocsPage();
+    } else {
+      navigateTo('uploads');
+      await loadDocsPage();
+    }
   } catch(e) {
     document.getElementById('upload-progress-text').textContent = 'Error: ' + e.message;
     toast('Upload failed: ' + e.message, 'error');
@@ -6186,6 +7691,7 @@ async function syncHubSpotTasks() {
     // Try to extract portal ID from task data
     if (data.portalId) window._hubspotPortalId = data.portalId;
     renderTasksList();
+    renderTaskReminders();
     toast('Tasks synced: ' + hubspotTasks.length + ' tasks loaded.', 'success');
   } catch(e) {
     listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load tasks. Add /hubspot/tasks route to your Cloudflare Worker to enable this feature.</div>';
@@ -6203,7 +7709,21 @@ function renderTasksList() {
   }
 
   const now = new Date();
-  const sorted = [...hubspotTasks].sort(function(a, b) {
+
+  // Filter to active tasks only — exclude COMPLETED and DEFERRED
+  const activeTasks = hubspotTasks.filter(function(t) {
+    const props = t.properties || {};
+    const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
+    return status !== 'COMPLETED' && status !== 'DEFERRED';
+  });
+
+  if (activeTasks.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--text-secondary)"><div style="font-size:28px;margin-bottom:8px">✓</div>All caught up — no open tasks.</div>';
+    return;
+  }
+
+  // Sort by due date ascending (soonest first)
+  const sorted = [...activeTasks].sort(function(a, b) {
     const props_a = a.properties || {};
     const props_b = b.properties || {};
     const da = (props_a.hs_task_due_date || props_a.hs_timestamp) ? new Date(props_a.hs_task_due_date || props_a.hs_timestamp) : new Date('2099-01-01');
@@ -6213,22 +7733,19 @@ function renderTasksList() {
 
   listEl.innerHTML = sorted.slice(0, 20).map(function(t) {
     const props = t.properties || {};
-    // Try all possible HubSpot task field names
     const title = props.hs_task_subject || props.subject || props.hs_note_body || props.title || t.subject || 'Untitled Task';
     const dueDateRaw = props.hs_task_due_date || props.hs_timestamp || null;
     const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
-    // HubSpot status can be COMPLETED, NOT_STARTED, IN_PROGRESS, WAITING, or DEFERRED
     const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
-    const isDone = status === 'COMPLETED';
-    const isOverdue = dueDate && dueDate < now && !isDone;
+    const isOverdue = dueDate && dueDate < now;
+    const isDueToday = dueDate && dueDate.toDateString() === now.toDateString();
     const type = props.hs_task_type || props.type || t.type || '';
 
-    const icon = isDone ? '✅' : isOverdue ? '🔴' : '⬜';
+    const icon = isOverdue ? '🔴' : isDueToday ? '🟡' : '⬜';
     const dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const color = isDone ? 'var(--text-light)' : isOverdue ? 'var(--burgundy)' : 'var(--text)';
-    const opacity = isDone ? 'opacity:0.45;' : '';
+    const color = isOverdue ? 'var(--burgundy)' : isDueToday ? '#b45309' : 'var(--text)';
 
-    return '<div class="followup-item" style="' + opacity + '">' +
+    return '<div class="followup-item">' +
       '<div style="font-size:16px;flex-shrink:0">' + icon + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-weight:600;font-size:13px;color:' + color + '">' + title + '</div>' +
@@ -6238,9 +7755,71 @@ function renderTasksList() {
     '</div>';
   }).join('');
 
-  if (hubspotTasks.length > 20) {
-    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + hubspotTasks.length + ' tasks — view all in HubSpot</div>';
+  if (activeTasks.length > 20) {
+    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + activeTasks.length + ' open tasks — view all in HubSpot</div>';
   }
+}
+
+function renderTaskReminders() {
+  var banner = document.getElementById('task-reminder-banner');
+  if (!banner || hubspotTasks.length === 0) return;
+
+  var now = new Date();
+  var today = now.toDateString();
+
+  var overdue = [];
+  var dueToday = [];
+
+  hubspotTasks.forEach(function(t) {
+    var props = t.properties || {};
+    var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
+    if (status === 'COMPLETED' || status === 'DEFERRED') return;
+    var dueDateRaw = props.hs_task_due_date || props.hs_timestamp || null;
+    if (!dueDateRaw) return;
+    var dueDate = new Date(dueDateRaw);
+    var title = props.hs_task_subject || props.subject || 'Untitled Task';
+    if (dueDate.toDateString() === today) {
+      dueToday.push(title);
+    } else if (dueDate < now) {
+      overdue.push(title);
+    }
+  });
+
+  if (overdue.length === 0 && dueToday.length === 0) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  var html = '';
+  if (overdue.length > 0) {
+    html += '<div style="margin-bottom:' + (dueToday.length > 0 ? '12px' : '0') + '">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span style="font-size:15px">🔴</span>' +
+        '<span style="font-weight:700;font-size:13px;color:var(--burgundy)">' + overdue.length + ' overdue task' + (overdue.length > 1 ? 's' : '') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;padding-left:24px">' +
+        overdue.map(function(t) {
+          return '<div style="font-size:12px;color:var(--text-secondary)">• ' + t + '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }
+  if (dueToday.length > 0) {
+    html += '<div>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span style="font-size:15px">🟡</span>' +
+        '<span style="font-weight:700;font-size:13px;color:#b45309">' + dueToday.length + ' task' + (dueToday.length > 1 ? 's' : '') + ' due today</span>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;padding-left:24px">' +
+        dueToday.map(function(t) {
+          return '<div style="font-size:12px;color:var(--text-secondary)">• ' + t + '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }
+
+  banner.innerHTML = html;
+  banner.style.display = 'block';
 }
 
 function openAddTask() {
@@ -6509,7 +8088,13 @@ async function runJobSearch() {
     const result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
-    contentEl.textContent = result;
+    // Render markdown bold (**text**) as actual bold HTML
+    var rendered = result
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    contentEl.innerHTML = rendered;
+    contentEl.style.whiteSpace = 'normal';
     toast('Search complete.', 'success');
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
