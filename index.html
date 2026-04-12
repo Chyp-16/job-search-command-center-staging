@@ -6605,19 +6605,20 @@ async function exportIPZip() {
   if (Object.keys(sections).length === 0) sections = allSections;
   const sectionCount = Object.keys(sections).length;
 
-  var idx = 1;
+  var docKeyMap = ['Company_Overview','SWOT_Competitive_Analysis','Target_Niche_Analysis','30_60_90_Day_Plan','Resume_to_Role_Fit','Executive_Summary','Strategic_Questions','Interview_QA_Guide'];
   for (const [name, sectionText] of Object.entries(sections)) {
     const safeName = name.replace(/[^a-zA-Z0-9]/g, '_');
     const docTitle = company + ' — ' + name.replace(/_/g, ' ');
+    // Use original doc number, not sequential index
+    var originalNum = docKeyMap.indexOf(name) + 1;
+    var paddedIdx = originalNum > 0 ? String(originalNum).padStart(2, '0') : '00';
     try {
       const docBlob = await makeDocxBlob(sectionText, docTitle);
       const docArray = await docBlob.arrayBuffer();
-      const paddedIdx = String(idx).padStart(2, '0');
       outerZip.file(paddedIdx + '_Jay_Wadhwa_' + safeName + '_' + company.replace(/\s+/g,'_') + '.docx', docArray);
     } catch(e) {
       console.error('Failed to build doc for ' + name + ':', e);
     }
-    idx++;
   }
 
   const blob = await outerZip.generateAsync({ type: 'blob', mimeType: 'application/zip' });
