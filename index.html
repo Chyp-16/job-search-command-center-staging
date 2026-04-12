@@ -6295,6 +6295,7 @@ async function runInterviewPrep() {
 
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
   var call1Docs = selectedDocs.filter(function(d){ return d <= 4; });
+  var call2Docs = selectedDocs.filter(function(d){ return d >= 5; });
   var docNames = {1:'Company Overview',2:'SWOT Analysis',3:'Niche Analysis',4:'30-60-90 Day Plan',5:'Resume Fit',6:'Executive Summary',7:'Strategic Questions',8:'Q&A Guide'};
   var call1Names = call1Docs.map(function(d){ return docNames[d]; }).join(', ');
   var call2Names = call2Docs.map(function(d){ return docNames[d]; }).join(', ');
@@ -6362,7 +6363,6 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
   // Build prompt 2 dynamically based on selected docs 5-8
-  var call2Docs = selectedDocs.filter(function(d){ return d >= 5; });
   var p2DocSections = {
     5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Jay Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from Jay career\n- Section Key Overlaps: 4-5 paragraphs mapping Jay background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background (media, Web3, SaaS, nonprofits) is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
     6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges Jay will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how Jay drives it\n- Jay Top 3 Talking Points: 3 things he must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why Jay is the right person right now.',
