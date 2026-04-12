@@ -6296,9 +6296,12 @@ async function runInterviewPrep() {
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
   var totalSteps = (needCall1 ? 1 : 0) + (needCall2 ? 1 : 0);
   var currentStep = 1;
+  var docNames = {1:'Company Overview',2:'SWOT Analysis',3:'Niche Analysis',4:'30-60-90 Day Plan',5:'Resume Fit',6:'Executive Summary',7:'Strategic Questions',8:'Q&A Guide'};
+  var call1Names = call1Docs.map(function(d){ return docNames[d]; }).join(', ');
+  var call2Names = call2Docs.map(function(d){ return docNames[d]; }).join(', ');
   contentEl.textContent = needCall1
-    ? 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan...'
-    : 'Generating docs 5-8...';
+    ? 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating: ' + call1Names + '...'
+    : 'Generating: ' + call2Names + '...';
 
   // Build prompt 1 dynamically based on selected docs 1-4
   var call1Docs = selectedDocs.filter(function(d){ return d <= 4; });
@@ -6351,7 +6354,7 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
     }
     if (needCall2) {
       currentStep++;
-      contentEl.textContent = 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating Resume Fit, Executive Summary, Strategic Questions, and Q&A Guide...';
+      contentEl.textContent = 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating: ' + call2Names + '...';
     }
   } else {
     contentEl.textContent = 'Generating docs 5-8...';
@@ -6990,7 +6993,9 @@ function _tableXml(rows) {
 
       var cellTxt = cell.trim();
       // Split on <br> tags and newlines
-      var cellLines = cellTxt.split(/<br\s*\/?>/i).join('\n').split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+      // Normalize: replace <br>, literal \n, and multiple spaces
+      var cellNorm = cellTxt.replace(/<br\s*\/?>/gi, '\n').replace(/\\n/g, '\n');
+      var cellLines = cellNorm.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
       if (cellLines.length === 0) cellLines = [''];
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
