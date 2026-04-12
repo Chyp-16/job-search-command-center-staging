@@ -6320,13 +6320,19 @@ Write this as a dense research brief, not a summary. Include:
 - 3-4 specific risks Jay needs to know walking in
 - Recent news or developments worth knowing`,
     2: `## DOC 02: SWOT + COMPETITIVE ANALYSIS
-- SWOT table (markdown table format ONLY — do NOT use <br> tags inside cells, use normal text separated by periods)
-- Each SWOT quadrant must have 4-6 specific bullets as separate sentences
-- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How Company Wins
-- Use 4-5 named real competitors
-- Pros of joining vs. a larger competitor (specific)
-- Cons and honest trade-offs
-- Sustainable competitive edge in one sharp paragraph`,
+
+CRITICAL FORMATTING RULES FOR THE SWOT TABLE:
+- Use a 2x2 markdown table with headers: STRENGTHS | WEAKNESSES (row 1), OPPORTUNITIES | THREATS (row 2)
+- Inside EACH cell, list items as: bullet1. bullet2. bullet3. (separated by periods, NOT line breaks)
+- Each cell must have exactly 5 items written as complete sentences separated by periods
+- Do NOT use <br> tags. Do NOT use newlines inside cells. Use periods between items only.
+- Example cell format: Owner-only model eliminates conflicts. 25M SF portfolio provides scale. Chicago expertise spans decades. Trophy specialization commands premium fees. Institutional relationships with major owners.
+
+After the SWOT table:
+- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How We Win — 4-5 named real competitors
+- Pros of joining vs. a larger competitor (bullet list, not table)
+- Cons and honest trade-offs (bullet list)
+- One paragraph: sustainable competitive edge`,
     3: `## DOC 03: TARGET NICHE ANALYSIS
 - Named customer segments with specific examples
 - What each segment actually cares about (specific to this company)
@@ -6993,9 +6999,15 @@ function _tableXml(rows) {
 
       var cellTxt = cell.trim();
       // Split on <br> tags and newlines
-      // Normalize: replace <br>, literal \n, and multiple spaces
+      // Normalize: replace <br> and literal newlines
       var cellNorm = cellTxt.replace(/<br\s*\/?>/gi, '\n').replace(/\\n/g, '\n');
       var cellLines = cellNorm.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+      // If only one long line with multiple sentences, split on ". " to create bullets
+      if (!isHeader && cellLines.length === 1 && cellLines[0].length > 80 && cellLines[0].indexOf('. ') > 0) {
+        cellLines = cellLines[0].split('. ').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; });
+        // Re-add period to each sentence except last
+        cellLines = cellLines.map(function(s, i){ return i < cellLines.length - 1 ? s + '.' : (s.endsWith('.') ? s : s + '.'); });
+      }
       if (cellLines.length === 0) cellLines = [''];
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
@@ -7003,12 +7015,14 @@ function _tableXml(rows) {
       cellLines.forEach(function(line, li) {
         var isBullet = !isHeader && (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('\u2022 '));
         var lineText = isBullet ? line.slice(2) : line;
+        // If not already a bullet but cell has multiple lines, treat each as a bullet
+        var renderAsBullet = isBullet || (!isHeader && cellLines.length > 1);
         var ppr = '<w:pPr><w:jc w:val="left"/><w:spacing w:before="' + (li===0?'0':'40') + '" w:after="0" w:line="240" w:lineRule="auto"/>' +
-          (isBullet ? '<w:ind w:left="240" w:hanging="180"/>' : '') + '</w:pPr>';
+          (renderAsBullet ? '<w:ind w:left="240" w:hanging="180"/>' : '') + '</w:pPr>';
         tbl += '<w:p>' + ppr;
         if (isHeader) {
           tbl += _run(lineText.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
-        } else if (isBullet) {
+        } else if (renderAsBullet) {
           tbl += _run('\u2022  ', { sz: 20, font: 'Calibri' }) + _inlineRuns(lineText);
         } else {
           tbl += _inlineRuns(lineText);
