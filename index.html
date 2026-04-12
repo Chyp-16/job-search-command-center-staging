@@ -1548,7 +1548,8 @@ a { color: var(--burgundy); text-decoration: none; }
                   <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-8" checked> <span>08 — Interview Q&amp;A Guide</span></label>
                 </div>
                 <div style="display:flex;gap:10px">
-                  <button class="btn btn-primary" style="flex:1;padding:12px" onclick="setTimeout(runInterviewPrep,0)">✦ Generate Selected Docs</button>
+                  <button class="btn btn-primary" style="flex:1;padding:12px" id="ip-gen-btn" onclick="setTimeout(runInterviewPrep,0)">✦ Generate Selected Docs</button>
+                  <button class="btn btn-secondary" style="display:none;background:var(--burgundy);color:#fff;border-color:var(--burgundy)" id="ip-stop-btn" onclick="stopInterviewPrep()">⏹ Stop</button>
                   <button class="btn btn-secondary" onclick="clearInterviewPrep()">Clear</button>
                 </div>
               </div>
@@ -2726,11 +2727,13 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
-  const r = await fetch(WORKER_URL + '/ai', {
+  var fetchOpts = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
-  });
+  };
+  if (ipAbortController) fetchOpts.signal = ipAbortController.signal;
+  const r = await fetch(WORKER_URL + '/ai', fetchOpts);
   if (!r.ok) throw new Error('API error: ' + r.status);
   const data = await r.json();
   if (data.error) throw new Error(data.error);
@@ -6141,7 +6144,22 @@ function getAvgTimeToResponse() {
 
 // ── INTERVIEW PREP PAGE ─────────────────────────────────────────────────
 let ipOutput = '';
-let ipSections = {}; // stores each of the 8 sections separately
+let ipSections = {};
+let ipAbortController = null;
+
+function stopInterviewPrep() {
+  if (ipAbortController) {
+    ipAbortController.abort();
+    ipAbortController = null;
+    var stopBtn = document.getElementById('ip-stop-btn');
+    var genBtn = document.getElementById('ip-gen-btn');
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (genBtn) genBtn.disabled = false;
+    var contentEl = document.getElementById('ip-output-content');
+    if (contentEl && !ipOutput) contentEl.textContent = 'Generation cancelled.';
+    toast('Generation stopped.', '');
+  }
+} // stores each of the 8 sections separately
 
 function loadInterviewPrepPage() {
   const sel = document.getElementById('ip-link-app');
@@ -6261,6 +6279,11 @@ async function runInterviewPrep() {
   contentEl.style.background = '';
   contentEl.style.padding = '';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var genBtn = document.getElementById('ip-gen-btn');
+  var stopBtn = document.getElementById('ip-stop-btn');
+  if (genBtn) genBtn.disabled = true;
+  if (stopBtn) stopBtn.style.display = '';
+  ipAbortController = new AbortController();
 
   const intLine = intName ? ('\nInterviewer: ' + intName + (intTitle ? ', ' + intTitle : '')) : '';
 
@@ -6380,6 +6403,9 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
       if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'interview_prep', content: ipOutput, date: today() }]);
     }
   }
+  if (genBtn) genBtn.disabled = false;
+  if (stopBtn) stopBtn.style.display = 'none';
+  ipAbortController = null;
   toast('Prep pack complete — ' + sectionCount + ' of 8 sections generated. Use Export buttons to download.', 'success');
 }
 
@@ -6963,18 +6989,24 @@ function _tableXml(rows) {
         : (ri % 2 === 1 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
 
       var cellTxt = cell.trim();
-      // Split on <br> tags — render each as a separate paragraph in the cell
-      var cellLines = cellTxt.split(/<br\s*\/?>/i).map(function(s){ return s.trim(); }).filter(Boolean);
+      // Split on <br> tags and newlines
+      var cellLines = cellTxt.split(/<br\s*\/?>/i).join('\n').split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
       if (cellLines.length === 0) cellLines = [''];
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
       tbl += '<w:vAlign w:val="center"/></w:tcPr>';
       cellLines.forEach(function(line, li) {
-        tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="' + (li===0?'0':'40') + '" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
+        var isBullet = !isHeader && (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('\u2022 '));
+        var lineText = isBullet ? line.slice(2) : line;
+        var ppr = '<w:pPr><w:jc w:val="left"/><w:spacing w:before="' + (li===0?'0':'40') + '" w:after="0" w:line="240" w:lineRule="auto"/>' +
+          (isBullet ? '<w:ind w:left="240" w:hanging="180"/>' : '') + '</w:pPr>';
+        tbl += '<w:p>' + ppr;
         if (isHeader) {
-          tbl += _run(line.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
+          tbl += _run(lineText.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
+        } else if (isBullet) {
+          tbl += _run('\u2022  ', { sz: 20, font: 'Calibri' }) + _inlineRuns(lineText);
         } else {
-          tbl += _inlineRuns(line);
+          tbl += _inlineRuns(lineText);
         }
         tbl += '</w:p>';
       });
