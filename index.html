@@ -6974,17 +6974,22 @@ function _tableXml(rows) {
         : (ri % 2 === 1 ? '<w:shd w:val="clear" w:color="auto" w:fill="F5EAEB"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
 
       var cellTxt = cell.trim();
+      // Split on <br> tags — render each as a separate paragraph in the cell
+      var cellLines = cellTxt.split(/<br\s*\/?>/i).map(function(s){ return s.trim(); }).filter(Boolean);
+      if (cellLines.length === 0) cellLines = [''];
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
-      tbl += '<w:vAlign w:val="center"/>';
-      tbl += '</w:tcPr>';
-      tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
-      if (isHeader) {
-        tbl += _run(cellTxt.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
-      } else {
-        tbl += _inlineRuns(cellTxt);
-      }
-      tbl += '</w:p></w:tc>';
+      tbl += '<w:vAlign w:val="top"/></w:tcPr>';
+      cellLines.forEach(function(line, li) {
+        tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="' + (li===0?'0':'40') + '" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
+        if (isHeader) {
+          tbl += _run(line.replace(/\*\*/g, ''), { bold: true, color: 'FFFFFF', sz: 20, font: 'Calibri' });
+        } else {
+          tbl += _inlineRuns(line);
+        }
+        tbl += '</w:p>';
+      });
+      tbl += '</w:tc>';
     });
     tbl += '</w:tr>';
   });
