@@ -6277,18 +6277,13 @@ async function runInterviewPrep() {
     ? 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan...'
     : 'Generating docs 5-8...';
 
-  const prompt1 = `You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Generate 4 detailed, specific, executive-quality documents. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice. Write as if you have done deep research on this company.
-
-${context}
-
-Jay Wadhwa's background: 25 years in marketing leadership. ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, built 25-person internal agency). Secret Network Foundation (60% revenue growth, created "programmable privacy" category). Rogue Marketing LLC (fractional CMO). Multi-industry: media, SaaS, Web3, FinTech, nonprofits.
-
-Create EXACTLY these 4 documents with these EXACT headers:
-
-## DOC 01: COMPANY OVERVIEW
+  // Build prompt 1 dynamically based on selected docs 1-4
+  var call1Docs = selectedDocs.filter(function(d){ return d <= 4; });
+  var p1DocSections = {
+    1: `## DOC 01: COMPANY OVERVIEW
 Write this as a dense research brief, not a summary. Include:
 - Company at a Glance: Founded (exact year if known), HQ, team size, revenue estimate with reasoning, ownership structure
-- What They Do: Core services explained specifically, who they serve, what makes them different from competitors
+- What They Do: Core services explained specifically, who they serve, what makes them different
 - Named clients or portfolio examples if known
 - Leadership: Named executives and their backgrounds
 - Awards, milestones, recognizable projects or deals
@@ -6296,32 +6291,32 @@ Write this as a dense research brief, not a summary. Include:
 - Top 3-5 named competitors with one-line differentiation for each
 - 3-4 specific opportunities tied to market conditions right now
 - 3-4 specific risks Jay needs to know walking in
-- Recent news or developments worth knowing
-
-## DOC 02: SWOT + COMPETITIVE ANALYSIS
-- SWOT table (markdown table) — each cell must have 4-6 specific bullets, not generic ones
-- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How Telos Wins Against Them — use 4-5 named competitors
-- Pros of joining this company vs. a larger competitor (specific, not generic)
-- Cons and honest trade-offs Jay should know
-- Telos's sustainable competitive edge in one sharp paragraph
-
-## DOC 03: TARGET NICHE ANALYSIS
-- Named customer segments with specific examples of who buys from this company
-- What each segment actually cares about (not generic — specific to this company's pitch)
+- Recent news or developments worth knowing`,
+    2: `## DOC 02: SWOT + COMPETITIVE ANALYSIS
+- SWOT table (markdown table format ONLY — do NOT use <br> tags inside cells, use normal text separated by periods)
+- Each SWOT quadrant must have 4-6 specific bullets as separate sentences
+- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How Company Wins
+- Use 4-5 named real competitors
+- Pros of joining vs. a larger competitor (specific)
+- Cons and honest trade-offs
+- Sustainable competitive edge in one sharp paragraph`,
+    3: `## DOC 03: TARGET NICHE ANALYSIS
+- Named customer segments with specific examples
+- What each segment actually cares about (specific to this company)
 - Unmet needs this company is positioned to solve
-- Where Jay's marketing experience maps directly to their client acquisition challenges
-- 2-3 high-growth micro-segments worth prioritizing in the first 90 days
+- Where Jay's marketing experience maps to their client acquisition challenges
+- 2-3 high-growth micro-segments worth prioritizing in first 90 days`,
+    4: `## DOC 04: 30-60-90 DAY PLAN
+Write as Jay's actual plan — not a generic template. Use the company name throughout.
+- Days 0-30: Listen and Learn — specific people to meet, systems to audit, deliverable at day 30
+- Days 31-60: Test and Build — specific campaigns, brand decisions, infrastructure to build
+- Days 61-90: Scale and Optimize — what's launching, what's measured, what success looks like
+- Each phase covers: brand, content, partnerships, demand generation, team/vendor relationships
+- End with "Key 90-Day Commitment" — one paragraph on what Jay commits to delivering`
+  };
+  var p1Sections = call1Docs.map(function(n){ return p1DocSections[n]; }).join('\n\n');
 
-## DOC 04: 30-60-90 DAY PLAN
-Write this as Jay's actual plan, not a generic template. Use the company name, role, and interviewer name throughout.
-- Days 0-30: Listen and Learn — specific people to meet, specific systems to audit, specific deliverable at end of 30 days
-- Days 31-60: Test and Build — specific campaigns, brand decisions, or infrastructure to build. Name the priorities.
-- Days 61-90: Scale and Optimize — what's launching, what's being measured, what success looks like
-- Each phase must cover: brand, content, partnerships, demand generation, team/vendor relationships
-- End with: "Key 90-Day Commitment" — one paragraph on what Jay commits to delivering
-
-FORMAT: Use **bold** for all statistics, named companies, and key facts. Use markdown tables for SWOT and competitor grids. Sentences 15 words or fewer. Active voice only. No em dashes. No filler phrases.`;
-
+  const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\nJay Wadhwa background: 25 years marketing leadership. ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency). Secret Network Foundation (60% revenue growth, created programmable privacy category). Rogue Marketing LLC (fractional CMO). Multi-industry: media, SaaS, Web3, FinTech, nonprofits.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
   let result1 = '';
   if (needCall1) {
     try {
@@ -6340,72 +6335,17 @@ FORMAT: Use **bold** for all statistics, named companies, and key facts. Use mar
   }
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
-  const prompt2 = `You are a senior strategy consultant preparing Jay Wadhwa for a high-stakes marketing executive interview. Generate 4 documents that are specific, opinionated, and written entirely in Jay's voice. Generic answers get people cut. These need to be the real thing.
+  // Build prompt 2 dynamically based on selected docs 5-8
+  var call2Docs = selectedDocs.filter(function(d){ return d >= 5; });
+  var p2DocSections = {
+    5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Jay Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from Jay career\n- Section Key Overlaps: 4-5 paragraphs mapping Jay background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background (media, Web3, SaaS, nonprofits) is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
+    6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges Jay will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how Jay drives it\n- Jay Top 3 Talking Points: 3 things he must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why Jay is the right person right now.',
+    7: '## DOC 07: STRATEGIC QUESTIONS' + (intName ? ' FOR ' + intName.toUpperCase() : '') + '\nPure questions only — no answers. Demonstrate real research, not generic prep.\nMinimum 4 questions per category:\n**Team Dynamics** | **Strategic Priorities** | **Measurement and Success** | **Budget and Resources** | **Culture**' + (intName ? '\n**Questions Specifically for ' + intName + '**: 4 questions that only make sense given their background and role' : ''),
+    8: '## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in Jay voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us'
+  };
+  var p2Sections = call2Docs.map(function(n){ return p2DocSections[n]; }).join('\n\n');
 
-${context}
-
-Jay Wadhwa's career highlights:
-- ESPN Classic: Rebuilt network brand, quadrupled revenue to $40M in year one. 6 Emmy Awards.
-- NBC Sports Chicago: 130% advertiser revenue growth. Built 25-person internal creative agency. 588% social media audience growth.
-- Secret Network Foundation: 60% revenue growth in 9 months. Created "programmable privacy" market category. Global brand activation.
-- PHI Labs Global: Built marketing function from zero. $5M VC funding secured through positioning.
-- Rogue Marketing LLC: Fractional CMO for SaaS, Web3, FinTech, nonprofits.
-- Total: 25 years, 6 Emmy Awards, 9 Promax/BDA Awards, multi-industry expertise.
-
-Create EXACTLY these 4 documents with these EXACT headers:
-
-## DOC 05: RESUME-TO-ROLE FIT ANALYSIS
-- Side-by-side markdown table: Company Need | Jay's Experience | Specific Evidence/Metric
-- Minimum 10 rows. Each row must cite a specific result, number, or named project.
-- Section after table: "Key Overlaps" — 4-5 paragraphs on where Jay's background directly maps to their biggest challenges. Be specific. Use the company name.
-- Section: "The Multi-Industry Advantage" — explain why Jay's cross-industry background (media, Web3, SaaS, nonprofits) is an asset, not a liability, for this specific role.
-- Close with: "Fit Summary" — 3 sentences. Direct, confident, no hedging.
-
-## DOC 06: ONE-PAGE EXECUTIVE BRIEF
-Write this as a morning-of-interview cheat sheet. Bullet points only — no tables, no prose paragraphs.
-- Company Snapshot: 8-10 bullets with the most critical facts (founded, size, revenue, positioning, key clients, key awards, key deals)
-- Hiring Manager Intel: everything known about ${intName ? intName : 'the interviewer'} — background, priorities, what they likely care about
-- Key Strengths to Lead With: 4-5 bullets on what makes this company genuinely compelling
-- Key Risks to Know: 4-5 honest bullets on challenges Jay will face
-- Primary Growth Paths: 3-4 bullets on where the company can grow and how Jay drives that
-- Jay's Top 3 Talking Points: the 3 things he must land in this interview, written as one-liners
-- Bottom-Line Takeaway: 2 sentences. Why Jay is the right person for this role right now.
-
-## DOC 07: STRATEGIC QUESTIONS${intName ? ' FOR ' + intName.toUpperCase() : ''}
-Pure questions only — no answers. These must demonstrate that Jay has done real research, not generic prep.
-Minimum 4 questions per category:
-**Team Dynamics** — questions about how marketing currently works, team structure, broker relationships
-**Strategic Priorities** — questions about what the company is trying to accomplish in the next 12-24 months
-**Measurement and Success** — questions about how marketing performance is tracked and what winning looks like
-**Budget and Resources** — questions about what Jay would have to work with
-**Culture** — questions about decision-making, pace, and what it's like to work there
-${intName ? '**Questions Specifically for ' + intName + '** — 4 questions that only make sense coming from someone who knows ' + intName + "'s background and role" : ''}
-
-## DOC 08: INTERVIEW Q&A GUIDE
-12 questions with prepared answers written entirely in Jay's voice.
-Rules for every answer:
-- Lead with a specific metric or named result — never start with "I"
-- Tie the answer to this specific company and role by the third sentence
-- 4-6 sentences max. Under 90 seconds to deliver.
-- Peer-to-peer tone. Confident, not boastful.
-- Zero banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager, thrilled, inspired
-- No em dashes
-
-Cover these questions:
-1. Tell me about yourself.
-2. Why this company specifically?
-3. What's your greatest professional accomplishment?
-4. How do you approach building a marketing function from scratch?
-5. How do you measure marketing success?
-6. Tell me about a time marketing drove direct revenue impact.
-7. How do you manage relationships with a sales or brokerage team?
-8. What does your first 30 days look like?
-9. Why are you leaving your current role / why fractional consulting?
-10. What's your experience in [this company's industry]?
-11. What's your leadership style?
-12. What questions do you have for us?
-
-FORMAT: Use **bold** for all statistics and named results. Sentences 15 words or fewer. Active voice. No em dashes. No filler.`;
+  const prompt2 = 'You are a senior strategy consultant preparing Jay Wadhwa for a high-stakes marketing executive interview. Generate specific, opinionated documents written entirely in Jay voice. Generic answers get people cut.\n\n' + context + '\n\nJay Wadhwa career: ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency, 588% social growth). Secret Network Foundation (60% revenue growth, created programmable privacy category). PHI Labs ($5M VC secured). Rogue Marketing LLC (fractional CMO). 25 years, multi-industry.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
 
   let result2 = '';
   if (needCall2) {
