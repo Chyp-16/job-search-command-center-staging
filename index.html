@@ -1531,11 +1531,26 @@ a { color: var(--burgundy); text-decoration: none; }
                   </div>
                 </div>
               </div>
-              <div style="margin-top:16px;display:flex;gap:10px">
-                <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runInterviewPrep()">
-                  ✦ Generate Full Prep Pack
-                </button>
-                <button class="btn btn-secondary" onclick="clearInterviewPrep()">Clear</button>
+              <div style="margin-top:20px">
+                <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Documents to Generate</div>
+                <div style="display:flex;gap:8px;margin-bottom:10px">
+                  <button class="btn btn-secondary btn-sm" onclick="ipCheckAll()">Check All</button>
+                  <button class="btn btn-secondary btn-sm" onclick="ipCheckNone()">Check None</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px" id="ip-doc-selector">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-1" checked> <span>01 — Company Overview</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-2" checked> <span>02 — SWOT + Competitive Analysis</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-3" checked> <span>03 — Target Niche Analysis</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-4" checked> <span>04 — 30-60-90 Day Plan</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-5" checked> <span>05 — Resume-to-Role Fit</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-6" checked> <span>06 — Executive Summary</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-7" checked> <span>07 — Strategic Questions</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-8" checked> <span>08 — Interview Q&amp;A Guide</span></label>
+                </div>
+                <div style="display:flex;gap:10px">
+                  <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runInterviewPrep()">✦ Generate Selected Docs</button>
+                  <button class="btn btn-secondary" onclick="clearInterviewPrep()">Clear</button>
+                </div>
               </div>
             </div>
           </div>
@@ -5716,6 +5731,10 @@ async function generateDoc() {
   const jd = document.getElementById('ai-gen-jd').value.trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
+  var selectedDocs = ipSelectedDocs();
+  if (selectedDocs.length === 0) { toast('Select at least one document to generate.', 'error'); return; }
+  var needCall1 = selectedDocs.some(function(d){ return d <= 4; });
+  var needCall2 = selectedDocs.some(function(d){ return d >= 5; });
   showAIOutput('Generating with Claude...');
 
   const jdLine = jd ? ('\n\nJob description / context:\n' + jd) : '';
@@ -6216,6 +6235,15 @@ function handleCLGFileUpload(event)    { handleJDFileUpload(event, 'clg-jd',    
 function handleRTFileUpload(event)     { handleJDFileUpload(event, 'ai-jd-text',   'rt-jd-file-name'); }
 function handleCLFileUpload(event)     { handleJDFileUpload(event, 'ai-gen-jd',    'cl-jd-file-name'); }
 
+function ipCheckAll()  { for(var i=1;i<=8;i++){ var el=document.getElementById('ip-doc-'+i); if(el) el.checked=true; } }
+function ipCheckNone() { for(var i=1;i<=8;i++){ var el=document.getElementById('ip-doc-'+i); if(el) el.checked=false; } }
+
+function ipSelectedDocs() {
+  var sel = [];
+  for(var i=1;i<=8;i++){ var el=document.getElementById('ip-doc-'+i); if(el && el.checked) sel.push(i); }
+  return sel;
+}
+
 async function runInterviewPrep() {
   const company = (document.getElementById('ip-company').value || '').trim();
   const role = (document.getElementById('ip-role').value || '').trim();
@@ -6244,7 +6272,11 @@ async function runInterviewPrep() {
   const sysPrompt = getSystemPromptWithResume();
 
   // ── CALL 1: Docs 1-4 ──────────────────────────────────────────────────
-  contentEl.textContent = 'Step 1 of 2 — Generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan...';
+  var totalSteps = (needCall1 ? 1 : 0) + (needCall2 ? 1 : 0);
+  var currentStep = 1;
+  contentEl.textContent = needCall1
+    ? 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating Company Overview, SWOT, Niche Analysis, and 30-60-90 Day Plan...'
+    : 'Generating docs 5-8...';
 
   const prompt1 = `You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Generate 4 detailed, specific, executive-quality documents. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice. Write as if you have done deep research on this company.
 
@@ -6292,15 +6324,21 @@ Write this as Jay's actual plan, not a generic template. Use the company name, r
 FORMAT: Use **bold** for all statistics, named companies, and key facts. Use markdown tables for SWOT and competitor grids. Sentences 15 words or fewer. Active voice only. No em dashes. No filler phrases.`;
 
   let result1 = '';
-  try {
-    result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt, false);
-  } catch(e) {
-    contentEl.textContent = 'Error on Step 1: ' + e.message;
-    toast('Generation failed: ' + e.message, 'error');
-    return;
+  if (needCall1) {
+    try {
+      result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt, false);
+    } catch(e) {
+      contentEl.textContent = 'Error on Step 1: ' + e.message;
+      toast('Generation failed: ' + e.message, 'error');
+      return;
+    }
+    if (needCall2) {
+      currentStep++;
+      contentEl.textContent = 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating Resume Fit, Executive Summary, Strategic Questions, and Q&A Guide...';
+    }
+  } else {
+    contentEl.textContent = 'Generating docs 5-8...';
   }
-
-  contentEl.textContent = 'Step 1 complete. Step 2 of 2 — Generating Resume Fit, Executive Summary, Strategic Questions, and Q&A Guide...';
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
   const prompt2 = `You are a senior strategy consultant preparing Jay Wadhwa for a high-stakes marketing executive interview. Generate 4 documents that are specific, opinionated, and written entirely in Jay's voice. Generic answers get people cut. These need to be the real thing.
@@ -6371,12 +6409,14 @@ Cover these questions:
 FORMAT: Use **bold** for all statistics and named results. Sentences 15 words or fewer. Active voice. No em dashes. No filler.`;
 
   let result2 = '';
-  try {
-    result2 = await callAILong([{ role: 'user', content: prompt2 }], sysPrompt);
-  } catch(e) {
-    contentEl.textContent = result1 + '\n\n[Error on Step 2: ' + e.message + ']';
-    toast('Step 2 failed: ' + e.message, 'error');
-    return;
+  if (needCall2) {
+    try {
+      result2 = await callAILong([{ role: 'user', content: prompt2 }], sysPrompt);
+    } catch(e) {
+      contentEl.textContent = result1 + '\n\n[Error on Step 2: ' + e.message + ']';
+      toast('Step 2 failed: ' + e.message, 'error');
+      return;
+    }
   }
 
   // Combine both results
@@ -6554,7 +6594,16 @@ async function exportIPZip() {
   toast('Building zip file — this takes a moment...', '');
 
   const outerZip = new JSZip();
-  const sections = Object.keys(ipSections).length > 0 ? ipSections : { 'Full_Prep_Pack': ipOutput };
+  // Filter to only selected docs
+  var allSections = Object.keys(ipSections).length > 0 ? ipSections : { 'Full_Prep_Pack': ipOutput };
+  var selDocs = ipSelectedDocs();
+  var docKeyMap = ['Company_Overview','SWOT_Competitive_Analysis','Target_Niche_Analysis','30_60_90_Day_Plan','Resume_to_Role_Fit','Executive_Summary','Strategic_Questions','Interview_QA_Guide'];
+  var selectedKeys = selDocs.map(function(n){ return docKeyMap[n-1]; });
+  var sections = {};
+  Object.keys(allSections).forEach(function(k){
+    if (selectedKeys.indexOf(k) >= 0 || selectedKeys.length === 0) sections[k] = allSections[k];
+  });
+  if (Object.keys(sections).length === 0) sections = allSections;
   const sectionCount = Object.keys(sections).length;
 
   var idx = 1;
@@ -6979,7 +7028,7 @@ function _tableXml(rows) {
       if (cellLines.length === 0) cellLines = [''];
       tbl += '<w:tc>';
       tbl += '<w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + shading;
-      tbl += '<w:vAlign w:val="top"/></w:tcPr>';
+      tbl += '<w:vAlign w:val="center"/></w:tcPr>';
       cellLines.forEach(function(line, li) {
         tbl += '<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="' + (li===0?'0':'40') + '" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>';
         if (isHeader) {
