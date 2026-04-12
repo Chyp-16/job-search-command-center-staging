@@ -5731,10 +5731,6 @@ async function generateDoc() {
   const jd = document.getElementById('ai-gen-jd').value.trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
-  var selectedDocs = ipSelectedDocs();
-  if (selectedDocs.length === 0) { toast('Select at least one document to generate.', 'error'); return; }
-  var needCall1 = selectedDocs.some(function(d){ return d <= 4; });
-  var needCall2 = selectedDocs.some(function(d){ return d >= 5; });
   showAIOutput('Generating with Claude...');
 
   const jdLine = jd ? ('\n\nJob description / context:\n' + jd) : '';
@@ -6253,7 +6249,10 @@ async function runInterviewPrep() {
   const intTitle = (document.getElementById('ip-interviewer-title').value || '').trim();
 
   if (!company || !role) { toast('Company and role are required.', 'error'); return; }
-  // JD is optional — note it if missing but continue
+  var selectedDocs = ipSelectedDocs();
+  if (selectedDocs.length === 0) { toast('Select at least one document to generate.', 'error'); return; }
+  var needCall1 = selectedDocs.some(function(d){ return d <= 4; });
+  var needCall2 = selectedDocs.some(function(d){ return d >= 5; });
 
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
