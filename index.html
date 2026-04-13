@@ -2665,7 +2665,7 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-task')">Cancel</button>
-      <button class="btn btn-primary" id="save-task-btn">Save & Sync to HubSpot</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save & Sync to HubSpot</button>
     </div>
   </div>
 </div>
@@ -8188,13 +8188,7 @@ function openAddTask() {
   var sel = document.getElementById('task-contact');
   sel.innerHTML = '<option value="">⏳ Loading contacts...</option>';
   openModal('modal-add-task');
-  // Wire save button via addEventListener to bypass extension interference
-  var saveBtn = document.getElementById('save-task-btn');
-  if (saveBtn) {
-    var newBtn = saveBtn.cloneNode(true);
-    saveBtn.parentNode.replaceChild(newBtn, saveBtn);
-    newBtn.addEventListener('click', function() { saveTask(); });
-  }
+
 
   // Always fetch fresh with hubspot_contact_id — paginate to get all
   (async function() {
@@ -8209,13 +8203,13 @@ function openAddTask() {
   })();
 }
 
-async function saveTask() {
+function saveTask() {
   var subject = (document.getElementById('task-subject').value || '').trim();
   var dueDate = document.getElementById('task-due-date').value;
   var type = document.getElementById('task-type').value;
   var notes = (document.getElementById('task-notes').value || '').trim();
-  var contactSel = document.getElementById('task-contact');
-  var hsContactId = contactSel.value || null;
+  var contactEl = document.getElementById('task-contact');
+  var hsContactId = contactEl ? (contactEl.value || null) : null;
 
   if (!subject) { toast('Task subject is required.', 'error'); return; }
   if (!dueDate) { toast('Follow-up date is required.', 'error'); return; }
@@ -8233,7 +8227,6 @@ async function saveTask() {
     }
   };
 
-  // Associate with contact if selected and has valid HubSpot ID
   if (hsContactId && hsContactId.length > 5) {
     taskBody.associations = [{
       to: { id: String(hsContactId) },
@@ -8241,40 +8234,44 @@ async function saveTask() {
     }];
   }
 
-  var saveBtn = document.querySelector('#modal-add-task .btn-primary');
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
+  // Store task data globally and close modal before fetch
+  window._pendingTask = { body: taskBody, subject: subject, type: type, dueMsUtc: dueMsUtc, notes: notes };
+  closeModal('modal-add-task');
+  toast('Saving task...', '');
 
+  // Fire independently after a delay to escape extension interception
+  window.setTimeout(function() { pushTaskToHubSpot(); }, 100);
+}
+
+async function pushTaskToHubSpot() {
+  var t = window._pendingTask;
+  if (!t) return;
+  window._pendingTask = null;
   try {
     var r = await fetch(WORKER_URL + '/hubspot/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(taskBody)
+      body: JSON.stringify(t.body)
     });
     var data = await r.json();
-    if (data.status === 'error' || !r.ok) throw new Error(data.message || 'HubSpot error: ' + r.status);
-
-    // Add to local tasks array and re-render
+    if (data.status === 'error' || !r.ok) throw new Error(data.message || 'HubSpot error ' + r.status);
     if (data.id) {
       hubspotTasks.unshift({
         id: data.id,
         properties: {
-          hs_task_subject: subject,
+          hs_task_subject: t.subject,
           hs_task_status: 'NOT_STARTED',
-          hs_task_type: type,
-          hs_timestamp: String(dueMsUtc),
-          hs_task_body: notes
+          hs_task_type: t.type,
+          hs_timestamp: String(t.dueMsUtc),
+          hs_task_body: t.notes
         }
       });
       renderTasksList();
       renderTaskReminders();
+      toast('Task created and synced to HubSpot.', 'success');
     }
-
-    closeModal('modal-add-task');
-    toast('Task created and synced to HubSpot.', 'success');
   } catch(e) {
-    toast('Could not create task: ' + e.message, 'error');
-  } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save & Sync to HubSpot'; }
+    toast('Could not sync task: ' + e.message, 'error');
   }
 }
 
