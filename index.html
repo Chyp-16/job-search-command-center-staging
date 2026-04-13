@@ -8247,14 +8247,11 @@ async function pushTaskToHubSpot() {
   var t = window._pendingTask;
   if (!t) return;
   window._pendingTask = null;
-  try {
-    var r = await fetch(WORKER_URL + '/hubspot/task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(t.body)
-    });
-    var data = await r.json();
-    if (data.status === 'error' || !r.ok) throw new Error(data.message || 'HubSpot error ' + r.status);
+  fetch(WORKER_URL + '/hubspot/task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(t.body)
+  }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.id) {
       hubspotTasks.unshift({
         id: data.id,
@@ -8269,10 +8266,12 @@ async function pushTaskToHubSpot() {
       renderTasksList();
       renderTaskReminders();
       toast('Task created and synced to HubSpot.', 'success');
+    } else {
+      toast('Task saved but HubSpot sync may have failed.', '');
     }
-  } catch(e) {
+  }).catch(function(e) {
     toast('Could not sync task: ' + e.message, 'error');
-  }
+  });
 }
 
 async function syncHubSpotActivity() {
