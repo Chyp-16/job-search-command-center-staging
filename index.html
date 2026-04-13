@@ -2665,7 +2665,7 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-task')">Cancel</button>
-      <button class="btn btn-primary" onclick="setTimeout(saveTask,0)">Save & Sync to HubSpot</button>
+      <button class="btn btn-primary" id="save-task-btn">Save & Sync to HubSpot</button>
     </div>
   </div>
 </div>
@@ -8185,6 +8185,13 @@ function openAddTask() {
   var sel = document.getElementById('task-contact');
   sel.innerHTML = '<option value="">⏳ Loading contacts...</option>';
   openModal('modal-add-task');
+  // Wire save button via addEventListener to bypass extension interference
+  var saveBtn = document.getElementById('save-task-btn');
+  if (saveBtn) {
+    var newBtn = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+    newBtn.addEventListener('click', function() { saveTask(); });
+  }
 
   // Always fetch fresh with hubspot_contact_id — paginate to get all
   (async function() {
