@@ -7964,6 +7964,27 @@ async function syncHubSpotTasks() {
   }
 }
 
+async function completeTask(taskId, btnEl) {
+  if (!confirm('Mark this task as completed in HubSpot?')) return;
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/task/' + taskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ properties: { hs_task_status: 'COMPLETED' } })
+    });
+    if (!r.ok) throw new Error('Status ' + r.status);
+    // Remove from local array and re-render
+    hubspotTasks = hubspotTasks.filter(function(t) { return t.id !== taskId; });
+    renderTasksList();
+    renderTaskReminders();
+    toast('Task completed and synced to HubSpot.', 'success');
+  } catch(e) {
+    toast('Could not complete task: ' + e.message, 'error');
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '✓ Done'; }
+  }
+}
+
 function renderTasksList() {
   const listEl = document.getElementById('tasks-list');
   if (!listEl) return;
@@ -8009,13 +8030,15 @@ function renderTasksList() {
     const dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     const color = isOverdue ? 'var(--burgundy)' : isDueToday ? '#b45309' : 'var(--text)';
 
+    var tid = t.id || '';
     return '<div class="followup-item">' +
       '<div style="font-size:16px;flex-shrink:0">' + icon + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-weight:600;font-size:13px;color:' + color + '">' + title + '</div>' +
         (type ? '<div style="font-size:11px;color:var(--text-light);text-transform:capitalize">' + type.toLowerCase() + '</div>' : '') +
       '</div>' +
-      (dateStr ? '<div style="font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + dateStr + '</div>' : '') +
+      (dateStr ? '<div style="font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap;margin-right:8px">' + dateStr + '</div>' : '') +
+      (tid ? '<button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="completeTask(this.dataset.tid, this)">✓ Done</button>' : '') +
     '</div>';
   }).join('');
 
@@ -8033,6 +8056,8 @@ function renderTaskReminders() {
 
   var overdue = [];
   var dueToday = [];
+  var overdueItems = [];
+  var dueTodayItems = [];
 
   hubspotTasks.forEach(function(t) {
     var props = t.properties || {};
@@ -8044,8 +8069,10 @@ function renderTaskReminders() {
     var title = props.hs_task_subject || props.subject || 'Untitled Task';
     if (dueDate.toDateString() === today) {
       dueToday.push(title);
+      dueTodayItems.push({ title: title, id: t.id || '' });
     } else if (dueDate < now) {
       overdue.push(title);
+      overdueItems.push({ title: title, id: t.id || '' });
     }
   });
 
@@ -8061,9 +8088,12 @@ function renderTaskReminders() {
         '<span style="font-size:15px">🔴</span>' +
         '<span style="font-weight:700;font-size:13px;color:var(--burgundy)">' + overdue.length + ' overdue task' + (overdue.length > 1 ? 's' : '') + '</span>' +
       '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:4px;padding-left:24px">' +
-        overdue.map(function(t) {
-          return '<div style="font-size:12px;color:var(--text-secondary)">• ' + t + '</div>';
+      '<div style="display:flex;flex-direction:column;gap:6px;padding-left:24px">' +
+        overdueItems.map(function(item) {
+          return '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:12px;color:var(--text-secondary);flex:1">• ' + item.title + '</span>' +
+            (item.id ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 7px;flex-shrink:0" data-tid="' + item.id + '" onclick="completeTask(this.dataset.tid,this)">✓ Done</button>' : '') +
+          '</div>';
         }).join('') +
       '</div>' +
     '</div>';
@@ -8074,9 +8104,12 @@ function renderTaskReminders() {
         '<span style="font-size:15px">🟡</span>' +
         '<span style="font-weight:700;font-size:13px;color:#b45309">' + dueToday.length + ' task' + (dueToday.length > 1 ? 's' : '') + ' due today</span>' +
       '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:4px;padding-left:24px">' +
-        dueToday.map(function(t) {
-          return '<div style="font-size:12px;color:var(--text-secondary)">• ' + t + '</div>';
+      '<div style="display:flex;flex-direction:column;gap:6px;padding-left:24px">' +
+        dueTodayItems.map(function(item) {
+          return '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:12px;color:var(--text-secondary);flex:1">• ' + item.title + '</span>' +
+            (item.id ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 7px;flex-shrink:0" data-tid="' + item.id + '" onclick="completeTask(this.dataset.tid,this)">✓ Done</button>' : '') +
+          '</div>';
         }).join('') +
       '</div>' +
     '</div>';
