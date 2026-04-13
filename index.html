@@ -2619,6 +2619,51 @@ a { color: var(--burgundy); text-decoration: none; }
   </div>
 </div>
 
+<!-- Add Task Modal -->
+<div class="modal-overlay" id="modal-add-task">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>Add Task</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-task')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Task Subject *</label>
+          <input class="form-input" type="text" id="task-subject" placeholder="e.g. Follow up with Sarah Chen at Acme">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="task-type">
+            <option value="EMAIL">Email</option>
+            <option value="CALL">Call</option>
+            <option value="TODO">To-Do</option>
+            <option value="LINKEDIN_MESSAGE">LinkedIn Message</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Follow-Up Date *</label>
+          <input class="form-input" type="date" id="task-due-date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="task-notes" rows="3" placeholder="Add context or talking points..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link to Contact (optional)</label>
+          <select class="form-select" id="task-contact">
+            <option value="">— No contact —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save & Sync to HubSpot</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
 
@@ -8120,11 +8165,92 @@ function renderTaskReminders() {
 }
 
 function openAddTask() {
-  // Use stored portal ID if available, otherwise fall back to contacts page
-  var url = window._hubspotPortalId
-    ? 'https://app.hubspot.com/tasks/' + window._hubspotPortalId
-    : 'https://app.hubspot.com/contacts/';
-  window.open(url, '_blank');
+  // Pre-fill today's date + 1 day as default follow-up
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var dateStr = tomorrow.toISOString().split('T')[0];
+  document.getElementById('task-due-date').value = dateStr;
+  document.getElementById('task-subject').value = '';
+  document.getElementById('task-notes').value = '';
+  document.getElementById('task-type').value = 'EMAIL';
+
+  // Populate contact dropdown
+  var sel = document.getElementById('task-contact');
+  sel.innerHTML = '<option value="">— No contact —</option>' +
+    allContacts.slice(0, 500).map(function(c) {
+      return '<option value="' + (c.hubspot_contact_id || '') + '" data-name="' + c.name + '">' +
+        c.name + (c.company ? ' — ' + c.company : '') + '</option>';
+    }).join('');
+
+  openModal('modal-add-task');
+}
+
+async function saveTask() {
+  var subject = (document.getElementById('task-subject').value || '').trim();
+  var dueDate = document.getElementById('task-due-date').value;
+  var type = document.getElementById('task-type').value;
+  var notes = (document.getElementById('task-notes').value || '').trim();
+  var contactSel = document.getElementById('task-contact');
+  var hsContactId = contactSel.value || null;
+
+  if (!subject) { toast('Task subject is required.', 'error'); return; }
+  if (!dueDate) { toast('Follow-up date is required.', 'error'); return; }
+
+  var dueMsUtc = new Date(dueDate + 'T12:00:00Z').getTime();
+
+  var taskBody = {
+    properties: {
+      hs_task_subject: subject,
+      hs_task_status: 'NOT_STARTED',
+      hs_task_type: type,
+      hs_task_due_date: String(dueMsUtc),
+      hs_task_body: notes || '',
+    }
+  };
+
+  // Associate with contact if selected
+  if (hsContactId) {
+    taskBody.associations = [{
+      to: { id: hsContactId },
+      types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 204 }]
+    }];
+  }
+
+  var saveBtn = document.querySelector('#modal-add-task .btn-primary');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
+
+  try {
+    var r = await fetch(WORKER_URL + '/hubspot/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify(taskBody)
+    });
+    if (!r.ok) throw new Error('HubSpot error: ' + r.status);
+    var data = await r.json();
+
+    // Add to local tasks array and re-render
+    if (data.id) {
+      hubspotTasks.unshift({
+        id: data.id,
+        properties: {
+          hs_task_subject: subject,
+          hs_task_status: 'NOT_STARTED',
+          hs_task_type: type,
+          hs_task_due_date: String(dueMsUtc),
+          hs_task_body: notes
+        }
+      });
+      renderTasksList();
+      renderTaskReminders();
+    }
+
+    closeModal('modal-add-task');
+    toast('Task created and synced to HubSpot.', 'success');
+  } catch(e) {
+    toast('Could not create task: ' + e.message, 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save & Sync to HubSpot'; }
+  }
 }
 
 async function syncHubSpotActivity() {
