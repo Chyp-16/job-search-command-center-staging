@@ -8222,6 +8222,7 @@ async function saveTask() {
       hs_task_status: 'NOT_STARTED',
       hs_task_type: type,
       hs_task_due_date: String(dueMsUtc),
+      hs_timestamp: String(dueMsUtc),
       hs_task_body: notes || '',
     }
   };
