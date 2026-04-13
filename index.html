@@ -8245,21 +8245,13 @@ async function saveTask() {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
 
   try {
-    // Use XHR to bypass extension fetch interception
-    var data = await new Promise(function(resolve, reject) {
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', WORKER_URL + '/hubspot/task', true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Origin', location.origin);
-      xhr.onload = function() {
-        try { resolve(JSON.parse(xhr.responseText)); }
-        catch(e) { reject(new Error('Invalid response')); }
-      };
-      xhr.onerror = function() { reject(new Error('Network error')); };
-      xhr.send(JSON.stringify(taskBody));
+    var r = await fetch(WORKER_URL + '/hubspot/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskBody)
     });
-
-    if (data.status === 'error') throw new Error(data.message || 'HubSpot error');
+    var data = await r.json();
+    if (data.status === 'error' || !r.ok) throw new Error(data.message || 'HubSpot error: ' + r.status);
 
     // Add to local tasks array and re-render
     if (data.id) {
