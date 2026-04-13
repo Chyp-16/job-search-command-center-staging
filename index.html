@@ -8186,14 +8186,11 @@ function openAddTask() {
   sel.innerHTML = '<option value="">⏳ Loading contacts...</option>';
   openModal('modal-add-task');
 
-  // Load contacts async — paginate to get all
+  // Always fetch fresh with hubspot_contact_id — paginate to get all
   (async function() {
-    var contacts = allContacts;
-    if (contacts.length < 100) {
-      var batch1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=0');
-      var batch2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=1000');
-      contacts = (Array.isArray(batch1) ? batch1 : []).concat(Array.isArray(batch2) ? batch2 : []);
-    }
+    var batch1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=0');
+    var batch2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=1000');
+    var contacts = (Array.isArray(batch1) ? batch1 : []).concat(Array.isArray(batch2) ? batch2 : []);
     sel.innerHTML = '<option value="">— No contact —</option>' +
       contacts.map(function(c) {
         return '<option value="' + (c.hubspot_contact_id || '') + '">' +
@@ -8226,10 +8223,10 @@ async function saveTask() {
     }
   };
 
-  // Associate with contact if selected
-  if (hsContactId) {
+  // Associate with contact if selected and has valid HubSpot ID
+  if (hsContactId && hsContactId.length > 5) {
     taskBody.associations = [{
-      to: { id: hsContactId },
+      to: { id: String(hsContactId) },
       types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 204 }]
     }];
   }
