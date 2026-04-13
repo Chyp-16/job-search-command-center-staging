@@ -8062,8 +8062,11 @@ function renderTasksList() {
   const sorted = [...activeTasks].sort(function(a, b) {
     const props_a = a.properties || {};
     const props_b = b.properties || {};
-    const da = (props_a.hs_timestamp || props_a.hs_task_due_date) ? new Date(parseInt(props_a.hs_timestamp || props_a.hs_task_due_date)) : new Date('2099-01-01');
-    const db = (props_b.hs_timestamp || props_b.hs_task_due_date) ? new Date(parseInt(props_b.hs_timestamp || props_b.hs_task_due_date)) : new Date('2099-01-01');
+    var _da = props_a.hs_timestamp || props_a.hs_task_due_date || null;
+    var _db = props_b.hs_timestamp || props_b.hs_task_due_date || null;
+    var parseD = function(v) { if (!v) return new Date('2099-01-01'); return /^\d{10,}$/.test(v) ? new Date(parseInt(v)) : new Date(v); };
+    const da = parseD(_da);
+    const db = parseD(_db);
     return da - db;
   });
 
@@ -8071,7 +8074,7 @@ function renderTasksList() {
     const props = t.properties || {};
     const title = props.hs_task_subject || props.subject || props.hs_note_body || props.title || t.subject || 'Untitled Task';
     const dueDateRaw = props.hs_timestamp || props.hs_task_due_date || null;
-    const dueDate = dueDateRaw ? new Date(parseInt(dueDateRaw) || dueDateRaw) : null;
+    const dueDate = dueDateRaw ? (/^\d{10,}$/.test(dueDateRaw) ? new Date(parseInt(dueDateRaw)) : new Date(dueDateRaw)) : null;
     const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
     const isOverdue = dueDate && dueDate < now;
     const isDueToday = dueDate && dueDate.toDateString() === now.toDateString();
@@ -8116,7 +8119,7 @@ function renderTaskReminders() {
     if (status === 'COMPLETED' || status === 'DEFERRED') return;
     var dueDateRaw = props.hs_timestamp || props.hs_task_due_date || null;
     if (!dueDateRaw) return;
-    var dueDate = new Date(parseInt(dueDateRaw) || dueDateRaw);
+    var dueDate = /^\d{10,}$/.test(dueDateRaw) ? new Date(parseInt(dueDateRaw)) : new Date(dueDateRaw);
     var title = props.hs_task_subject || props.subject || 'Untitled Task';
     if (dueDate.toDateString() === today) {
       dueToday.push(title);
