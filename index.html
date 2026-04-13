@@ -2641,9 +2641,15 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="LINKEDIN_MESSAGE">LinkedIn Message</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Follow-Up Date *</label>
-          <input class="form-input" type="date" id="task-due-date">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Follow-Up Date *</label>
+            <input class="form-input" type="date" id="task-due-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time (optional)</label>
+            <input class="form-input" type="time" id="task-due-time">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
@@ -8173,16 +8179,27 @@ function openAddTask() {
   document.getElementById('task-subject').value = '';
   document.getElementById('task-notes').value = '';
   document.getElementById('task-type').value = 'EMAIL';
+  document.getElementById('task-due-time').value = '09:00';
 
-  // Populate contact dropdown
+  // Populate contact dropdown — fetch all if needed
   var sel = document.getElementById('task-contact');
-  sel.innerHTML = '<option value="">— No contact —</option>' +
-    allContacts.slice(0, 500).map(function(c) {
-      return '<option value="' + (c.hubspot_contact_id || '') + '" data-name="' + c.name + '">' +
-        c.name + (c.company ? ' — ' + c.company : '') + '</option>';
-    }).join('');
-
+  sel.innerHTML = '<option value="">⏳ Loading contacts...</option>';
   openModal('modal-add-task');
+
+  // Load contacts async — paginate to get all
+  (async function() {
+    var contacts = allContacts;
+    if (contacts.length < 100) {
+      var batch1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=0');
+      var batch2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=1000');
+      contacts = (Array.isArray(batch1) ? batch1 : []).concat(Array.isArray(batch2) ? batch2 : []);
+    }
+    sel.innerHTML = '<option value="">— No contact —</option>' +
+      contacts.map(function(c) {
+        return '<option value="' + (c.hubspot_contact_id || '') + '">' +
+          c.name + (c.company ? ' — ' + c.company : '') + '</option>';
+      }).join('');
+  })();
 }
 
 async function saveTask() {
@@ -8196,7 +8213,8 @@ async function saveTask() {
   if (!subject) { toast('Task subject is required.', 'error'); return; }
   if (!dueDate) { toast('Follow-up date is required.', 'error'); return; }
 
-  var dueMsUtc = new Date(dueDate + 'T12:00:00Z').getTime();
+  var timeVal = (document.getElementById('task-due-time').value || '09:00');
+  var dueMsUtc = new Date(dueDate + 'T' + timeVal + ':00Z').getTime();
 
   var taskBody = {
     properties: {
@@ -8220,13 +8238,15 @@ async function saveTask() {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
 
   try {
+    console.log('Creating HubSpot task:', JSON.stringify(taskBody));
     var r = await fetch(WORKER_URL + '/hubspot/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
       body: JSON.stringify(taskBody)
     });
-    if (!r.ok) throw new Error('HubSpot error: ' + r.status);
     var data = await r.json();
+    console.log('HubSpot task response:', JSON.stringify(data));
+    if (!r.ok) throw new Error((data.message || data.error || 'HubSpot error: ' + r.status));
 
     // Add to local tasks array and re-render
     if (data.id) {
