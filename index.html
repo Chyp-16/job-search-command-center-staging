@@ -2681,7 +2681,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <div style="display:flex;flex-direction:column;gap:12px">
         <div class="form-group">
           <label class="form-label">Task Subject *</label>
-          <input class="form-input" type="text" id="edit-task-subject">
+          <input class="form-input" type="text" id="edit-task-subject" placeholder="e.g. Follow up with Sarah Chen at Acme">
         </div>
         <div class="form-group">
           <label class="form-label">Type</label>
@@ -2704,7 +2704,13 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
-          <textarea class="form-textarea" id="edit-task-notes" rows="3"></textarea>
+          <textarea class="form-textarea" id="edit-task-notes" rows="3" placeholder="Add context or talking points..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Link to Contact (optional)</label>
+          <select class="form-select" id="edit-task-contact">
+            <option value="">— No contact —</option>
+          </select>
         </div>
       </div>
     </div>
@@ -8082,7 +8088,20 @@ function openEditTask(taskId) {
     document.getElementById('edit-task-due-time').value = '09:00';
   }
 
+  // Populate contact dropdown
+  var editSel = document.getElementById('edit-task-contact');
+  editSel.innerHTML = '<option value="">⏳ Loading...</option>';
   openModal('modal-edit-task');
+  (async function() {
+    var b1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=0');
+    var b2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=1000');
+    var contacts = (Array.isArray(b1) ? b1 : []).concat(Array.isArray(b2) ? b2 : []);
+    editSel.innerHTML = '<option value="">— No contact —</option>' +
+      contacts.map(function(c) {
+        return '<option value="' + (c.hubspot_contact_id || '') + '">' +
+          c.name + (c.company ? ' — ' + c.company : '') + '</option>';
+      }).join('');
+  })();
 }
 
 function updateTask() {
@@ -8100,6 +8119,9 @@ function updateTask() {
 
   var dueMsUtc = new Date(dueDate + 'T' + timeVal + ':00Z').getTime();
 
+  var editContactSel = document.getElementById('edit-task-contact');
+  var editContactId = editContactSel ? (editContactSel.value || null) : null;
+
   var updateBody = {
     properties: {
       hs_task_subject: subject,
@@ -8108,6 +8130,13 @@ function updateTask() {
       hs_task_body: notes || '',
     }
   };
+
+  if (editContactId && editContactId.length > 5) {
+    updateBody.associations = [{
+      to: { id: String(editContactId) },
+      types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 204 }]
+    }];
+  }
 
   window._pendingTaskUpdate = { id: taskId, body: updateBody, subject: subject, type: type, dueMsUtc: dueMsUtc, notes: notes };
   closeModal('modal-edit-task');
