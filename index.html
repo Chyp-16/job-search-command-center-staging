@@ -3251,11 +3251,23 @@ function goPage(p) {
 }
 
 // ── APP FORM ───────────────────────────────────────────────────────────
-function populateAppContactDropdown(selectedId) {
+async function populateAppContactDropdown(selectedId) {
   var sel = document.getElementById('f-linked-contact');
   if (!sel) return;
+  sel.innerHTML = '<option value="">— Loading... —</option>';
+  // Fetch all contacts from DB paginated — allContacts caps at 1000
+  var all = [];
+  var offset = 0;
+  var limit = 1000;
+  while (true) {
+    var page = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=' + limit + '&offset=' + offset);
+    if (!Array.isArray(page) || page.length === 0) break;
+    all = all.concat(page);
+    if (page.length < limit) break;
+    offset += limit;
+  }
   sel.innerHTML = '<option value="">— None —</option>';
-  allContacts.forEach(function(c) {
+  all.forEach(function(c) {
     if (!c.name) return;
     var opt = document.createElement('option');
     opt.value = c.id;
@@ -3383,7 +3395,6 @@ async function saveApp() {
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
     linked_contact_id: getVal('f-linked-contact') || null,
-    linked_contact_id: (document.getElementById('f-contact') || {}).value || null,
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
