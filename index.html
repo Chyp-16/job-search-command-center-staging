@@ -3277,12 +3277,12 @@ async function populateAppContactDropdown(selectedId) {
   if (selectedId) sel.value = selectedId;
 }
 
-function openAddApp() {
+async function openAddApp() {
   editingId = null;
   document.getElementById('modal-app-title').textContent = 'Add Application';
   clearAppForm();
   document.getElementById('f-date').value = today();
-  populateAppContactDropdown(null);
+  await populateAppContactDropdown(null);
   openModal('modal-app');
 }
 
@@ -3300,7 +3300,7 @@ function clearAppForm() {
   });
 }
 
-function editApp(id) {
+async function editApp(id) {
   const a = allApps.find(x => x.id === id);
   if (!a) return;
   editingId = id;
@@ -3357,7 +3357,7 @@ function editApp(id) {
   setVal('f-rf-status', a.rejection_followup_status);
   setVal('f-rf-date', a.rejection_followup_date);
   setVal('f-rf-notes', a.rejection_followup_notes);
-  populateAppContactDropdown(a.linked_contact_id || null);
+  await populateAppContactDropdown(a.linked_contact_id || null);
 
   openModal('modal-app');
 }
