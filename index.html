@@ -3352,6 +3352,19 @@ function editApp(id) {
 
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() || null : null; }
 
+// Normalize LinkedIn URLs — ensures href always starts with https://
+function normalizeLinkedIn(url) {
+  if (!url) return null;
+  url = url.trim();
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('linkedin.com') || url.startsWith('www.linkedin.com')) return 'https://' + url;
+  // Bare username or path like "in/username" — build full URL
+  if (url.startsWith('in/')) return 'https://www.linkedin.com/' + url;
+  // Just a username slug
+  return 'https://www.linkedin.com/in/' + url;
+}
+
 async function saveApp() {
   const company = getVal('f-company');
   const job_title = getVal('f-title');
@@ -3573,7 +3586,7 @@ async function loadDetailContacts(company, appId) {
       ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No contacts at this company yet.</div>'
       : related.map(function(c) {
           const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
-          var linkedInHtml = c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
+          var linkedInHtml = c.linkedin_url ? '<a href="' + (normalizeLinkedIn(c.linkedin_url)||'#') + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
           return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
             '<div style="flex:1">' +
               '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
@@ -3846,7 +3859,7 @@ function renderContactsTable() {
     return '<tr>' +
       '<td>' +
         '<div style="font-weight:600">' + c.name + hubspotLinked + '</div>' +
-        (c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy);font-size:11px" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '') +
+        (c.linkedin_url ? '<a href="' + (normalizeLinkedIn(c.linkedin_url)||'#') + '" target="_blank" style="color:var(--burgundy);font-size:11px" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '') +
       '</td>' +
       '<td>' + (c.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
@@ -3882,7 +3895,7 @@ function buildContactDetailHTML(c) {
       '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
       '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
       (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
-      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + (normalizeLinkedIn(c.linkedin_url)||'#') + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
       (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
       (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
     '</div>' +
@@ -4101,7 +4114,7 @@ function viewContactFromApp(contactId) {
           '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + (c.next_action||'—') + '</span></div>' +
           (c.email ? '<div class="detail-field"><span class="detail-field-label">Email</span><span class="detail-field-value"><a href="mailto:' + c.email + '" style="color:var(--burgundy)">' + c.email + '</a></span></div>' : '') +
-        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + (normalizeLinkedIn(c.linkedin_url)||'#') + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
           (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
         '</div>' +
       '</div>';
@@ -4168,11 +4181,16 @@ async function saveContact() {
     name, company: getVal('cf-company'), title: getVal('cf-title'),
     linked_application_id: getVal('cf-linked-app') || null,
     contact_type: getVal('cf-type'), connection_source: getVal('cf-source'),
-    last_contact_date: getVal('cf-last-date') || null,
+    last_contact_date: (function() {
+      var manual = getVal('cf-last-date') || null;
+      var dates = [getVal('cf-o1d'), getVal('cf-o2d'), getVal('cf-o3d'), manual].filter(Boolean);
+      if (!dates.length) return null;
+      return dates.sort().reverse()[0];
+    })(),
     next_action: getVal('cf-next-action'),
     next_action_date: getVal('cf-next-date') || null,
     email: getVal('cf-email'),
-    linkedin_url: getVal('cf-linkedin'),
+    linkedin_url: normalizeLinkedIn(getVal('cf-linkedin')),
     notes: getVal('cf-notes'),
     outreach_1_type: getVal('cf-o1t'), outreach_1_status: getVal('cf-o1s'), outreach_1_date: getVal('cf-o1d') || null, outreach_1_notes: getVal('cf-o1n'),
     outreach_2_type: getVal('cf-o2t'), outreach_2_status: getVal('cf-o2s'), outreach_2_date: getVal('cf-o2d') || null, outreach_2_notes: getVal('cf-o2n'),
