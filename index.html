@@ -1934,17 +1934,13 @@ a { color: var(--burgundy); text-decoration: none; }
           <label class="form-label">Cover Letter Version</label>
           <input class="form-input" type="text" id="f-coverletter" placeholder="Version name">
         </div>
-        <div class="form-group">
-          <label class="form-label">Primary Contact</label>
-          <select class="form-select" id="f-contact">
-            <option value="">— None —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Linked Contact</label>
-          <select class="form-select" id="f-linked-contact">
-            <option value="">— None —</option>
-          </select>
+        <div class="form-group full">
+          <label class="form-label">Contacts</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <input class="form-input" type="text" id="f-contact-search" placeholder="Search contacts..." oninput="filterAppContactPicker()" style="flex:1">
+          </div>
+          <div id="f-contact-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:0"></div>
+          <div id="f-contact-picker" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);display:none"></div>
         </div>
         <div class="form-group full">
           <label class="form-label">Notes</label>
@@ -2944,18 +2940,7 @@ function populateDropdowns() {
   indSel.innerHTML = '<option value="">-- Select --</option>';
   INDUSTRIES.forEach(i => indSel.innerHTML += `<option>${i}</option>`);
 
-  // Populate contact dropdown
-  const contactSel = document.getElementById('f-contact');
-  if (contactSel) {
-    contactSel.innerHTML = '<option value="">— None —</option>';
-    allContacts.slice(0, 500).forEach(function(c) {
-      if (!c.name) return;
-      var opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-      contactSel.appendChild(opt);
-    });
-  }
+  // Contact picker is initialized per-modal via initAppContactPicker()
 
   // Filter dropdowns
   const fs = document.getElementById('filter-status');
@@ -3251,43 +3236,119 @@ function goPage(p) {
 }
 
 // ── APP FORM ───────────────────────────────────────────────────────────
-async function populateAppContactDropdown(selectedId) {
-  var sel = document.getElementById('f-linked-contact');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— Loading... —</option>';
-  // Fetch all contacts from DB paginated — allContacts caps at 1000
-  var all = [];
+// ── MULTI-CONTACT PICKER FOR APPLICATIONS ─────────────────────────────
+var _appContactPickerAll = [];   // full contact list cached for picker
+var _appContactPickerSel = [];   // selected contact ids [{id, name, company}]
+
+async function initAppContactPicker(selectedIds) {
+  // Fetch all contacts paginated
+  _appContactPickerAll = [];
   var offset = 0;
-  var limit = 1000;
   while (true) {
-    var page = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=' + limit + '&offset=' + offset);
+    var page = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000&offset=' + offset);
     if (!Array.isArray(page) || page.length === 0) break;
-    all = all.concat(page);
-    if (page.length < limit) break;
-    offset += limit;
+    _appContactPickerAll = _appContactPickerAll.concat(page);
+    if (page.length < 1000) break;
+    offset += 1000;
   }
-  sel.innerHTML = '<option value="">— None —</option>';
-  all.forEach(function(c) {
-    if (!c.name) return;
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-    sel.appendChild(opt);
-  });
-  if (selectedId) sel.value = selectedId;
+  // Set pre-selected contacts
+  _appContactPickerSel = [];
+  if (selectedIds && selectedIds.length) {
+    selectedIds.forEach(function(sid) {
+      var c = _appContactPickerAll.find(function(x) { return x.id === sid; });
+      if (c) _appContactPickerSel.push(c);
+    });
+  }
+  renderAppContactTags();
+  filterAppContactPicker();
+  // Show picker on search focus
+  var search = document.getElementById('f-contact-search');
+  if (search) {
+    search.onfocus = function() {
+      var picker = document.getElementById('f-contact-picker');
+      if (picker) picker.style.display = 'block';
+    };
+  }
 }
+
+function renderAppContactTags() {
+  var tags = document.getElementById('f-contact-tags');
+  if (!tags) return;
+  if (_appContactPickerSel.length === 0) { tags.innerHTML = ''; return; }
+  tags.innerHTML = _appContactPickerSel.map(function(c) {
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--burgundy-muted);color:var(--burgundy);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:500">' +
+      c.name + (c.company ? ' — ' + c.company : '') +
+      '<span style="cursor:pointer;font-weight:700;margin-left:2px" data-cid="' + c.id + '" onclick="removeAppContact(this.dataset.cid)">×</span>' +
+    '</span>';
+  }).join('');
+}
+
+function filterAppContactPicker() {
+  var picker = document.getElementById('f-contact-picker');
+  var search = document.getElementById('f-contact-search');
+  if (!picker) return;
+  var q = (search ? search.value.toLowerCase() : '');
+  var selIds = _appContactPickerSel.map(function(c) { return c.id; });
+  var filtered = _appContactPickerAll.filter(function(c) {
+    if (selIds.includes(c.id)) return false;
+    if (!q) return true;
+    return (c.name + ' ' + (c.company||'')).toLowerCase().includes(q);
+  });
+  picker.style.display = 'block';
+  if (filtered.length === 0) {
+    picker.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">No contacts found</div>';
+    return;
+  }
+  picker.innerHTML = filtered.slice(0, 50).map(function(c) {
+    var label = c.name + (c.company ? ' <span style="color:var(--text-secondary);font-size:11px">\u2014 ' + c.company + '</span>' : '');
+    return '<div style="padding:8px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.1s" ' +
+      'data-cid="' + c.id + '" onclick="addAppContact(this.dataset.cid)" ' +
+      'onmousedown="addAppContact(\'' + c.id + '\')">' +
+      label +
+    '</div>';
+  }).join('');
+}
+
+function addAppContact(cid) {
+  var c = _appContactPickerAll.find(function(x) { return x.id === cid; });
+  if (!c || _appContactPickerSel.find(function(x) { return x.id === cid; })) return;
+  _appContactPickerSel.push(c);
+  var search = document.getElementById('f-contact-search');
+  if (search) search.value = '';
+  renderAppContactTags();
+  filterAppContactPicker();
+  var picker = document.getElementById('f-contact-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+function removeAppContact(cid) {
+  _appContactPickerSel = _appContactPickerSel.filter(function(c) { return c.id !== cid; });
+  renderAppContactTags();
+  filterAppContactPicker();
+}
+
+function getAppContactPickerIds() {
+  return _appContactPickerSel.map(function(c) { return c.id; });
+}
+
+// Legacy stub — no longer used but kept to avoid reference errors
+async function populateAppContactDropdown(selectedId) {}
 
 async function openAddApp() {
   editingId = null;
   document.getElementById('modal-app-title').textContent = 'Add Application';
   clearAppForm();
   document.getElementById('f-date').value = today();
-  await populateAppContactDropdown(null);
+  await initAppContactPicker([]);
   openModal('modal-app');
 }
 
 function clearAppForm() {
-  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes','f-linked-contact',
+  _appContactPickerSel = []; _appContactPickerAll = [];
+  var tags = document.getElementById('f-contact-tags'); if (tags) tags.innerHTML = '';
+  var picker = document.getElementById('f-contact-picker'); if (picker) picker.style.display = 'none';
+  var search = document.getElementById('f-contact-search'); if (search) search.value = '';
+  ['f-date','f-company','f-title','f-url','f-salary','f-resume','f-coverletter','f-notes',
    'f-io-date','f-io-notes','f-3d-date','f-3d-notes','f-1w-date','f-1w-notes',
    'f-2w-date','f-2w-notes','f-rf-date','f-rf-notes'].forEach(id => {
     const el = document.getElementById(id);
@@ -3322,8 +3383,6 @@ async function editApp(id) {
   setVal('f-salary', a.salary);
   setVal('f-resume', a.resume_version);
   setVal('f-coverletter', a.cover_letter_version);
-  var contactSel = document.getElementById('f-contact');
-  if (contactSel && a.linked_contact_id) contactSel.value = a.linked_contact_id;
   setVal('f-notes', a.notes);
 
   // Set select values after ensuring options are populated
@@ -3357,7 +3416,14 @@ async function editApp(id) {
   setVal('f-rf-status', a.rejection_followup_status);
   setVal('f-rf-date', a.rejection_followup_date);
   setVal('f-rf-notes', a.rejection_followup_notes);
-  await populateAppContactDropdown(a.linked_contact_id || null);
+  // Load contacts linked to this application
+  var linkedIds = [];
+  try {
+    var linked = await dbGet('contacts', 'select=id&linked_application_id=eq.' + a.id);
+    if (Array.isArray(linked)) linkedIds = linked.map(function(c) { return c.id; });
+    if (a.linked_contact_id && !linkedIds.includes(a.linked_contact_id)) linkedIds.push(a.linked_contact_id);
+  } catch(e) {}
+  await initAppContactPicker(linkedIds);
 
   openModal('modal-app');
 }
@@ -3394,7 +3460,7 @@ async function saveApp() {
     resume_version: getVal('f-resume'),
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
-    linked_contact_id: getVal('f-linked-contact') || null,
+    linked_contact_id: getAppContactPickerIds()[0] || null,
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
@@ -3438,6 +3504,30 @@ async function saveApp() {
     }
     closeModal('modal-app');
     filterApps('keep-page');
+
+    // Save all selected contacts — link them to this application
+    if (savedApp && savedApp.id) {
+      var pickerIds = getAppContactPickerIds();
+      // For edits: first clear existing links for contacts no longer selected
+      if (editingId) {
+        var prevLinked = await dbGet('contacts', 'select=id&linked_application_id=eq.' + savedApp.id);
+        if (Array.isArray(prevLinked)) {
+          for (var pl of prevLinked) {
+            if (!pickerIds.includes(pl.id)) {
+              await dbPatch('contacts', pl.id, { linked_application_id: null });
+              var mc = allContacts.find(function(c) { return c.id === pl.id; });
+              if (mc) mc.linked_application_id = null;
+            }
+          }
+        }
+      }
+      // Link all selected contacts to this application
+      for (var cid of pickerIds) {
+        await dbPatch('contacts', cid, { linked_application_id: savedApp.id });
+        var mc2 = allContacts.find(function(c) { return c.id === cid; });
+        if (mc2) mc2.linked_application_id = savedApp.id;
+      }
+    }
 
     // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
     if (savedApp) syncOutreachToHubSpot(savedApp);
