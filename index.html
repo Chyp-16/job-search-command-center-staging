@@ -4148,6 +4148,8 @@ function populateContactAppDropdown(selectedId) {
 
 function openAddContact(defaultType) {
   editingId = null;
+  window._origNextAction = null;
+  window._origNextActionDate = null;
   document.getElementById('modal-contact-title').textContent = 'Add Contact';
   ['cf-name','cf-company','cf-title','cf-email','cf-notes','cf-next-action','cf-linkedin','cf-o1n','cf-o2n','cf-o3n','cf-o1t','cf-o2t','cf-o3t'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
   ['cf-last-date','cf-next-date','cf-o1d','cf-o2d','cf-o3d'].forEach(function(id) { var e=document.getElementById(id); if(e) e.value=''; });
@@ -4161,6 +4163,9 @@ function editContact(id) {
   const c = allContacts.find(x => x.id === id);
   if (!c) return;
   editingId = id;
+  // Store original next action so we can detect changes on save
+  window._origNextAction = c.next_action || null;
+  window._origNextActionDate = c.next_action_date || null;
   document.getElementById('modal-contact-title').textContent = 'Edit Contact';
   const sv = (fid, val) => { const e = document.getElementById(fid); if(e) e.value = val || ''; };
   sv('cf-name', c.name); sv('cf-company', c.company); sv('cf-title', c.title);
@@ -4217,14 +4222,23 @@ async function saveContact() {
       closeModal('modal-contact');
       filterContacts();
       // Push to HubSpot now that we have the saved contact with its DB id
-      if (saved) await pushContactToHubSpot(saved);
+      if (saved) {
+        await pushContactToHubSpot(saved);
+        // Push next action as HubSpot task for new contacts
+        if (saved.next_action && saved.next_action_date) pushNextActionAsTask(saved);
+      }
       return;
     }
     closeModal('modal-contact');
     filterContacts();
     // Sync to HubSpot for updates — use the merged contact with hubspot_contact_id
     var savedContact = allContacts.find(function(c) { return c.id === editingId; });
-    if (savedContact) await pushContactToHubSpot(savedContact);
+    if (savedContact) {
+      await pushContactToHubSpot(savedContact);
+      // Push next action as HubSpot task only if it changed
+      var nextChanged = savedContact.next_action !== window._origNextAction || savedContact.next_action_date !== window._origNextActionDate;
+      if (nextChanged && savedContact.next_action && savedContact.next_action_date) pushNextActionAsTask(savedContact);
+    }
     return;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
@@ -4940,6 +4954,54 @@ async function loadContactHubSpotActivity(contactId, hubspotId) {
   } catch(e) {
     if (el) el.textContent = 'Error: ' + e.message;
   }
+}
+
+function pushNextActionAsTask(contact) {
+  // Push contact's next action to HubSpot as a task if date is today or future
+  if (!contact.next_action || !contact.next_action_date) return;
+  var actionDate = new Date(contact.next_action_date + 'T09:00:00Z');
+  var now = new Date();
+  now.setHours(0,0,0,0);
+  if (actionDate < now) return; // Skip past dates
+  var hsId = contact.hubspot_contact_id;
+  if (!hsId) return;
+  var subject = contact.next_action + (contact.name ? ' — ' + contact.name : '') + (contact.company ? ' @ ' + contact.company : '');
+  var taskBody = {
+    properties: {
+      hs_task_subject: subject,
+      hs_task_status: 'NOT_STARTED',
+      hs_task_type: 'TODO',
+      hs_timestamp: String(actionDate.getTime()),
+      hs_task_body: 'Next action from Job Search Command Center'
+    },
+    associations: [{
+      to: { id: String(hsId) },
+      types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 204 }]
+    }]
+  };
+  window.setTimeout(function() {
+    fetch(WORKER_URL + '/hubspot/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskBody)
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.id) {
+        hubspotTasks.unshift({
+          id: data.id,
+          properties: {
+            hs_task_subject: subject,
+            hs_task_status: 'NOT_STARTED',
+            hs_task_type: 'TODO',
+            hs_timestamp: String(actionDate.getTime()),
+            hs_task_body: ''
+          }
+        });
+        renderTasksList();
+        renderTaskReminders();
+        toast('Next action synced to HubSpot tasks.', 'success');
+      }
+    }).catch(function(e) { console.warn('Next action task push failed:', e.message); });
+  }, 200);
 }
 
 async function pushContactToHubSpot(contact) {
