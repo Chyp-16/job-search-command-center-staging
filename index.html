@@ -2534,10 +2534,12 @@ a { color: var(--burgundy); text-decoration: none; }
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Link to Contact (optional)</label>
-          <select class="form-select" id="upload-link-contact">
-            <option value="">— Don't link —</option>
-          </select>
+          <label class="form-label">Link to Contacts (optional)</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <input class="form-input" type="text" id="upload-contact-search" placeholder="Search contacts..." oninput="filterUploadContactPicker()" style="flex:1">
+          </div>
+          <div id="upload-contact-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:0"></div>
+          <div id="upload-contact-picker" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);display:none"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
@@ -3821,21 +3823,9 @@ async function openUploadFromDetail() {
   closeModal('modal-detail');
 
   // Open upload modal pre-filled for this application
-  await openUploadModal();
-  setTimeout(function() {
-    // Pre-select doc type and link to this application
-    const docType = document.getElementById('upload-doc-type');
-    if (docType) docType.value = 'Resume';
-
-    const appSel = document.getElementById('upload-link-app');
-    if (appSel && appId) appSel.value = appId;
-
-    const companyEl = document.getElementById('upload-company');
-    if (companyEl && company) companyEl.value = company;
-
-    const roleEl = document.getElementById('upload-role');
-    if (roleEl && role) roleEl.value = role;
-  }, 150);
+  await openUploadModal(appId || null);
+  if (company) document.getElementById('upload-company').value = company;
+  if (role) document.getElementById('upload-role').value = role;
 }
 
 // ── CONTACTS ───────────────────────────────────────────────────────────
@@ -7779,28 +7769,6 @@ let uploadFile = null;
 
 async function loadDocsPage() {
   // Populate dropdowns
-  const appSel = document.getElementById('upload-link-app');
-  if (appSel) {
-    appSel.innerHTML = "<option value=''>— Don't link —</option>";
-    allApps.slice(0, 200).forEach(function(a) {
-      if (!a.company) return;
-      const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
-      appSel.appendChild(opt);
-    });
-  }
-  const contactSel = document.getElementById('upload-link-contact');
-  if (contactSel) {
-    contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-    allContacts.forEach(function(c) {
-      if (!c.name) return;
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-      contactSel.appendChild(opt);
-    });
-  }
   await refreshDocs();
 }
 
@@ -7928,7 +7896,10 @@ async function editDocRecord(id) {
     document.getElementById('upload-doc-type').value = d.doc_type || 'Resume';
     document.getElementById('upload-notes').value = d.notes || '';
     if (d.linked_application_id) document.getElementById('upload-link-app').value = d.linked_application_id;
-    if (d.linked_contact_id) document.getElementById('upload-link-contact').value = d.linked_contact_id;
+    if (d.linked_contact_id) {
+      var preC = _uploadContactPickerAll.find(function(c) { return c.id === d.linked_contact_id; });
+      if (preC) { _uploadContactPickerSel = [preC]; renderUploadContactTags(); }
+    }
     // Mark as edit mode
     document.getElementById('upload-submit-btn').textContent = 'Save Changes';
     document.getElementById('upload-submit-btn').onclick = function() { saveDocEdits(id); };
@@ -7944,7 +7915,7 @@ async function saveDocEdits(id) {
     doc_type: document.getElementById('upload-doc-type').value,
     notes: (document.getElementById('upload-notes').value||'').trim() || null,
     linked_application_id: document.getElementById('upload-link-app').value || null,
-    linked_contact_id: document.getElementById('upload-link-contact').value || null,
+    linked_contact_id: _uploadContactPickerSel.length > 0 ? _uploadContactPickerSel[0].id : null,
   };
   await dbPatch('uploaded_documents', id, payload);
   closeModal('modal-upload');
@@ -7970,7 +7941,7 @@ async function openUploadDoc(docType) {
   }, 200);
 }
 
-async function openUploadModal() {
+async function openUploadModal(preSelectAppId) {
   uploadFile = null;
   clearUploadFile();
   document.getElementById('upload-doc-type').value = 'Resume';
@@ -7983,34 +7954,32 @@ async function openUploadModal() {
   document.getElementById('upload-submit-btn').textContent = 'Upload Document';
   document.getElementById('upload-submit-btn').onclick = submitUpload;
 
-  // Show modal immediately with loading state in dropdowns
+  // Reset contact picker
+  _uploadContactPickerSel = [];
+  _uploadContactPickerAll = [];
+  var tags = document.getElementById('upload-contact-tags'); if (tags) tags.innerHTML = '';
+  var picker = document.getElementById('upload-contact-picker'); if (picker) picker.style.display = 'none';
+  var csearch = document.getElementById('upload-contact-search'); if (csearch) csearch.value = '';
+
   var appSel = document.getElementById('upload-link-app');
-  var contactSel = document.getElementById('upload-link-contact');
   appSel.innerHTML = "<option value=''>Loading applications...</option>";
-  contactSel.innerHTML = "<option value=''>Loading contacts...</option>";
   openModal('modal-upload');
 
-  // Always reset arrays before fetching to prevent duplicates
-  allApps = [];
-  allContacts = [];
-
-  var appsData = await dbGet('applications', 'select=id,company,job_title,date_applied&order=company.asc&limit=1000');
-  allApps = Array.isArray(appsData) ? appsData : [];
-
-  var contactsData = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000');
-  allContacts = Array.isArray(contactsData) ? contactsData : [];
-
-  // Deduplicate by ID
-  var seen = {};
-  allApps = allApps.filter(function(a) { if (!a.id || seen[a.id]) return false; seen[a.id]=1; return true; });
-  var seenC = {};
-  allContacts = allContacts.filter(function(c) { if (!c.id || seenC[c.id]) return false; seenC[c.id]=1; return true; });
-  var uniqueApps = {}; allApps.forEach(function(a) { uniqueApps[a.id] = a; });
-  var uniqueContacts = {}; allContacts.forEach(function(c) { uniqueContacts[c.id] = c; });
+  // Fetch all applications paginated
+  var appsAll = [];
+  var aOffset = 0;
+  while (true) {
+    var appsPage = await dbGet('applications', 'select=id,company,job_title,date_applied&order=company.asc&limit=1000&offset=' + aOffset);
+    if (!Array.isArray(appsPage) || appsPage.length === 0) break;
+    appsAll = appsAll.concat(appsPage);
+    if (appsPage.length < 1000) break;
+    aOffset += 1000;
+  }
+  allApps = appsAll;
 
   // Populate application dropdown
   appSel.innerHTML = "<option value=''>— Don't link —</option>";
-  Object.values(uniqueApps).forEach(function(a) {
+  appsAll.forEach(function(a) {
     if (!a.company) return;
     var opt = document.createElement('option');
     opt.value = a.id;
@@ -8023,15 +7992,33 @@ async function openUploadModal() {
     appSel.appendChild(opt);
   });
 
-  // Populate contact dropdown
-  contactSel.innerHTML = "<option value=''>— Don't link —</option>";
-  Object.values(uniqueContacts).forEach(function(c) {
-    if (!c.name) return;
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-    contactSel.appendChild(opt);
-  });
+  // Pre-select app if provided
+  if (preSelectAppId) {
+    appSel.value = preSelectAppId;
+    autoFillFromApp();
+  }
+
+  // Fetch all contacts paginated for picker
+  var cAll = [];
+  var cOffset = 0;
+  while (true) {
+    var cPage = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=1000&offset=' + cOffset);
+    if (!Array.isArray(cPage) || cPage.length === 0) break;
+    cAll = cAll.concat(cPage);
+    if (cPage.length < 1000) break;
+    cOffset += 1000;
+  }
+  _uploadContactPickerAll = cAll;
+  allContacts = cAll;
+
+  // Wire up contact picker search focus
+  var csearchEl = document.getElementById('upload-contact-search');
+  if (csearchEl) {
+    csearchEl.onfocus = function() {
+      var p = document.getElementById('upload-contact-picker');
+      if (p) { filterUploadContactPicker(); p.style.display = 'block'; }
+    };
+  }
 }
 
 function handleFileDrop(event) {
@@ -8070,6 +8057,60 @@ function clearUploadFile() {
   if (input) input.value = '';
 }
 
+// ── UPLOAD MODAL CONTACT PICKER ────────────────────────────────────────
+var _uploadContactPickerAll = [];
+var _uploadContactPickerSel = [];
+
+function filterUploadContactPicker() {
+  var picker = document.getElementById('upload-contact-picker');
+  var search = document.getElementById('upload-contact-search');
+  if (!picker) return;
+  var q = (search ? search.value.toLowerCase() : '');
+  var selIds = _uploadContactPickerSel.map(function(c) { return c.id; });
+  var filtered = _uploadContactPickerAll.filter(function(c) {
+    if (selIds.includes(c.id)) return false;
+    if (!q) return true;
+    return (c.name + ' ' + (c.company||'')).toLowerCase().includes(q);
+  });
+  picker.style.display = 'block';
+  if (filtered.length === 0) {
+    picker.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">No contacts found</div>';
+    return;
+  }
+  picker.innerHTML = filtered.slice(0, 50).map(function(c) {
+    var label = c.name + (c.company ? ' — ' + c.company : '');
+    return '<div style="padding:8px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)" ' +
+      'data-cid="' + c.id + '" onmousedown="addUploadContact(this.dataset.cid)">' + label + '</div>';
+  }).join('');
+}
+
+function addUploadContact(cid) {
+  var c = _uploadContactPickerAll.find(function(x) { return x.id === cid; });
+  if (!c || _uploadContactPickerSel.find(function(x) { return x.id === cid; })) return;
+  _uploadContactPickerSel.push(c);
+  var search = document.getElementById('upload-contact-search');
+  if (search) search.value = '';
+  renderUploadContactTags();
+  var picker = document.getElementById('upload-contact-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+function removeUploadContact(cid) {
+  _uploadContactPickerSel = _uploadContactPickerSel.filter(function(c) { return c.id !== cid; });
+  renderUploadContactTags();
+}
+
+function renderUploadContactTags() {
+  var tags = document.getElementById('upload-contact-tags');
+  if (!tags) return;
+  tags.innerHTML = _uploadContactPickerSel.map(function(c) {
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--burgundy-muted);color:var(--burgundy);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:500">' +
+      c.name + (c.company ? ' — ' + c.company : '') +
+      '<span style="cursor:pointer;font-weight:700;margin-left:2px" data-cid="' + c.id + '" onclick="removeUploadContact(this.dataset.cid)">×</span>' +
+    '</span>';
+  }).join('');
+}
+
 function autoFillFromApp() {
   const appId = document.getElementById('upload-link-app').value;
   if (!appId) return;
@@ -8091,7 +8132,8 @@ async function submitUpload() {
   const docType = document.getElementById('upload-doc-type').value;
   const notes = (document.getElementById('upload-notes').value||'').trim();
   const linkedAppId = document.getElementById('upload-link-app').value || null;
-  const linkedContactId = document.getElementById('upload-link-contact').value || null;
+  const linkedContactId = _uploadContactPickerSel.length > 0 ? _uploadContactPickerSel[0].id : null;
+  const linkedContactIds = _uploadContactPickerSel.map(function(c) { return c.id; });
 
   const btn = document.getElementById('upload-submit-btn');
   btn.disabled = true;
