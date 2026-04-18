@@ -3110,10 +3110,8 @@ async function refreshDashboard() {
 
 // ── APPLICATIONS ───────────────────────────────────────────────────────
 async function loadApps() {
-  if (allApps.length === 0) {
-    const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
-    allApps = Array.isArray(data) ? data : [];
-  }
+  const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
+  allApps = Array.isArray(data) ? data : [];
   populateDropdowns();
   filterApps();
 }
@@ -3519,8 +3517,11 @@ async function saveApp() {
       }
       const result = await dbPost('applications', payload);
       savedApp = Array.isArray(result) ? result[0] : result;
-      allApps.unshift(savedApp);
+      if (savedApp) allApps.unshift(savedApp);
       toast('Application added.', 'success');
+      // Force fresh DB load so list reflects the new record
+      const freshApps = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
+      if (Array.isArray(freshApps)) allApps = freshApps;
     }
     closeModal('modal-app');
     filterApps('keep-page');
