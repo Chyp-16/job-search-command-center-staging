@@ -5298,7 +5298,7 @@ const SEED_PROMPTS = [
   {
     "name": "Resume Tailoring",
     "category": "Resume",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nHIGHLIGHTING RULE: Wrap every added or changed word or phrase in [YLW]...[/YLW] tags. Example: - Led [YLW]brand strategy[/YLW] across [YLW]B2B and B2C[/YLW] markets. Use ONLY [YLW] tags — no other tag formats.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Wrap every change in [YLW]...[/YLW] tags. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "keywords_required",
       "keywords_nice",
@@ -7040,7 +7040,7 @@ async function runResumeTailor() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export.\n\nHIGHLIGHTING RULE: Wrap every added or changed word or phrase in [YLW]...[/YLW] tags. Example: - Led [YLW]brand strategy[/YLW] across markets. Use ONLY [YLW] tags.\n\nBold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
   }
   prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
                  .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
@@ -7049,7 +7049,7 @@ async function runResumeTailor() {
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
-    contentEl.textContent = result;
+    contentEl.textContent = result.replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi, '');
     const linkedId = document.getElementById('rt-link-app').value || null;
     await dbPost('ai_outputs', { output_type: 'resume_tailor', linked_application_id: linkedId, content: result });
     if (linkedId) {
@@ -7280,13 +7280,13 @@ function _inlineRuns(text) {
   while (remaining.length > 0) {
     var bm = /\*\*([^*]+)\*\*/.exec(remaining);
     var im = /(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)/.exec(remaining);
-    var ym = /\[YLW\](.*?)\[\/YLW\]/i.exec(remaining);
+    var ym = /\[YLW\](.*?)\[\/YLW\]|\[YH\](.*?)\[\/YH\]/i.exec(remaining);
     var next = null;
     // Pick whichever match comes first
     var candidates = [];
     if (bm) candidates.push({ idx: bm.index, len: bm[0].length, inner: bm[1], bold: true });
     if (im) candidates.push({ idx: im.index, len: im[0].length, inner: im[1], italic: true });
-    if (ym) candidates.push({ idx: ym.index, len: ym[0].length, inner: ym[1], highlight: 'yellow' });
+    if (ym) candidates.push({ idx: ym.index, len: ym[0].length, inner: ym[1] || ym[2], highlight: 'yellow' });
     candidates.sort(function(a,b){ return a.idx - b.idx; });
     next = candidates[0] || null;
     if (next) {
@@ -7329,7 +7329,7 @@ function _pageBreak() {
 }
 
 function _stripTags(text) {
-  return text.replace(/\*\*/g,'').replace(/\[YLW\]|\[\/YLW\]/gi,'');
+  return text.replace(/\*\*/g,'').replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi,'');
 }
 
 function _h1(text) {
