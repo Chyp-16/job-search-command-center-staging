@@ -1625,9 +1625,10 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="dash-card" id="rt-output-panel" style="display:none">
           <div class="dash-card-header">✦ Tailored Resume Analysis
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
               <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
+              <button class="btn btn-primary btn-sm" onclick="createAppFromRT()">+ New Application</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -2797,13 +2798,16 @@ async function dbGet(table, params = '') {
   return r.json();
 }
 
-async function dbPost(table, body) {
-  const r = await fetch(`${WORKER_URL}/db/${table}`, {
+async function dbPost(table, body, params) {
+  const qs = params ? '?' + params : '';
+  const r = await fetch(`${WORKER_URL}/db/${table}${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
   });
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.message || data?.error || JSON.stringify(data) || 'DB error');
+  return data;
 }
 
 async function dbPatch(table, id, body) {
@@ -3462,7 +3466,7 @@ async function saveApp() {
     resume_version: getVal('f-resume'),
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
-    linked_contact_id: getAppContactPickerIds()[0] || null,
+
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
@@ -7061,6 +7065,22 @@ async function runResumeTailor() {
   } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
 }
 
+function createAppFromRT() {
+  // Pre-fill Add Application modal from linked app or JD context
+  var linkedAppId = document.getElementById('rt-link-app').value;
+  var app = allApps.find(function(a) { return a.id === linkedAppId; });
+  openAddApp();
+  setTimeout(function() {
+    if (app) {
+      var co = document.getElementById('f-company'); if (co && app.company) co.value = app.company;
+      var ti = document.getElementById('f-title');   if (ti && app.job_title) ti.value = app.job_title;
+      var ur = document.getElementById('f-url');     if (ur && app.job_url) ur.value = app.job_url;
+    }
+    var dt = document.getElementById('f-date'); if (dt) dt.value = today();
+  }, 300);
+  showPage('applications');
+}
+
 function clearRT() {
   ['rt-jd','rt-keywords-req','rt-keywords-nice'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
@@ -7237,13 +7257,14 @@ function _esc(s) {
 }
 
 function _rpr(opts) {
-  // opts: { bold, italic, color, sz, font }
+  // opts: { bold, italic, color, sz, font, highlight }
   var x = '';
-  if (opts && opts.bold)   x += '<w:b/><w:bCs/>';
-  if (opts && opts.italic) x += '<w:i/><w:iCs/>';
-  if (opts && opts.color)  x += '<w:color w:val="' + opts.color + '"/>';
-  if (opts && opts.sz)     x += '<w:sz w:val="' + opts.sz + '"/><w:szCs w:val="' + opts.sz + '"/>';
-  if (opts && opts.font)   x += '<w:rFonts w:ascii="' + opts.font + '" w:hAnsi="' + opts.font + '" w:cs="' + opts.font + '"/>';
+  if (opts && opts.bold)      x += '<w:b/><w:bCs/>';
+  if (opts && opts.italic)    x += '<w:i/><w:iCs/>';
+  if (opts && opts.color)     x += '<w:color w:val="' + opts.color + '"/>';
+  if (opts && opts.sz)        x += '<w:sz w:val="' + opts.sz + '"/><w:szCs w:val="' + opts.sz + '"/>';
+  if (opts && opts.font)      x += '<w:rFonts w:ascii="' + opts.font + '" w:hAnsi="' + opts.font + '" w:cs="' + opts.font + '"/>';
+  if (opts && opts.highlight) x += '<w:highlight w:val="' + opts.highlight + '"/>';
   return x ? '<w:rPr>' + x + '</w:rPr>' : '';
 }
 
@@ -7252,24 +7273,25 @@ function _run(text, opts) {
 }
 
 function _inlineRuns(text) {
-  // Parse **bold**, *italic* inline markdown into Word runs
+  // Parse **bold**, *italic*, [YLW]...[/YLW] inline markdown into Word runs
   if (!text) return _run('');
   var parts = [];
   var remaining = text;
   while (remaining.length > 0) {
-    // Check for **bold**
     var bm = /\*\*([^*]+)\*\*/.exec(remaining);
-    // Check for *italic* (not **)
     var im = /(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)/.exec(remaining);
+    var ym = /\[YLW\](.*?)\[\/YLW\]/i.exec(remaining);
     var next = null;
-    if (bm && (!im || bm.index <= im.index)) {
-      next = { idx: bm.index, len: bm[0].length, inner: bm[1], bold: true };
-    } else if (im) {
-      next = { idx: im.index, len: im[0].length, inner: im[1], italic: true };
-    }
+    // Pick whichever match comes first
+    var candidates = [];
+    if (bm) candidates.push({ idx: bm.index, len: bm[0].length, inner: bm[1], bold: true });
+    if (im) candidates.push({ idx: im.index, len: im[0].length, inner: im[1], italic: true });
+    if (ym) candidates.push({ idx: ym.index, len: ym[0].length, inner: ym[1], highlight: 'yellow' });
+    candidates.sort(function(a,b){ return a.idx - b.idx; });
+    next = candidates[0] || null;
     if (next) {
       if (next.idx > 0) parts.push(_run(remaining.slice(0, next.idx), { sz: 22, font: 'Calibri' }));
-      parts.push(_run(next.inner, { bold: next.bold, italic: next.italic, sz: 22, font: 'Calibri' }));
+      parts.push(_run(next.inner, { bold: next.bold, italic: next.italic, highlight: next.highlight, sz: 22, font: 'Calibri' }));
       remaining = remaining.slice(next.idx + next.len);
     } else {
       parts.push(_run(remaining, { sz: 22, font: 'Calibri' }));
@@ -7306,24 +7328,28 @@ function _pageBreak() {
   return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
 }
 
+function _stripTags(text) {
+  return text.replace(/\*\*/g,'').replace(/\[YLW\]|\[\/YLW\]/gi,'');
+}
+
 function _h1(text) {
   // Burgundy, bold, 14pt, with bottom border, Calibri
   var ppr = _ppr({ spacing_before: 160, spacing_after: 80, border_bottom: true });
-  var runs = _run(text.replace(/\*\*/g,''), { bold: true, color: '972B32', sz: 28, font: 'Calibri' });
+  var runs = _run(_stripTags(text), { bold: true, color: '972B32', sz: 28, font: 'Calibri' });
   return _para(runs, ppr);
 }
 
 function _h2(text) {
   // Burgundy, bold, 12pt, Calibri
   var ppr = _ppr({ spacing_before: 120, spacing_after: 60 });
-  var runs = _run(text.replace(/\*\*/g,''), { bold: true, color: '972B32', sz: 24, font: 'Calibri' });
+  var runs = _run(_stripTags(text), { bold: true, color: '972B32', sz: 24, font: 'Calibri' });
   return _para(runs, ppr);
 }
 
 function _h3(text) {
   // Dark, bold, 11pt, Calibri
   var ppr = _ppr({ spacing_before: 80, spacing_after: 40 });
-  var runs = _run(text.replace(/\*\*/g,''), { bold: true, sz: 22, font: 'Calibri' });
+  var runs = _run(_stripTags(text), { bold: true, sz: 22, font: 'Calibri' });
   return _para(runs, ppr);
 }
 
