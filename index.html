@@ -6137,7 +6137,7 @@ async function generateDoc() {
 
     const prompt = prompts[outputType] || prompts.cover_letter;
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     showAIOutput(result, outputType);
   } catch(e) { showAIOutput('Error: ' + e.message); }
 }
@@ -7049,7 +7049,7 @@ async function runResumeTailor() {
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
-    contentEl.textContent = result.replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi, '');
+    contentEl.textContent = result.replace(/\[\/?Y[LH][WH]?\]/gi, '').replace(/\[\/?YLW\]/gi, '').replace(/\[\/?YH\]/gi, '');
     const linkedId = document.getElementById('rt-link-app').value || null;
     await dbPost('ai_outputs', { output_type: 'resume_tailor', linked_application_id: linkedId, content: result });
     if (linkedId) {
@@ -7275,6 +7275,8 @@ function _run(text, opts) {
 function _inlineRuns(text) {
   // Parse **bold**, *italic*, [YLW]...[/YLW] inline markdown into Word runs
   if (!text) return _run('');
+  // Normalize tag variants and strip orphaned markers pre-parse
+  text = text.replace(/\[YH\]/gi,'[YLW]').replace(/\[\/YH\]/gi,'[/YLW]');
   var parts = [];
   var remaining = text;
   while (remaining.length > 0) {
@@ -7298,7 +7300,9 @@ function _inlineRuns(text) {
       break;
     }
   }
-  return parts.join('');
+  // Join and strip any orphaned ** that weren't part of a bold pair
+  var joined = parts.join('');
+  return joined;
 }
 
 function _para(runs, pprXml) {
@@ -7329,7 +7333,18 @@ function _pageBreak() {
 }
 
 function _stripTags(text) {
-  return text.replace(/\*\*/g,'').replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi,'');
+  return text
+    .replace(/\*\*/g,'')
+    .replace(/\[\/?Y[LH][WH]?\]/gi,'')
+    .replace(/\[\/?YLW\]/gi,'')
+    .replace(/\[\/?YH\]/gi,'');
+}
+
+function _cleanLine(text) {
+  // Remove unmatched ** pairs — count occurrences; if odd number, strip all
+  var count = (text.match(/\*\*/g) || []).length;
+  if (count % 2 !== 0) text = text.replace(/\*\*/g, '');
+  return text;
 }
 
 function _h1(text) {
@@ -7355,12 +7370,12 @@ function _h3(text) {
 
 function _body(text) {
   var ppr = _ppr({ spacing_before: 0, spacing_after: 80 });
-  return _para(_inlineRuns(text), ppr);
+  return _para(_inlineRuns(_cleanLine(text)), ppr);
 }
 
 function _bullet(text, numId) {
   var ppr = _ppr({ numId: numId, ilvl: 0, spacing_before: 0, spacing_after: 40 });
-  return _para(_inlineRuns(text), ppr);
+  return _para(_inlineRuns(_cleanLine(text)), ppr);
 }
 
 function _tableXml(rows) {
@@ -7458,6 +7473,8 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId) {
 
   for (var i = 0; i < rawLines.length; i++) {
     var raw = rawLines[i];
+    // Normalize all highlight tag variants to [YLW]...[/YLW]
+    raw = raw.replace(/\[YH\]/gi,'[YLW]').replace(/\[\/YH\]/gi,'[/YLW]');
     var t = raw.trim();
 
     // Table row detection
