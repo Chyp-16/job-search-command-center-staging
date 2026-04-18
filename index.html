@@ -1714,65 +1714,112 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="page-header">
         <div class="page-header-left">
           <h2>Outreach Builder</h2>
-          <p>Build a complete 4-part outreach sequence for any role</p>
+          <p>Build outreach sequences and find hiring contacts</p>
         </div>
       </div>
       <div style="padding:28px 32px;flex:1;overflow-y:auto;">
-        <div class="dash-card" style="margin-bottom:24px">
-          <div class="dash-card-header">📨 4-Part Outreach Sequence Builder</div>
-          <div style="padding:20px">
-            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Generates all 4 outreach touches in one shot — Day 1 InMail/Email, Day 3 LinkedIn connection request, Day 5 follow-up, and Day 7 CEO/hiring manager email. Includes subject lines and word counts.</p>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Company *</label>
-                <input class="form-input" type="text" id="ob-company" placeholder="Company name">
+
+        <!-- Tab switcher -->
+        <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border)">
+          <button id="ob-tab-sequence" onclick="switchOBTab('sequence')" style="padding:10px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">📨 Outreach Sequence</button>
+          <button id="ob-tab-contacts" onclick="switchOBTab('contacts')" style="padding:10px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🔍 Find Contacts</button>
+        </div>
+
+        <!-- Tab: Outreach Sequence -->
+        <div id="ob-panel-sequence">
+          <div class="dash-card" style="margin-bottom:24px">
+            <div class="dash-card-header">📨 4-Part Outreach Sequence Builder</div>
+            <div style="padding:20px">
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Generates all 4 outreach touches in one shot — Day 1 InMail/Email, Day 3 LinkedIn connection request, Day 5 follow-up, and Day 7 CEO/hiring manager email. Includes subject lines and word counts.</p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Company *</label>
+                  <input class="form-input" type="text" id="ob-company" placeholder="Company name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Role Title *</label>
+                  <input class="form-input" type="text" id="ob-role" placeholder="VP of Marketing">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Recruiter / Primary Contact Name</label>
+                  <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Recruiter Email</label>
+                  <input class="form-input" type="email" id="ob-email" placeholder="recruiter@company.com">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Hiring Manager / CEO Name</label>
+                  <input class="form-input" type="text" id="ob-hm" placeholder="First name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Link to Application (optional)</label>
+                  <select class="form-select" id="ob-link-app">
+                    <option value="">— Don't link —</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">Company URL</label>
+                  <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
+                </div>
+                <div class="form-group full">
+                  <label class="form-label">Recent Company News or Context</label>
+                  <textarea class="form-textarea" id="ob-context" rows="4" placeholder="e.g. Series B funding announced, new product launch, recent leadership hire..."></textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Role Title *</label>
-                <input class="form-input" type="text" id="ob-role" placeholder="VP of Marketing">
+              <div style="margin-top:16px;display:flex;gap:10px">
+                <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runOutreachBuilder()">✦ Build Outreach Sequence</button>
+                <button class="btn btn-secondary" onclick="clearOB()">Clear</button>
               </div>
-              <div class="form-group">
-                <label class="form-label">Recruiter / Primary Contact Name</label>
-                <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Recruiter Email</label>
-                <input class="form-input" type="email" id="ob-email" placeholder="recruiter@company.com">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Hiring Manager / CEO Name</label>
-                <input class="form-input" type="text" id="ob-hm" placeholder="First name">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Link to Application (optional)</label>
-                <select class="form-select" id="ob-link-app">
-                  <option value="">— Don't link —</option>
-                </select>
-              </div>
-              <div class="form-group full">
-                <label class="form-label">Company URL</label>
-                <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
-              </div>
-              <div class="form-group full">
-                <label class="form-label">Recent Company News or Context</label>
-                <textarea class="form-textarea" id="ob-context" rows="4" placeholder="e.g. Series B funding announced, new product launch, recent leadership hire..."></textarea>
-              </div>
-            </div>
-            <div style="margin-top:16px;display:flex;gap:10px">
-              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runOutreachBuilder()">✦ Build Outreach Sequence</button>
-              <button class="btn btn-secondary" onclick="clearOB()">Clear</button>
             </div>
           </div>
+          <div class="dash-card" id="ob-output-panel" style="display:none">
+            <div class="dash-card-header">✦ Outreach Sequence
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="copyOBOutput()">Copy All</button>
+                <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
+              </div>
+            </div>
+            <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+          </div>
         </div>
-        <div class="dash-card" id="ob-output-panel" style="display:none">
-          <div class="dash-card-header">✦ Outreach Sequence
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-secondary btn-sm" onclick="copyOBOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
+
+        <!-- Tab: Find Contacts -->
+        <div id="ob-panel-contacts" style="display:none">
+          <div class="dash-card" style="margin-bottom:24px">
+            <div class="dash-card-header">🔍 Find Hiring Managers & Recruiters</div>
+            <div style="padding:20px">
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Search for hiring managers, HR leads, and recruiters at any company. Save results directly as contact cards.</p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Company *</label>
+                  <input class="form-input" type="text" id="fc-company" placeholder="Company name">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Role You're Targeting</label>
+                  <input class="form-input" type="text" id="fc-role" placeholder="VP of Marketing">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Link to Application (optional)</label>
+                  <select class="form-select" id="fc-link-app">
+                    <option value="">— Don't link —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Company URL (optional)</label>
+                  <input class="form-input" type="url" id="fc-url" placeholder="https://company.com">
+                </div>
+              </div>
+              <div style="margin-top:16px">
+                <button class="btn btn-primary" style="width:100%;padding:12px" onclick="runFindContacts()">🔍 Find Contacts</button>
+              </div>
             </div>
           </div>
-          <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+          <div id="fc-results-panel" style="display:none">
+            <div id="fc-results-list"></div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -7260,6 +7307,143 @@ function clearOB() {
 }
 function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
 function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
+
+// ── OUTREACH BUILDER — TAB SWITCHER ─────────────────────────────────────
+function switchOBTab(tab) {
+  var tabs = ['sequence', 'contacts'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('ob-tab-' + t);
+    var panel = document.getElementById('ob-panel-' + t);
+    var active = t === tab;
+    if (btn) {
+      btn.style.color = active ? 'var(--burgundy)' : 'var(--text-secondary)';
+      btn.style.borderBottom = active ? '2px solid var(--burgundy)' : '2px solid transparent';
+    }
+    if (panel) panel.style.display = active ? 'block' : 'none';
+  });
+  // Populate fc-link-app when switching to contacts tab
+  if (tab === 'contacts') {
+    var sel = document.getElementById('fc-link-app');
+    if (sel && sel.options.length <= 1) {
+      sel.innerHTML = "<option value=''>— Don't link —</option>";
+      allApps.slice(0, 200).forEach(function(a) {
+        if (!a.company) return;
+        var opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+        sel.appendChild(opt);
+      });
+    }
+  }
+}
+
+// ── FIND CONTACTS ────────────────────────────────────────────────────────
+var _fcResults = [];
+
+async function runFindContacts() {
+  var company = (document.getElementById('fc-company').value||'').trim();
+  var role = (document.getElementById('fc-role').value||'').trim();
+  var url = (document.getElementById('fc-url').value||'').trim();
+  if (!company) { toast('Company name is required.', 'error'); return; }
+
+  var panel = document.getElementById('fc-results-panel');
+  var list = document.getElementById('fc-results-list');
+  panel.style.display = 'block';
+  list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary)">Searching for contacts at ' + company + '... This may take 20-30 seconds.</div>';
+
+  var prompt = 'Search for real, current people at ' + company + ' who would be involved in hiring a ' + (role || 'senior marketing executive') + '. Find: ' +
+    '1. Head of Talent / HR Director / Recruiter (whoever handles senior marketing hires). ' +
+    '2. CMO or VP Marketing (the likely hiring manager). ' +
+    '3. CEO or President (for executive-level outreach). ' +
+    (url ? 'Company website: ' + url + '. ' : '') +
+    'For each person return EXACTLY this JSON format (array only, no markdown, no explanation): ' +
+    '[{"name":"Full Name","title":"Job Title","type":"Recruiter or Hiring Manager or Executive","linkedin":"https://linkedin.com/in/slug or null","email":"email or null","notes":"1 sentence why relevant"}]. ' +
+    'Omit any category where you cannot find a real current employee. Only include people you are confident currently work there.';
+
+  try {
+    var result = await callAI(
+      [{ role: 'user', content: prompt }],
+      'You are a research assistant. Search the web for current employees at companies. Return only valid JSON.',
+      true
+    );
+
+    // Parse JSON from result
+    var contacts = [];
+    try {
+      var clean = result.replace(/```json|```/g, '').trim();
+      // Find JSON array in response
+      var match = clean.match(/\[\s*\{[\s\S]*\}\s*\]/);
+      if (match) contacts = JSON.parse(match[0]);
+      else contacts = JSON.parse(clean);
+    } catch(pe) {
+      list.innerHTML = '<div class="dash-card" style="padding:20px;color:var(--text-secondary);font-size:13px">Could not parse results. Raw output:<br><br><pre style="white-space:pre-wrap;font-size:12px">' + result + '</pre></div>';
+      return;
+    }
+
+    _fcResults = contacts;
+
+    if (!contacts.length) {
+      list.innerHTML = '<div class="dash-card" style="padding:20px;font-size:13px;color:var(--text-secondary)">No contacts found for ' + company + '. Try adding the company URL for better results.</div>';
+      return;
+    }
+
+    var linkedAppId = document.getElementById('fc-link-app').value || null;
+
+    list.innerHTML = contacts.map(function(c, i) {
+      var typeColor = c.type === 'Recruiter' ? '#2563eb' : c.type === 'Hiring Manager' ? 'var(--burgundy)' : '#059669';
+      return '<div class="dash-card" style="margin-bottom:16px;padding:20px">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">' +
+          '<div style="flex:1">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+              '<div style="font-size:15px;font-weight:700">' + c.name + '</div>' +
+              '<span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;background:rgba(0,0,0,0.06);color:' + typeColor + '">' + (c.type||'Contact') + '</span>' +
+            '</div>' +
+            '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">' + (c.title||'') + '</div>' +
+            (c.linkedin ? '<div style="margin-bottom:4px"><a href="' + c.linkedin + '" target="_blank" style="font-size:12px;color:var(--burgundy)">LinkedIn ↗</a></div>' : '') +
+            (c.email ? '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">✉ ' + c.email + '</div>' : '') +
+            (c.notes ? '<div style="font-size:12px;color:var(--text-secondary);font-style:italic">' + c.notes + '</div>' : '') +
+          '</div>' +
+          '<button class="btn btn-primary btn-sm" style="flex-shrink:0;white-space:nowrap" data-idx="' + i + '" onclick="saveFoundContact(' + i + ',\'' + (linkedAppId||'') + '\')">+ Save Contact</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+  } catch(e) {
+    list.innerHTML = '<div class="dash-card" style="padding:20px;color:var(--burgundy);font-size:13px">Error: ' + e.message + '</div>';
+  }
+}
+
+function saveFoundContact(idx, linkedAppId) {
+  var c = _fcResults[idx];
+  if (!c) return;
+  var company = (document.getElementById('fc-company').value||'').trim();
+  var typeMap = { 'Recruiter': 'Recruiter', 'Hiring Manager': 'Hiring Manager', 'Executive': 'Executive' };
+  var payload = {
+    name: c.name,
+    title: c.title || null,
+    company: company || null,
+    contact_type: typeMap[c.type] || 'Other',
+    connection_source: 'Find Contacts',
+    linkedin_url: normalizeLinkedIn(c.linkedin) || null,
+    email: c.email || null,
+    notes: c.notes || null,
+    linked_application_id: linkedAppId || null,
+  };
+  window.setTimeout(function() {
+    dbPost('contacts', payload).then(function(saved) {
+      var contact = Array.isArray(saved) ? saved[0] : saved;
+      if (contact) {
+        allContacts.unshift(contact);
+        // Push to HubSpot
+        pushContactToHubSpot(contact);
+        toast(c.name + ' saved as contact.', 'success');
+        // Update button to show saved
+        var btn = document.querySelector('[data-idx="' + idx + '"]');
+        if (btn) { btn.textContent = '✓ Saved'; btn.disabled = true; btn.style.opacity = '0.6'; }
+      }
+    }).catch(function(e) { toast('Save failed: ' + e.message, 'error'); });
+  }, 100);
+}
 
 // ── SHARED DOCX EXPORT ───────────────────────────────────────────────────
 const BASE_URL = 'https://chyp-16.github.io/job-search-command-center';
