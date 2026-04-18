@@ -2845,6 +2845,20 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   return (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
 }
 
+async function callAIResume(messages, systemPrompt) {
+  // High token limit for full resume output — 8000 tokens
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages };
+  if (systemPrompt) body.system = systemPrompt;
+  const r = await fetch(`${WORKER_URL}/ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (data.content && data.content[0]) return data.content[0].text;
+  throw new Error(data.error?.message || 'AI request failed');
+}
+
 async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   // Append resource context to last user message if present
   var resourceCtx = getResourceContext();
@@ -7047,7 +7061,7 @@ async function runResumeTailor() {
                  .replace(/\{\{job_description\}\}/g, jd);
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAIResume([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
     contentEl.textContent = result.replace(/\[\/?Y[LH][WH]?\]/gi, '').replace(/\[\/?YLW\]/gi, '').replace(/\[\/?YH\]/gi, '');
     const linkedId = document.getElementById('rt-link-app').value || null;
