@@ -2767,8 +2767,9 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-task')">Cancel</button>
+      <button class="btn btn-secondary" onclick="openTaskTemplatePicker('add')">📋 Templates</button>
       <button class="btn btn-primary" onclick="saveTask()">Save & Sync to HubSpot</button>
     </div>
   </div>
@@ -2823,8 +2824,9 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
       <button class="btn btn-secondary" onclick="closeModal('modal-edit-task')">Cancel</button>
+      <button class="btn btn-secondary" onclick="openTaskTemplatePicker('edit')">📋 Templates</button>
       <button class="btn btn-primary" id="update-task-btn" onclick="setTimeout(updateTask,0)">Update Task</button>
     </div>
   </div>
@@ -8909,6 +8911,74 @@ async function saveOutreachSteps(mode) {
   } catch(e) {
     toast('Could not save outreach steps: ' + e.message, 'error');
   }
+}
+
+// ── TASK TEMPLATE PICKER ────────────────────────────────────────────────
+async function openTaskTemplatePicker(mode) {
+  // Load templates if not already loaded
+  if (allTemplates.length === 0) {
+    await loadTemplates();
+  }
+
+  // Remove existing picker if open
+  var existing = document.getElementById('task-template-picker-overlay');
+  if (existing) { existing.remove(); return; }
+
+  var subjectId = mode === 'edit' ? 'edit-task-subject' : 'task-subject';
+  var notesId   = mode === 'edit' ? 'edit-task-notes'   : 'task-notes';
+
+  // Build overlay
+  var overlay = document.createElement('div');
+  overlay.id = 'task-template-picker-overlay';
+  overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-lg);z-index:10000;width:400px;max-width:90vw';
+
+  var title = document.createElement('div');
+  title.style.cssText = 'font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center';
+  title.innerHTML = '📋 Choose a Template <button onclick="document.getElementById(&quot;task-template-picker-overlay&quot;).remove();document.getElementById(&quot;task-template-picker-backdrop&quot;).remove();" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-secondary)">✕</button>';
+
+  var list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto';
+
+  var templates = allTemplates.filter(function(t) { return t.name !== '__writing_style__'; });
+  if (templates.length === 0) {
+    list.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary);text-align:center">No templates yet. Add some in Library → Email Templates.</div>';
+  } else {
+    templates.forEach(function(t) {
+      var btn = document.createElement('div');
+      btn.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
+      btn.innerHTML = '<div style="font-weight:600;font-size:13px">' + t.name + (t.type ? ' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">(' + t.type + ')</span>' : '') + '</div>' +
+        (t.subject ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Subject: ' + t.subject + '</div>' : '') +
+        (t.body ? '<div style="font-size:11px;color:var(--text-light);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.body.slice(0, 80) + '...</div>' : '');
+      btn.onmouseover = function() { this.style.background = 'var(--burgundy-muted)'; };
+      btn.onmouseout  = function() { this.style.background = ''; };
+      btn.onclick = function() {
+        var subjectEl = document.getElementById(subjectId);
+        var notesEl   = document.getElementById(notesId);
+        if (subjectEl && t.subject) subjectEl.value = t.subject;
+        if (notesEl   && t.body)    notesEl.value   = t.body;
+        var ov = document.getElementById('task-template-picker-overlay');
+        var bk = document.getElementById('task-template-picker-backdrop');
+        if (ov) ov.remove();
+        if (bk) bk.remove();
+        toast('Template applied.', 'success');
+      };
+      list.appendChild(btn);
+    });
+  }
+
+  overlay.appendChild(title);
+  overlay.appendChild(list);
+  document.body.appendChild(overlay);
+
+  // Backdrop
+  var backdrop = document.createElement('div');
+  backdrop.id = 'task-template-picker-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9999';
+  backdrop.onclick = function() {
+    overlay.remove();
+    backdrop.remove();
+  };
+  document.body.appendChild(backdrop);
 }
 
 function openEditTask(taskId) {
