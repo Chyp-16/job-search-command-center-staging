@@ -8540,72 +8540,68 @@ document.addEventListener('keydown', e => {
 let hubspotTasks = [];
 
 async function syncNextActionsFromTasks() {
-  // For each contact with a HubSpot ID and no next_action, fetch their open tasks
-  // Uses /hubspot/contact-tasks/{hsId} — new Worker route
+  // Use already-loaded hubspotTasks — match to contacts via associations
+  // One fetch for all tasks, then match in memory. No per-contact API calls.
   try {
     var now = new Date();
     now.setHours(0,0,0,0);
 
-    // Only process contacts that have a HubSpot ID
-    var hsContacts = allContacts.filter(function(c) { return c.hubspot_contact_id; });
-    if (!hsContacts.length) return;
+    // Fetch tasks with contact associations (single call)
+    var r = await fetch(WORKER_URL + '/hubspot/tasks?associations=contacts', {
+      headers: { 'Origin': location.origin }
+    });
+    if (!r.ok) return;
+    var data = await r.json();
+    var tasks = Array.isArray(data.results) ? data.results : [];
+    if (!tasks.length) return;
 
-    var updated = 0;
-    for (var c of hsContacts) {
-      try {
-        var r = await fetch(WORKER_URL + '/hubspot/contact-tasks/' + c.hubspot_contact_id, {
-          headers: { 'Origin': location.origin }
-        });
-        if (!r.ok) continue;
-        var data = await r.json();
-        var tasks = Array.isArray(data.results) ? data.results : [];
-        if (!tasks.length) continue;
+    // Build map: hubspot_contact_id -> earliest upcoming task
+    var contactTaskMap = {};
+    tasks.forEach(function(t) {
+      var props = t.properties || {};
+      var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
+      if (status === 'COMPLETED' || status === 'DEFERRED') return;
+      var dueDateRaw = props.hs_timestamp || null;
+      if (!dueDateRaw) return;
+      var dueDate = /^\d{10,}$/.test(String(dueDateRaw))
+        ? new Date(parseInt(dueDateRaw))
+        : new Date(dueDateRaw);
+      if (isNaN(dueDate.getTime()) || dueDate < now) return;
 
-        // Find earliest upcoming open task
-        var earliest = null;
-        tasks.forEach(function(t) {
-          var props = t.properties || {};
-          var dueDateRaw = props.hs_timestamp || null;
-          if (!dueDateRaw) return;
-          // Handle both ISO string and milliseconds formats
-          var dueDate = /^\d{10,}$/.test(String(dueDateRaw))
-            ? new Date(parseInt(dueDateRaw))
-            : new Date(dueDateRaw);
-          if (isNaN(dueDate.getTime()) || dueDate < now) return;
-          if (!earliest || dueDate < (earliest.dueDate)) {
-            earliest = {
-              subject: props.hs_task_subject || 'HubSpot Task',
-              ts: dueDateRaw,
-              dueDate: dueDate,
-              dateStr: dueDate.toISOString().split('T')[0]
-            };
-          }
-        });
+      var assocContacts = (t.associations && t.associations.contacts && t.associations.contacts.results) || [];
+      assocContacts.forEach(function(ac) {
+        var hsId = String(ac.id);
+        var ex = contactTaskMap[hsId];
+        if (!ex || dueDate < ex.dueDate) {
+          contactTaskMap[hsId] = {
+            subject: props.hs_task_subject || 'HubSpot Task',
+            dueDate: dueDate,
+            dateStr: dueDate.toISOString().split('T')[0]
+          };
+        }
+      });
+    });
 
-        if (!earliest) continue;
-
-        // Only update if next_action is blank or this task is sooner
-        var shouldUpdate = !c.next_action || !c.next_action_date ||
-          earliest.dateStr < c.next_action_date;
-        if (!shouldUpdate) continue;
-
-        await dbPatch('contacts', c.id, {
-          next_action: earliest.subject,
-          next_action_date: earliest.dateStr
-        });
-        c.next_action = earliest.subject;
-        c.next_action_date = earliest.dateStr;
-        updated++;
-
-        // Small delay to avoid rate limiting
-        await new Promise(function(res) { setTimeout(res, 150); });
-      } catch(inner) {
-        console.warn('Task fetch failed for ' + c.name + ':', inner.message);
-      }
+    // Update contacts where next_action is blank or task is sooner
+    var updates = [];
+    for (var hsId in contactTaskMap) {
+      var task = contactTaskMap[hsId];
+      var contact = allContacts.find(function(c) { return c.hubspot_contact_id === hsId; });
+      if (!contact) continue;
+      var shouldUpdate = !contact.next_action || !contact.next_action_date ||
+        task.dateStr < contact.next_action_date;
+      if (!shouldUpdate) continue;
+      updates.push({ id: contact.id, next_action: task.subject, next_action_date: task.dateStr });
+      contact.next_action = task.subject;
+      contact.next_action_date = task.dateStr;
     }
-    if (updated > 0) {
-      console.log('Next Action updated for ' + updated + ' contacts from HubSpot tasks.');
-      toast(updated + ' contact' + (updated > 1 ? 's' : '') + ' updated with next action from HubSpot.', 'success');
+
+    // Batch update Supabase
+    for (var u of updates) {
+      await dbPatch('contacts', u.id, { next_action: u.next_action, next_action_date: u.next_action_date });
+    }
+    if (updates.length > 0) {
+      toast(updates.length + ' contact' + (updates.length > 1 ? 's' : '') + ' updated with next action from HubSpot.', 'success');
     }
   } catch(e) {
     console.warn('syncNextActionsFromTasks failed:', e.message);
