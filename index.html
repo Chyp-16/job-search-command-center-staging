@@ -9084,6 +9084,7 @@ function pushTaskUpdateToHubSpot() {
   // Strip associations from PATCH body — HubSpot PATCH doesn't accept them
   var patchBody = { properties: u.body.properties };
   var contactId = u.body.associations && u.body.associations[0] ? u.body.associations[0].to.id : null;
+  console.log('Task update — taskId:', u.id, '| contactId:', contactId, '| associations:', JSON.stringify(u.body.associations));
 
   fetch(WORKER_URL + '/hubspot/task/' + u.id, {
     method: 'PATCH',
