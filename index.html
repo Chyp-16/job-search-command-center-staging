@@ -5128,15 +5128,22 @@ async function loadContactHubSpotActivity(contactId, hubspotId) {
     const typeIcons = { EMAIL:'📧', CALL:'📞', MEETING:'📅', NOTE:'📝', TASK:'✅' };
     el.innerHTML = results.slice(0, 10).map(function(a) {
       var props = a.properties || {};
-      var type = (props.hs_activity_type || a.type || 'NOTE').toUpperCase();
+      var type = (a.type || props.hs_activity_type || 'NOTE').toUpperCase();
       var icon = typeIcons[type] || '📌';
-      var title = props.hs_email_subject || props.hs_call_title || props.hs_meeting_title || props.hs_note_body || props.subject || 'Activity';
-      var date = props.hs_timestamp ? new Date(props.hs_timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      var title = props.hs_task_subject ||
+                  props.hs_email_subject ||
+                  props.hs_call_title ||
+                  props.hs_meeting_title ||
+                  props.hs_note_body ||
+                  props.subject || 'Activity';
+      if (title.length > 80) title = title.slice(0, 77) + '...';
+      var statusStr = type === 'TASK' && props.hs_task_status ? ' · ' + props.hs_task_status : '';
+      var date = props.hs_timestamp ? new Date(parseInt(props.hs_timestamp) || props.hs_timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
       return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
         '<span style="font-size:14px;flex-shrink:0">' + icon + '</span>' +
         '<div style="flex:1;min-width:0">' +
           '<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</div>' +
-          '<div style="font-size:11px;color:var(--text-light)">' + type + (date ? ' · ' + date : '') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-light)">' + type + statusStr + (date ? ' · ' + date : '') + '</div>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -8530,71 +8537,68 @@ document.addEventListener('keydown', e => {
 let hubspotTasks = [];
 
 async function syncNextActionsFromTasks() {
-  // Fetch HubSpot tasks with contact associations and populate next_action fields
+  // For each contact with a HubSpot ID and no next_action, fetch their open tasks
+  // Uses /hubspot/contact-tasks/{hsId} — new Worker route
   try {
-    var r = await fetch(WORKER_URL + '/hubspot/tasks?associations=contacts', {
-      headers: { 'Origin': location.origin }
-    });
-    if (!r.ok) return;
-    var data = await r.json();
-    var tasks = Array.isArray(data.results) ? data.results : [];
-    if (!tasks.length) return;
-
     var now = new Date();
     now.setHours(0,0,0,0);
 
-    // Build a map: hubspot_contact_id -> earliest upcoming open task
-    var contactTaskMap = {};
-    tasks.forEach(function(t) {
-      var props = t.properties || {};
-      var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
-      if (status === 'COMPLETED' || status === 'DEFERRED') return;
-      var dueDateRaw = props.hs_timestamp || null;
-      if (!dueDateRaw) return;
-      var dueDate = new Date(parseInt(dueDateRaw));
-      if (dueDate < now) return; // skip past tasks
+    // Only process contacts that have a HubSpot ID
+    var hsContacts = allContacts.filter(function(c) { return c.hubspot_contact_id; });
+    if (!hsContacts.length) return;
 
-      // Get associated contact IDs
-      var assocContacts = (t.associations && t.associations.contacts && t.associations.contacts.results) || [];
-      assocContacts.forEach(function(ac) {
-        var hsId = String(ac.id);
-        var existing = contactTaskMap[hsId];
-        if (!existing || dueDate < new Date(parseInt(existing.ts))) {
-          contactTaskMap[hsId] = {
-            subject: props.hs_task_subject || 'HubSpot Task',
-            ts: dueDateRaw,
-            dateStr: dueDate.toISOString().split('T')[0]
-          };
-        }
-      });
-    });
+    var updated = 0;
+    for (var c of hsContacts) {
+      try {
+        var r = await fetch(WORKER_URL + '/hubspot/contact-tasks/' + c.hubspot_contact_id, {
+          headers: { 'Origin': location.origin }
+        });
+        if (!r.ok) continue;
+        var data = await r.json();
+        var tasks = Array.isArray(data.results) ? data.results : [];
+        if (!tasks.length) continue;
 
-    // Update contacts in Supabase where next_action is blank or stale
-    var updates = [];
-    for (var hsId in contactTaskMap) {
-      var task = contactTaskMap[hsId];
-      var contact = allContacts.find(function(c) { return c.hubspot_contact_id === hsId; });
-      if (!contact) continue;
-      // Only update if next_action is empty or the task date is sooner
-      var shouldUpdate = !contact.next_action || !contact.next_action_date ||
-        task.dateStr < contact.next_action_date;
-      if (!shouldUpdate) continue;
-      updates.push({
-        id: contact.id,
-        next_action: task.subject,
-        next_action_date: task.dateStr
-      });
-      // Update in memory
-      contact.next_action = task.subject;
-      contact.next_action_date = task.dateStr;
+        // Find earliest upcoming open task
+        var earliest = null;
+        tasks.forEach(function(t) {
+          var props = t.properties || {};
+          var dueDateRaw = props.hs_timestamp || null;
+          if (!dueDateRaw) return;
+          var dueDate = new Date(parseInt(dueDateRaw));
+          if (dueDate < now) return;
+          if (!earliest || dueDate < new Date(parseInt(earliest.ts))) {
+            earliest = {
+              subject: props.hs_task_subject || 'HubSpot Task',
+              ts: dueDateRaw,
+              dateStr: dueDate.toISOString().split('T')[0]
+            };
+          }
+        });
+
+        if (!earliest) continue;
+
+        // Only update if next_action is blank or this task is sooner
+        var shouldUpdate = !c.next_action || !c.next_action_date ||
+          earliest.dateStr < c.next_action_date;
+        if (!shouldUpdate) continue;
+
+        await dbPatch('contacts', c.id, {
+          next_action: earliest.subject,
+          next_action_date: earliest.dateStr
+        });
+        c.next_action = earliest.subject;
+        c.next_action_date = earliest.dateStr;
+        updated++;
+
+        // Small delay to avoid rate limiting
+        await new Promise(function(res) { setTimeout(res, 150); });
+      } catch(inner) {
+        console.warn('Task fetch failed for ' + c.name + ':', inner.message);
+      }
     }
-
-    // Batch update Supabase
-    for (var u of updates) {
-      await dbPatch('contacts', u.id, { next_action: u.next_action, next_action_date: u.next_action_date });
-    }
-    if (updates.length > 0) {
-      console.log('Next Action updated for ' + updates.length + ' contacts from HubSpot tasks.');
+    if (updated > 0) {
+      console.log('Next Action updated for ' + updated + ' contacts from HubSpot tasks.');
+      toast(updated + ' contact' + (updated > 1 ? 's' : '') + ' updated with next action from HubSpot.', 'success');
     }
   } catch(e) {
     console.warn('syncNextActionsFromTasks failed:', e.message);
