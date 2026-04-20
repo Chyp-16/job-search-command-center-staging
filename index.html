@@ -812,6 +812,9 @@ a { color: var(--burgundy); text-decoration: none; }
         <span class="nav-icon">⬡</span><span>Dashboard</span>
       </div>
       <div class="nav-section-label">Tracking</div>
+      <div class="nav-item" data-page="tasks">
+        <span class="nav-icon">✅</span><span>Tasks</span>
+      </div>
       <div class="nav-item" data-page="applications">
         <span class="nav-icon">📋</span><span>Applications</span>
       </div>
@@ -890,14 +893,15 @@ a { color: var(--burgundy); text-decoration: none; }
         <div class="dashboard-cols" style="margin-bottom:20px">
           <div class="dash-card">
             <div class="dash-card-header">
-              📋 Tasks
+              📋 Tasks — Today & Overdue
               <div style="display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>
+                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync</button>
+                <button class="btn btn-secondary btn-sm" onclick="showPage('tasks')">View All →</button>
                 <button class="btn btn-primary btn-sm" onclick="openAddTask()">+ Add</button>
               </div>
             </div>
             <div class="dash-card-body" id="tasks-list">
-              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load your tasks.</div>
+              <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync to load tasks.</div>
             </div>
           </div>
           <div class="dash-card">
@@ -945,6 +949,36 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ── TASKS ───────────────────────────────────────────────────── -->
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Tasks</h2>
+          <p id="tasks-page-count"></p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-page-sync-btn">⟳ Sync HubSpot</button>
+          <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
+        </div>
+      </div>
+      <!-- Filter tabs -->
+      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
+        <button id="tf-all"      onclick="filterTasks('all')"      style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">All</button>
+        <button id="tf-overdue"  onclick="filterTasks('overdue')"  style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Overdue</button>
+        <button id="tf-today"    onclick="filterTasks('today')"    style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Due Today</button>
+        <button id="tf-upcoming" onclick="filterTasks('upcoming')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Upcoming</button>
+        <button id="tf-completed" onclick="filterTasks('completed')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Completed</button>
+      </div>
+      <!-- Search -->
+      <div style="padding:16px 32px 0 32px">
+        <input class="form-input" type="text" id="tasks-search" placeholder="Search tasks..." oninput="renderTasksPage()" style="max-width:360px">
+      </div>
+      <!-- Task list -->
+      <div style="padding:16px 32px 32px 32px">
+        <div id="tasks-page-list"></div>
       </div>
     </div>
 
@@ -2968,6 +3002,7 @@ function navigateTo(page) {
   const pageEl = document.getElementById('page-' + page);
   if (pageEl) pageEl.classList.add('active');
   if (page === 'dashboard') { refreshDashboard(); checkBackupReminder(); }
+  if (page === 'tasks') loadTasksPage();
   if (page === 'applications') loadApps();
   if (page === 'contacts') loadContacts();
   if (page === 'resumes') loadResumes();
@@ -8696,6 +8731,7 @@ async function syncHubSpotTasks() {
     if (data.portalId) window._hubspotPortalId = data.portalId;
     renderTasksList();
     renderTaskReminders();
+    renderTasksPage();
     toast('Tasks synced: ' + hubspotTasks.length + ' tasks loaded.', 'success');
   } catch(e) {
     listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load tasks. Add /hubspot/tasks route to your Cloudflare Worker to enable this feature.</div>';
@@ -8930,11 +8966,124 @@ async function completeTask(taskId, btnEl) {
     hubspotTasks = hubspotTasks.filter(function(t) { return t.id !== taskId; });
     renderTasksList();
     renderTaskReminders();
+    renderTasksPage();
     toast('Task completed and synced to HubSpot.', 'success');
   } catch(e) {
     toast('Could not complete task: ' + e.message, 'error');
     if (btnEl) { btnEl.disabled = false; btnEl.textContent = '✓ Done'; }
   }
+}
+
+// ── TASKS PAGE ──────────────────────────────────────────────────────────
+var _tasksFilter = 'all';
+
+function loadTasksPage() {
+  if (hubspotTasks.length === 0) {
+    syncHubSpotTasks();
+  } else {
+    renderTasksPage();
+  }
+}
+
+function filterTasks(filter) {
+  _tasksFilter = filter;
+  // Update tab styles
+  ['all','overdue','today','upcoming','completed'].forEach(function(f) {
+    var btn = document.getElementById('tf-' + f);
+    if (!btn) return;
+    var active = f === filter;
+    btn.style.color = active ? 'var(--burgundy)' : 'var(--text-secondary)';
+    btn.style.borderBottom = active ? '2px solid var(--burgundy)' : '2px solid transparent';
+  });
+  renderTasksPage();
+}
+
+function renderTasksPage() {
+  var listEl = document.getElementById('tasks-page-list');
+  if (!listEl) return;
+  var countEl = document.getElementById('tasks-page-count');
+
+  var now = new Date();
+  var todayStr = now.toDateString();
+  var q = ((document.getElementById('tasks-search') || {}).value || '').toLowerCase();
+
+  var parseD = function(v) {
+    if (!v) return null;
+    return /^\d{10,}$/.test(String(v)) ? new Date(parseInt(v)) : new Date(v);
+  };
+
+  var filtered = hubspotTasks.filter(function(t) {
+    var props = t.properties || {};
+    var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
+    var dueDate = parseD(props.hs_timestamp || props.hs_task_due_date);
+    var title = (props.hs_task_subject || '').toLowerCase();
+
+    if (q && !title.includes(q)) return false;
+
+    if (_tasksFilter === 'overdue')   return status !== 'COMPLETED' && dueDate && dueDate < now && dueDate.toDateString() !== todayStr;
+    if (_tasksFilter === 'today')     return status !== 'COMPLETED' && dueDate && dueDate.toDateString() === todayStr;
+    if (_tasksFilter === 'upcoming')  return status !== 'COMPLETED' && dueDate && dueDate > now && dueDate.toDateString() !== todayStr;
+    if (_tasksFilter === 'completed') return status === 'COMPLETED';
+    return true; // all
+  });
+
+  // Sort: overdue first, then by date asc
+  filtered.sort(function(a, b) {
+    var da = parseD((a.properties||{}).hs_timestamp) || new Date('2099-01-01');
+    var db = parseD((b.properties||{}).hs_timestamp) || new Date('2099-01-01');
+    return da - db;
+  });
+
+  if (countEl) countEl.textContent = filtered.length + ' task' + (filtered.length !== 1 ? 's' : '');
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-secondary);font-size:13px"><div style="font-size:32px;margin-bottom:12px">✓</div>No tasks in this filter.</div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(function(t) {
+    var props = t.properties || {};
+    var title = props.hs_task_subject || 'Untitled Task';
+    var dueDate = parseD(props.hs_timestamp || props.hs_task_due_date);
+    var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
+    var type = (props.hs_task_type || '').toLowerCase();
+    var notes = props.hs_task_body || '';
+    var tid = t.id || '';
+
+    var isOverdue  = dueDate && dueDate < now && dueDate.toDateString() !== now.toDateString();
+    var isDueToday = dueDate && dueDate.toDateString() === now.toDateString();
+    var isCompleted = status === 'COMPLETED';
+
+    var icon = isCompleted ? '✅' : isOverdue ? '🔴' : isDueToday ? '🟡' : '⬜';
+    var color = isCompleted ? 'var(--text-secondary)' : isOverdue ? 'var(--burgundy)' : isDueToday ? '#b45309' : 'var(--text)';
+    var dateStr = dueDate ? dueDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) : '';
+
+    // Find linked contact name
+    var assocContacts = (t.associations && t.associations.contacts && t.associations.contacts.results) || [];
+    var linkedContact = null;
+    if (assocContacts.length > 0) {
+      var hsId = String(assocContacts[0].id);
+      var c = allContacts.find(function(x) { return x.hubspot_contact_id === hsId; });
+      if (c) linkedContact = c.name + (c.company ? ' @ ' + c.company : '');
+    }
+
+    return '<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="font-size:18px;flex-shrink:0;padding-top:2px">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:600;font-size:13px;color:' + color + ';margin-bottom:2px">' + title + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text-secondary)">' +
+          (dateStr ? '<span>📅 ' + dateStr + '</span>' : '') +
+          (type ? '<span>· ' + type + '</span>' : '') +
+          (linkedContact ? '<span>👤 ' + linkedContact + '</span>' : '') +
+          (notes ? '<span>· ' + (notes.replace(/<[^>]*>/g,'').slice(0,60)) + '...</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-shrink:0">' +
+        (tid && !isCompleted ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="openEditTask(this.dataset.tid)">✏️ Edit</button>' : '') +
+        (tid && !isCompleted ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="completeTask(this.dataset.tid,this)">✓ Done</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function renderTasksList() {
@@ -8947,11 +9096,15 @@ function renderTasksList() {
 
   const now = new Date();
 
-  // Filter to active tasks only — exclude COMPLETED and DEFERRED
+  // Dashboard shows overdue + due today only
   const activeTasks = hubspotTasks.filter(function(t) {
     const props = t.properties || {};
     const status = (props.hs_task_status || props.status || t.status || 'NOT_STARTED').toUpperCase();
-    return status !== 'COMPLETED' && status !== 'DEFERRED';
+    if (status === 'COMPLETED' || status === 'DEFERRED') return false;
+    var dueDateRaw = props.hs_timestamp || props.hs_task_due_date || null;
+    if (!dueDateRaw) return true; // no date = show it
+    var dueDate = /^\d{10,}$/.test(String(dueDateRaw)) ? new Date(parseInt(dueDateRaw)) : new Date(dueDateRaw);
+    return dueDate <= now || dueDate.toDateString() === now.toDateString();
   });
 
   if (activeTasks.length === 0) {
@@ -8999,8 +9152,8 @@ function renderTasksList() {
     '</div>';
   }).join('');
 
-  if (activeTasks.length > 20) {
-    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing 20 of ' + activeTasks.length + ' open tasks — view all in HubSpot</div>';
+  if (hubspotTasks.filter(function(t){ var s=(t.properties||{}).hs_task_status||''; return s.toUpperCase()!=='COMPLETED'; }).length > activeTasks.length) {
+    listEl.innerHTML += '<div style="padding:8px 20px;font-size:12px;color:var(--text-secondary)">Showing today & overdue only. <a href="#" onclick="showPage(&quot;tasks&quot;);return false;" style="color:var(--burgundy)">View all tasks →</a></div>';
   }
 }
 
