@@ -847,8 +847,8 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="ai">
         <span class="nav-icon">✦</span><span>AI Tools</span>
       </div>
-      <div class="nav-item" data-page="prompts">
-        <span class="nav-icon">💬</span><span>Prompts</span>
+      <div class="nav-item" data-page="library">
+        <span class="nav-icon">📚</span><span>Library</span>
       </div>
       <div class="nav-item" data-page="jobsearch">
         <span class="nav-icon">🔍</span><span>Job Search</span>
@@ -857,9 +857,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="resources">
         <span class="nav-icon">🔖</span><span>Resources</span>
       </div>
-      <div class="nav-item" data-page="templates">
-        <span class="nav-icon">📋</span><span>Email Templates</span>
-      </div>
+
     </div>
     <div class="sidebar-footer">
       <button class="theme-toggle" onclick="toggleTheme()">
@@ -1433,20 +1431,29 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
 
     <!-- ── PROMPTS ─────────────────────────────────────────────────── -->
-    <div class="page" id="page-prompts">
+    <div class="page" id="page-library">
       <div class="page-header">
         <div class="page-header-left">
-          <h2>Prompts Library</h2>
-          <p>Saved Claude prompts — fire with one click</p>
+          <h2>Library</h2>
+          <p>Writing style, prompts, and email templates</p>
         </div>
-        <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="seedPrompts()">⬇ Load Default Prompts</button>
-          <button class="btn btn-primary" onclick="openAddPrompt()">+ Add Prompt</button>
+        <div class="page-header-actions" id="library-header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="seedPrompts()" id="lib-seed-btn">⬇ Load Default Prompts</button>
+          <button class="btn btn-primary" id="lib-add-btn" onclick="openAddPrompt()">+ Add Prompt</button>
         </div>
       </div>
 
+      <!-- Tab switcher -->
+      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
+        <button id="lib-tab-style"     onclick="switchLibTab('style')"     style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">✍️ Writing Style</button>
+        <button id="lib-tab-prompts"   onclick="switchLibTab('prompts')"   style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">💬 Prompts</button>
+        <button id="lib-tab-templates" onclick="switchLibTab('templates')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📧 Email Templates</button>
+      </div>
+
+      <!-- Tab: Writing Style -->
+      <div id="lib-panel-style" style="display:block">
       <!-- Writing Style Panel -->
-      <div style="padding:0 32px 24px 32px">
+      <div style="padding:24px 32px 24px 32px">
         <div class="dash-card">
           <div class="dash-card-header">✍️ Writing Style & AI Instructions
             <div style="display:flex;gap:8px;align-items:center">
@@ -1461,23 +1468,66 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
       </div>
 
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Category</th>
-              <th>Variable Fields</th>
-              <th>Size</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="prompts-tbody">
-            <tr><td colspan="4"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      </div><!-- end lib-panel-style -->
+
+      <!-- Tab: Prompts -->
+      <div id="lib-panel-prompts" style="display:none">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Variable Fields</th>
+                <th>Size</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="prompts-tbody">
+              <tr><td colspan="4"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end lib-panel-prompts -->
+
+      <!-- Tab: Email Templates -->
+      <div id="lib-panel-templates" style="display:none">
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates();document.getElementById('clear-template-search').style.display=this.value?'block':'none'">
+            <button class="search-clear" id="clear-template-search" onclick="document.getElementById('template-search').value='';filterTemplates();this.style.display='none'">✕</button>
+          </div>
+          <select class="filter-select" id="template-type-filter" onchange="filterTemplates()">
+            <option value="">All Types</option>
+            <option>Initial Outreach</option>
+            <option>Follow-Up</option>
+            <option>Thank You</option>
+            <option>Rejection Response</option>
+            <option>Networking</option>
+            <option>Other</option>
+          </select>
+          <span class="filter-count" id="template-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th onclick="sortTemplates('name')">Name ↕</th>
+                <th onclick="sortTemplates('type')">Type ↕</th>
+                <th>Subject</th>
+                <th>Preview</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="templates-tbody">
+              <tr><td colspan="5"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end lib-panel-templates -->
+
+    </div><!-- end page-library -->
 
     <!-- ── RESOURCES ──────────────────────────────────────────────── -->
     <div class="page" id="page-resources">
@@ -1880,51 +1930,6 @@ a { color: var(--burgundy); text-decoration: none; }
 
 
     <!-- ── EMAIL TEMPLATES PAGE ────────────────────────────────────── -->
-    <div class="page" id="page-templates">
-      <div class="page-header">
-        <div class="page-header-left">
-          <h2>Email Templates</h2>
-          <p>Reusable outreach templates for recruiters, hiring managers, and networking</p>
-        </div>
-        <div class="page-header-actions">
-          <button class="btn btn-primary" onclick="openAddTemplate()">+ Add Template</button>
-        </div>
-      </div>
-      <div class="filter-bar">
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search templates..." id="template-search" oninput="filterTemplates();document.getElementById('clear-template-search').style.display=this.value?'block':'none'">
-          <button class="search-clear" id="clear-template-search" onclick="document.getElementById('template-search').value='';filterTemplates();this.style.display='none'">✕</button>
-        </div>
-        <select class="filter-select" id="template-type-filter" onchange="filterTemplates()">
-          <option value="">All Types</option>
-          <option>Initial Outreach</option>
-          <option>Follow-Up</option>
-          <option>Thank You</option>
-          <option>Rejection Response</option>
-          <option>Networking</option>
-          <option>Other</option>
-        </select>
-        <span class="filter-count" id="template-count"></span>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th onclick="sortTemplates('name')">Name ↕</th>
-              <th onclick="sortTemplates('type')">Type ↕</th>
-              <th>Subject</th>
-              <th>Preview</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="templates-tbody">
-            <tr><td colspan="5"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
     <div class="page" id="page-uploads">
       <div class="page-header">
@@ -3007,9 +3012,9 @@ function navigateTo(page) {
   if (page === 'contacts') loadContacts();
   if (page === 'resumes') loadResumes();
   if (page === 'coverletters') loadCoverLetters();
-  if (page === 'prompts') { loadPrompts(); loadWritingStyle(); }
+  if (page === 'library') { loadWritingStyle(); loadPrompts(); }
   if (page === 'resources') loadResources();
-  if (page === 'templates') loadTemplates();
+
   if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
   if (page === 'interviewprep') loadInterviewPrepPage();
@@ -5513,6 +5518,38 @@ async function seedPrompts() {
   }
   toast('Prompts library loaded with your 4 Claude Projects.', 'success');
   loadPrompts();
+}
+
+// ── LIBRARY TAB SWITCHER ────────────────────────────────────────────────
+var _libTab = 'style';
+
+function switchLibTab(tab) {
+  _libTab = tab;
+  var tabs = ['style', 'prompts', 'templates'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('lib-tab-' + t);
+    var panel = document.getElementById('lib-panel-' + t);
+    var active = t === tab;
+    if (btn) {
+      btn.style.color = active ? 'var(--burgundy)' : 'var(--text-secondary)';
+      btn.style.borderBottom = active ? '2px solid var(--burgundy)' : '2px solid transparent';
+    }
+    if (panel) panel.style.display = active ? 'block' : 'none';
+  });
+  // Update header actions
+  var seedBtn = document.getElementById('lib-seed-btn');
+  var addBtn  = document.getElementById('lib-add-btn');
+  if (tab === 'style') {
+    if (seedBtn) seedBtn.style.display = 'none';
+    if (addBtn)  { addBtn.style.display = ''; addBtn.textContent = ''; addBtn.style.display = 'none'; }
+  } else if (tab === 'prompts') {
+    if (seedBtn) seedBtn.style.display = '';
+    if (addBtn)  { addBtn.style.display = ''; addBtn.textContent = '+ Add Prompt'; addBtn.onclick = openAddPrompt; }
+  } else if (tab === 'templates') {
+    if (seedBtn) seedBtn.style.display = 'none';
+    if (addBtn)  { addBtn.style.display = ''; addBtn.textContent = '+ Add Template'; addBtn.onclick = openAddTemplate; }
+    loadTemplates();
+  }
 }
 
 async function loadPrompts() {
