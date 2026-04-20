@@ -9081,10 +9081,14 @@ function pushTaskUpdateToHubSpot() {
   if (!u) return;
   window._pendingTaskUpdate = null;
 
+  // Strip associations from PATCH body — HubSpot PATCH doesn't accept them
+  var patchBody = { properties: u.body.properties };
+  var contactId = u.body.associations && u.body.associations[0] ? u.body.associations[0].to.id : null;
+
   fetch(WORKER_URL + '/hubspot/task/' + u.id, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(u.body)
+    body: JSON.stringify(patchBody)
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.id || data.properties) {
       var idx = hubspotTasks.findIndex(function(t) { return t.id === u.id; });
@@ -9096,13 +9100,41 @@ function pushTaskUpdateToHubSpot() {
       }
       renderTasksList();
       renderTaskReminders();
+      renderTasksPage();
       toast('Task updated and synced to HubSpot.', 'success');
+      // Associate contact via separate call if provided
+      if (contactId) {
+        fetch(WORKER_URL + '/hubspot/task-contact/' + u.id + '/' + contactId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Origin': location.origin }
+        }).catch(function(e) { console.warn('Contact association failed:', e.message); });
+      }
     } else {
       toast('Update may have failed: ' + (data.message || 'unknown error'), 'error');
     }
   }).catch(function(e) {
     toast('Could not update task: ' + e.message, 'error');
   });
+}
+
+async function deleteTask(taskId, btnEl) {
+  if (!confirm('Delete this task from HubSpot? This cannot be undone.')) return;
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+  try {
+    const r = await fetch(WORKER_URL + '/hubspot/task/' + taskId, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin }
+    });
+    if (!r.ok) throw new Error('Status ' + r.status);
+    hubspotTasks = hubspotTasks.filter(function(t) { return t.id !== taskId; });
+    renderTasksList();
+    renderTaskReminders();
+    renderTasksPage();
+    toast('Task deleted.', 'success');
+  } catch(e) {
+    toast('Could not delete task: ' + e.message, 'error');
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🗑'; }
+  }
 }
 
 async function completeTask(taskId, btnEl) {
@@ -9234,6 +9266,7 @@ function renderTasksPage() {
       '<div style="display:flex;gap:6px;flex-shrink:0">' +
         (tid && !isCompleted ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="openEditTask(this.dataset.tid)">✏️ Edit</button>' : '') +
         (tid && !isCompleted ? '<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="completeTask(this.dataset.tid,this)">✓ Done</button>' : '') +
+        (tid ? '<button class="action-btn danger" style="flex-shrink:0;font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="deleteTask(this.dataset.tid,this)" title="Delete task">🗑</button>' : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -9302,6 +9335,7 @@ function renderTasksList() {
       (dateStr ? '<div style="font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap;margin-right:8px">' + dateStr + '</div>' : '') +
       (tid ? '<button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="openEditTask(this.dataset.tid)">✏️</button>' : '') +
       (tid && needsAction ? '<button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;padding:3px 8px" data-tid="' + tid + '" onclick="completeTask(this.dataset.tid, this)">✓ Done</button>' : '') +
+      (tid ? '<button class="action-btn danger" style="flex-shrink:0;font-size:11px;padding:3px 6px" data-tid="' + tid + '" onclick="deleteTask(this.dataset.tid,this)" title="Delete">🗑</button>' : '') +
     '</div>';
   }).join('');
 
