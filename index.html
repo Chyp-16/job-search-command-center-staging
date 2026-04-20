@@ -1410,6 +1410,23 @@ a { color: var(--burgundy); text-decoration: none; }
           <button class="btn btn-primary" onclick="openAddPrompt()">+ Add Prompt</button>
         </div>
       </div>
+
+      <!-- Writing Style Panel -->
+      <div style="padding:0 32px 24px 32px">
+        <div class="dash-card">
+          <div class="dash-card-header">✍️ Writing Style & AI Instructions
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="ws-saved-indicator" style="font-size:11px;color:var(--text-secondary);display:none">✓ Saved</span>
+              <button class="btn btn-primary btn-sm" onclick="saveWritingStyle()">Save</button>
+            </div>
+          </div>
+          <div style="padding:20px">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">These instructions apply to every AI tool — Outreach Builder, Resume Tailor, Cover Letter, Interview Prep. Add tone rules, banned words, style preferences, or standing instructions.</p>
+            <textarea class="form-textarea" id="writing-style-input" rows="8" placeholder="e.g. Always write in first person. Sentences under 15 words. Never use em dashes. Peer-to-peer tone. Lead with results and numbers. Banned words: leverage, synergy, innovative..."></textarea>
+          </div>
+        </div>
+      </div>
+
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -2945,7 +2962,7 @@ function navigateTo(page) {
   if (page === 'contacts') loadContacts();
   if (page === 'resumes') loadResumes();
   if (page === 'coverletters') loadCoverLetters();
-  if (page === 'prompts') loadPrompts();
+  if (page === 'prompts') { loadPrompts(); loadWritingStyle(); }
   if (page === 'resources') loadResources();
   if (page === 'templates') loadTemplates();
   if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
@@ -5455,7 +5472,7 @@ async function seedPrompts() {
 
 async function loadPrompts() {
   const data = await dbGet('prompts', 'select=*&order=created_at.asc');
-  const prompts = Array.isArray(data) ? data : [];
+  const prompts = (Array.isArray(data) ? data : []).filter(function(p) { return p.name !== '__writing_style__'; });
   const tbody = document.getElementById('prompts-tbody');
   if (prompts.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">💬</div><h3>No prompts yet</h3><p>Your Claude Projects prompts will appear here.</p><button class="btn btn-primary" style="margin-top:12px" onclick="seedPrompts()">Load Default Prompts</button></div></td></tr>';
@@ -6011,13 +6028,48 @@ async function saveBaseDocs() {
   }
 }
 
+// ── WRITING STYLE ───────────────────────────────────────────────────────
+var _writingStyleText = '';
+
+async function loadWritingStyle() {
+  try {
+    var data = await dbGet('prompts', 'select=system_prompt&name=eq.__writing_style__&limit=1');
+    if (Array.isArray(data) && data[0] && data[0].system_prompt) {
+      _writingStyleText = data[0].system_prompt;
+      var el = document.getElementById('writing-style-input');
+      if (el) el.value = _writingStyleText;
+    }
+  } catch(e) { console.warn('Could not load writing style:', e.message); }
+}
+
+async function saveWritingStyle() {
+  var el = document.getElementById('writing-style-input');
+  if (!el) return;
+  var text = el.value.trim();
+  _writingStyleText = text;
+  try {
+    var existing = await dbGet('prompts', 'select=id&name=eq.__writing_style__&limit=1');
+    if (Array.isArray(existing) && existing[0]) {
+      await dbPatch('prompts', existing[0].id, { system_prompt: text });
+    } else {
+      await dbPost('prompts', { name: '__writing_style__', category: 'Settings', system_prompt: text, variable_fields: [] });
+    }
+    var ind = document.getElementById('ws-saved-indicator');
+    if (ind) { ind.style.display = 'inline'; setTimeout(function(){ ind.style.display = 'none'; }, 2000); }
+    toast('Writing style saved.', 'success');
+  } catch(e) { toast('Save failed: ' + e.message, 'error'); }
+}
+
 function getSystemPromptWithResume() {
   let prompt = JAY_SYSTEM_PROMPT;
+  if (_writingStyleText) {
+    prompt += '\n\n--- ADDITIONAL WRITING INSTRUCTIONS ---\n' + _writingStyleText;
+  }
   if (baseResumeText) {
-    prompt += `\n\n--- JAY'S MASTER RESUME ---\n` + baseResumeText;
+    prompt += '\n\n--- JAY\'S MASTER RESUME ---\n' + baseResumeText;
   }
   if (baseCoverLetterText) {
-    prompt += `\n\n--- JAY'S COVER LETTER TEMPLATE ---\n` + baseCoverLetterText;
+    prompt += '\n\n--- JAY\'S COVER LETTER TEMPLATE ---\n' + baseCoverLetterText;
   }
   return prompt;
 }
@@ -9289,6 +9341,7 @@ refreshDashboard();
 setTimeout(seedPrompts, 1500);
 // Load base documents
 loadBaseDocs();
+loadWritingStyle();
 
 // Check for follow-ups on load and show badge
 setTimeout(async () => {
