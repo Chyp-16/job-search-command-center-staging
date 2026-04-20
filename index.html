@@ -4080,7 +4080,7 @@ function buildContactDetailHTML(c) {
           '<a href="https://app.hubspot.com/contacts/242599414/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' +
         '</div>' +
       '</div>' +
-      '<div id="hs-activity-' + c.id + '" style="font-size:12px;color:var(--text-secondary)">Click Load to fetch latest HubSpot activity.</div>' +
+      '<div id="hs-activity-' + c.id + '" style="font-size:12px;color:var(--text-secondary)">Loading HubSpot activity...</div>' +
     '</div>'
   : '');
 }
@@ -4105,6 +4105,12 @@ function viewContact(id) {
   // Load related applications from same company
   if (c.company) loadContactRelatedApps(c.company, c.linked_application_id, id);
   openModal('modal-detail');
+  // Auto-load HubSpot activity if contact has HS ID
+  if (c.hubspot_contact_id) {
+    window.setTimeout(function() {
+      loadContactHubSpotActivity(id, c.hubspot_contact_id);
+    }, 300);
+  }
 }
 
 async function loadContactRelatedApps(company, linkedAppId, contactId) {
@@ -4537,24 +4543,42 @@ async function syncHubSpot() {
         }
       }
 
-      const payload = {
-        name,
-        company: hc.properties?.company || null,
-        title: hc.properties?.jobtitle || null,
-        contact_type: 'Recruiter',
-        connection_source: 'HubSpot',
-        hubspot_contact_id: hsId,
-        email: hc.properties?.email || null,
-        linkedin_url: linkedInUrl,
-        notes: null,
-        last_contact_date: hc.properties?.lastmodifieddate
-          ? hc.properties.lastmodifieddate.split('T')[0] : null,
-      };
       const existing = allContacts.find(c => c.hubspot_contact_id === hsId);
+
       if (existing) {
-        toUpdate.push({ id: existing.id, payload });
+        // Update only fields that HubSpot owns — preserve app-side fields
+        var updatePayload = {
+          name,
+          company: hc.properties?.company || existing.company || null,
+          title: hc.properties?.jobtitle || existing.title || null,
+          email: hc.properties?.email || existing.email || null,
+          linkedin_url: linkedInUrl || existing.linkedin_url || null,
+          hubspot_contact_id: hsId,
+          // Preserve all app-side fields — never overwrite with blank
+          contact_type: existing.contact_type || 'Recruiter',
+          connection_source: existing.connection_source || 'HubSpot',
+          notes: existing.notes || null,
+          next_action: existing.next_action || null,
+          next_action_date: existing.next_action_date || null,
+          last_contact_date: existing.last_contact_date || (hc.properties?.lastmodifieddate ? hc.properties.lastmodifieddate.split('T')[0] : null),
+        };
+        toUpdate.push({ id: existing.id, payload: updatePayload });
       } else {
-        toCreate.push(payload);
+        // New contact from HubSpot — create with defaults
+        var createPayload = {
+          name,
+          company: hc.properties?.company || null,
+          title: hc.properties?.jobtitle || null,
+          contact_type: 'Recruiter',
+          connection_source: 'HubSpot',
+          hubspot_contact_id: hsId,
+          email: hc.properties?.email || null,
+          linkedin_url: linkedInUrl,
+          notes: null,
+          last_contact_date: hc.properties?.lastmodifieddate
+            ? hc.properties.lastmodifieddate.split('T')[0] : null,
+        };
+        toCreate.push(createPayload);
       }
     }
 
@@ -4592,7 +4616,15 @@ async function syncHubSpot() {
     // Reload contacts from DB to get full fresh list
     allContacts = [];
     await loadContacts();
-    toast('HubSpot sync complete. ' + created + ' new, ' + updated + ' updated.', 'success');
+
+    // Fix 9: Populate next_action from HubSpot tasks
+    // Re-fetch tasks with associations so we can match to contacts
+    if (btn) btn.textContent = '⟳ Syncing tasks...';
+    await syncNextActionsFromTasks();
+
+    var newCount = toCreate.length;
+    var updCount = toUpdate.length;
+    toast('HubSpot sync complete. ' + newCount + ' new, ' + updCount + ' updated.', 'success');
 
   } catch(e) {
     if (e.message && e.message.includes('HUBSPOT')) {
@@ -8496,6 +8528,78 @@ document.addEventListener('keydown', e => {
 
 // ── HUBSPOT TASKS + ACTIVITY ────────────────────────────────────────────
 let hubspotTasks = [];
+
+async function syncNextActionsFromTasks() {
+  // Fetch HubSpot tasks with contact associations and populate next_action fields
+  try {
+    var r = await fetch(WORKER_URL + '/hubspot/tasks?associations=contacts', {
+      headers: { 'Origin': location.origin }
+    });
+    if (!r.ok) return;
+    var data = await r.json();
+    var tasks = Array.isArray(data.results) ? data.results : [];
+    if (!tasks.length) return;
+
+    var now = new Date();
+    now.setHours(0,0,0,0);
+
+    // Build a map: hubspot_contact_id -> earliest upcoming open task
+    var contactTaskMap = {};
+    tasks.forEach(function(t) {
+      var props = t.properties || {};
+      var status = (props.hs_task_status || 'NOT_STARTED').toUpperCase();
+      if (status === 'COMPLETED' || status === 'DEFERRED') return;
+      var dueDateRaw = props.hs_timestamp || null;
+      if (!dueDateRaw) return;
+      var dueDate = new Date(parseInt(dueDateRaw));
+      if (dueDate < now) return; // skip past tasks
+
+      // Get associated contact IDs
+      var assocContacts = (t.associations && t.associations.contacts && t.associations.contacts.results) || [];
+      assocContacts.forEach(function(ac) {
+        var hsId = String(ac.id);
+        var existing = contactTaskMap[hsId];
+        if (!existing || dueDate < new Date(parseInt(existing.ts))) {
+          contactTaskMap[hsId] = {
+            subject: props.hs_task_subject || 'HubSpot Task',
+            ts: dueDateRaw,
+            dateStr: dueDate.toISOString().split('T')[0]
+          };
+        }
+      });
+    });
+
+    // Update contacts in Supabase where next_action is blank or stale
+    var updates = [];
+    for (var hsId in contactTaskMap) {
+      var task = contactTaskMap[hsId];
+      var contact = allContacts.find(function(c) { return c.hubspot_contact_id === hsId; });
+      if (!contact) continue;
+      // Only update if next_action is empty or the task date is sooner
+      var shouldUpdate = !contact.next_action || !contact.next_action_date ||
+        task.dateStr < contact.next_action_date;
+      if (!shouldUpdate) continue;
+      updates.push({
+        id: contact.id,
+        next_action: task.subject,
+        next_action_date: task.dateStr
+      });
+      // Update in memory
+      contact.next_action = task.subject;
+      contact.next_action_date = task.dateStr;
+    }
+
+    // Batch update Supabase
+    for (var u of updates) {
+      await dbPatch('contacts', u.id, { next_action: u.next_action, next_action_date: u.next_action_date });
+    }
+    if (updates.length > 0) {
+      console.log('Next Action updated for ' + updates.length + ' contacts from HubSpot tasks.');
+    }
+  } catch(e) {
+    console.warn('syncNextActionsFromTasks failed:', e.message);
+  }
+}
 
 async function syncHubSpotTasks() {
   const btn = document.getElementById('tasks-sync-btn');
