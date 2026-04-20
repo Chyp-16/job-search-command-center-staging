@@ -9091,6 +9091,8 @@ function pushTaskUpdateToHubSpot() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patchBody)
   }).then(function(r) { return r.json(); }).then(function(data) {
+    console.log('PATCH response:', JSON.stringify(data).slice(0,200));
+    console.log('contactId check:', contactId, '| data.id:', data.id, '| data.properties:', !!data.properties);
     if (data.id || data.properties) {
       var idx = hubspotTasks.findIndex(function(t) { return t.id === u.id; });
       if (idx >= 0) {
@@ -9108,6 +9110,11 @@ function pushTaskUpdateToHubSpot() {
         fetch(WORKER_URL + '/hubspot/task-contact/' + u.id + '/' + contactId, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Origin': location.origin }
+        }).then(function(r) {
+          console.log('Association response status:', r.status);
+          return r.json();
+        }).then(function(d) {
+          console.log('Association response body:', JSON.stringify(d));
         }).catch(function(e) { console.warn('Contact association failed:', e.message); });
       }
     } else {
