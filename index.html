@@ -2720,9 +2720,14 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Link to Contact (optional)</label>
-          <select class="form-select" id="task-contact">
+          <select class="form-select" id="task-contact" onchange="loadOutreachStepsForContact(this.value, 'add')">
             <option value="">— No contact —</option>
           </select>
+        </div>
+        <div id="add-outreach-steps" style="display:none">
+          <div style="border-top:1px solid var(--border);margin:8px 0 12px 0"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--burgundy);margin-bottom:10px">📋 Outreach Sequence — <span id="add-outreach-app-name" style="font-weight:400;color:var(--text-secondary)"></span></div>
+          <div style="display:flex;flex-direction:column;gap:8px" id="add-outreach-steps-list"></div>
         </div>
       </div>
     </div>
@@ -2771,9 +2776,14 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Link to Contact (optional)</label>
-          <select class="form-select" id="edit-task-contact">
+          <select class="form-select" id="edit-task-contact" onchange="loadOutreachStepsForContact(this.value, 'edit')">
             <option value="">— No contact —</option>
           </select>
+        </div>
+        <div id="edit-outreach-steps" style="display:none">
+          <div style="border-top:1px solid var(--border);margin:8px 0 12px 0"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--burgundy);margin-bottom:10px">📋 Outreach Sequence — <span id="edit-outreach-app-name" style="font-weight:400;color:var(--text-secondary)"></span></div>
+          <div style="display:flex;flex-direction:column;gap:8px" id="edit-outreach-steps-list"></div>
         </div>
       </div>
     </div>
@@ -8694,11 +8704,103 @@ async function syncHubSpotTasks() {
   }
 }
 
+// ── OUTREACH STEPS IN TASK MODALS ───────────────────────────────────────
+var _taskOutreachAppId = null; // tracks which app's outreach we're editing
+
+var OUTREACH_STEPS = [
+  { key: 'initial_outreach',    label: 'Initial Outreach' },
+  { key: 'followup_3day',       label: '3-Day Follow-Up' },
+  { key: 'followup_1week',      label: '1-Week Follow-Up' },
+  { key: 'followup_2week',      label: '2-Week Follow-Up' },
+  { key: 'rejection_followup',  label: 'Rejection Follow-Up' },
+];
+var OUTREACH_STATUSES = ['', 'Scheduled', 'Sent', 'Opened', 'Responded', 'Skipped'];
+
+async function loadOutreachStepsForContact(hsContactId, mode) {
+  var panelId = mode + '-outreach-steps';
+  var listId  = mode + '-outreach-steps-list';
+  var nameId  = mode + '-outreach-app-name';
+  var panel = document.getElementById(panelId);
+  var list  = document.getElementById(listId);
+  if (!panel || !list) return;
+
+  _taskOutreachAppId = null;
+  panel.style.display = 'none';
+  list.innerHTML = '';
+
+  if (!hsContactId) return;
+
+  // Find contact by HubSpot ID to get linked_application_id
+  var contact = allContacts.find(function(c) { return c.hubspot_contact_id === hsContactId; });
+  if (!contact || !contact.linked_application_id) return;
+
+  var appId = contact.linked_application_id;
+  var app = allApps.find(function(a) { return a.id === appId; });
+  if (!app) {
+    // Fetch from DB if not in memory
+    var res = await dbGet('applications', 'select=*&id=eq.' + appId + '&limit=1');
+    app = Array.isArray(res) && res[0] ? res[0] : null;
+  }
+  if (!app) return;
+
+  _taskOutreachAppId = appId;
+  var nameEl = document.getElementById(nameId);
+  if (nameEl) nameEl.textContent = app.company + (app.job_title ? ' — ' + app.job_title : '');
+
+  // Render editable step rows
+  list.innerHTML = OUTREACH_STEPS.map(function(step) {
+    var statusVal = app[step.key + '_status'] || '';
+    var dateVal   = app[step.key + '_date'] || '';
+    var statusOpts = OUTREACH_STATUSES.map(function(s) {
+      return '<option value="' + s + '"' + (s === statusVal ? ' selected' : '') + '>' + (s || '— None —') + '</option>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:1fr 130px 130px;gap:8px;align-items:center">' +
+      '<div style="font-size:12px;font-weight:500;color:var(--text)">' + step.label + '</div>' +
+      '<select class="form-select" style="font-size:12px;padding:4px 8px" data-step="' + step.key + '" data-field="status" onchange="markOutreachDirty()">' + statusOpts + '</select>' +
+      '<input class="form-input" type="date" style="font-size:12px;padding:4px 8px" data-step="' + step.key + '" data-field="date" value="' + dateVal + '" onchange="markOutreachDirty()">' +
+    '</div>';
+  }).join('');
+
+  panel.style.display = 'block';
+}
+
+var _outreachDirty = false;
+function markOutreachDirty() { _outreachDirty = true; }
+
+async function saveOutreachSteps(mode) {
+  if (!_taskOutreachAppId || !_outreachDirty) return;
+  var listId = mode + '-outreach-steps-list';
+  var list = document.getElementById(listId);
+  if (!list) return;
+
+  var payload = {};
+  OUTREACH_STEPS.forEach(function(step) {
+    var statusEl = list.querySelector('[data-step="' + step.key + '"][data-field="status"]');
+    var dateEl   = list.querySelector('[data-step="' + step.key + '"][data-field="date"]');
+    if (statusEl) payload[step.key + '_status'] = statusEl.value || null;
+    if (dateEl)   payload[step.key + '_date']   = dateEl.value || null;
+  });
+
+  try {
+    await dbPatch('applications', _taskOutreachAppId, payload);
+    var app = allApps.find(function(a) { return a.id === _taskOutreachAppId; });
+    if (app) Object.assign(app, payload);
+    _outreachDirty = false;
+    toast('Outreach steps saved.', 'success');
+  } catch(e) {
+    toast('Could not save outreach steps: ' + e.message, 'error');
+  }
+}
+
 function openEditTask(taskId) {
   var t = hubspotTasks.find(function(x) { return x.id === taskId; });
   if (!t) return;
   var props = t.properties || {};
   window._editingTaskId = taskId;
+  _outreachDirty = false;
+  _taskOutreachAppId = null;
+  var ep = document.getElementById('edit-outreach-steps');
+  if (ep) ep.style.display = 'none';
 
   document.getElementById('edit-task-subject').value = props.hs_task_subject || '';
   document.getElementById('edit-task-type').value = props.hs_task_type || 'EMAIL';
@@ -8721,14 +8823,26 @@ function openEditTask(taskId) {
   editSel.innerHTML = '<option value="">⏳ Loading...</option>';
   openModal('modal-edit-task');
   (async function() {
-    var b1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=0');
-    var b2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id&order=name.asc&limit=1000&offset=1000');
+    var b1 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id,linked_application_id&order=name.asc&limit=1000&offset=0');
+    var b2 = await dbGet('contacts', 'select=id,name,company,hubspot_contact_id,linked_application_id&order=name.asc&limit=1000&offset=1000');
     var contacts = (Array.isArray(b1) ? b1 : []).concat(Array.isArray(b2) ? b2 : []);
+    // Merge into allContacts for outreach lookup
+    contacts.forEach(function(c) {
+      var idx = allContacts.findIndex(function(x) { return x.id === c.id; });
+      if (idx >= 0) allContacts[idx] = Object.assign(allContacts[idx], c);
+      else allContacts.push(c);
+    });
+    // Find pre-selected contact from task associations
+    var preselect = '';
+    var taskAssoc = (t.associations && t.associations.contacts && t.associations.contacts.results) || [];
+    if (taskAssoc.length > 0) preselect = String(taskAssoc[0].id);
     editSel.innerHTML = '<option value="">— No contact —</option>' +
       contacts.map(function(c) {
-        return '<option value="' + (c.hubspot_contact_id || '') + '">' +
+        return '<option value="' + (c.hubspot_contact_id || '') + '"' +
+          (c.hubspot_contact_id === preselect ? ' selected' : '') + '>' +
           c.name + (c.company ? ' — ' + c.company : '') + '</option>';
       }).join('');
+    if (preselect) loadOutreachStepsForContact(preselect, 'edit');
   })();
 }
 
@@ -8767,6 +8881,7 @@ function updateTask() {
   }
 
   window._pendingTaskUpdate = { id: taskId, body: updateBody, subject: subject, type: type, dueMsUtc: dueMsUtc, notes: notes };
+  saveOutreachSteps('edit');
   closeModal('modal-edit-task');
   toast('Updating task...', '');
   window.setTimeout(pushTaskUpdateToHubSpot, 100);
@@ -9024,6 +9139,7 @@ function saveTask() {
 
   // Store task data globally and close modal before fetch
   window._pendingTask = { body: taskBody, subject: subject, type: type, dueMsUtc: dueMsUtc, notes: notes };
+  saveOutreachSteps('add');
   closeModal('modal-add-task');
   toast('Saving task...', '');
 
