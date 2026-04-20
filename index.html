@@ -5138,7 +5138,10 @@ async function loadContactHubSpotActivity(contactId, hubspotId) {
                   props.subject || 'Activity';
       if (title.length > 80) title = title.slice(0, 77) + '...';
       var statusStr = type === 'TASK' && props.hs_task_status ? ' · ' + props.hs_task_status : '';
-      var date = props.hs_timestamp ? new Date(parseInt(props.hs_timestamp) || props.hs_timestamp).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      var date = props.hs_timestamp ? (function(ts) {
+        var d = /^\d{10,}$/.test(String(ts)) ? new Date(parseInt(ts)) : new Date(ts);
+        return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      })(props.hs_timestamp) : '';
       return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
         '<span style="font-size:14px;flex-shrink:0">' + icon + '</span>' +
         '<div style="flex:1;min-width:0">' +
@@ -8564,12 +8567,16 @@ async function syncNextActionsFromTasks() {
           var props = t.properties || {};
           var dueDateRaw = props.hs_timestamp || null;
           if (!dueDateRaw) return;
-          var dueDate = new Date(parseInt(dueDateRaw));
-          if (dueDate < now) return;
-          if (!earliest || dueDate < new Date(parseInt(earliest.ts))) {
+          // Handle both ISO string and milliseconds formats
+          var dueDate = /^\d{10,}$/.test(String(dueDateRaw))
+            ? new Date(parseInt(dueDateRaw))
+            : new Date(dueDateRaw);
+          if (isNaN(dueDate.getTime()) || dueDate < now) return;
+          if (!earliest || dueDate < (earliest.dueDate)) {
             earliest = {
               subject: props.hs_task_subject || 'HubSpot Task',
               ts: dueDateRaw,
+              dueDate: dueDate,
               dateStr: dueDate.toISOString().split('T')[0]
             };
           }
