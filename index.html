@@ -1698,8 +1698,11 @@ a { color: var(--burgundy); text-decoration: none; }
                   <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
                 </div>
                 <div class="form-group full">
-                  <label class="form-label">Recent Company News or Context</label>
-                  <textarea class="form-textarea" id="ob-context" rows="4" placeholder="e.g. Series B funding announced, new product launch, recent leadership hire..."></textarea>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                    <label class="form-label" style="margin-bottom:0">Recent Company News or Context</label>
+                    <button class="btn btn-secondary btn-sm" id="ob-find-context-btn" onclick="fetchOBContext()" style="font-size:11px">🔍 Auto-Find</button>
+                  </div>
+                  <textarea class="form-textarea" id="ob-context" rows="4" placeholder="e.g. Series B funding announced, new product launch, recent leadership hire... or click Auto-Find to search automatically."></textarea>
                 </div>
               </div>
               <div style="margin-top:16px;display:flex;gap:10px">
@@ -7495,6 +7498,26 @@ async function runOutreachBuilder() {
   } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
 }
 
+async function fetchOBContext() {
+  var company = (document.getElementById('ob-company').value||'').trim();
+  var url     = (document.getElementById('ob-url').value||'').trim();
+  if (!company && !url) { toast('Enter a company name or URL first.', 'error'); return; }
+  var btn = document.getElementById('ob-find-context-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Searching...'; }
+  var contextEl = document.getElementById('ob-context');
+  var searchTarget = company || url;
+  var prompt = 'Search for 1-2 recent notable developments about ' + searchTarget + '. Focus on: funding, product launches, leadership changes, partnerships, revenue milestones, or strategic pivots from the past 6-12 months. Return a concise 2-3 sentence summary with specific dates, amounts, and names where available. No fluff.';
+  try {
+    var result = await callAI([{ role: 'user', content: prompt }], 'You are a business research assistant. Return only factual, specific, recent company news. Be concise.', true);
+    if (contextEl) contextEl.value = result.trim();
+    toast('Context found.', 'success');
+  } catch(e) {
+    toast('Could not fetch context: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Auto-Find'; }
+  }
+}
+
 function clearOB() {
   ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
@@ -8288,7 +8311,7 @@ function renderDocsTable() {
   const tbody = document.getElementById('docs-tbody');
   if (!tbody) return;
   if (filteredDocs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📁</div><h3>No documents yet</h3><p>Upload resumes, cover letters, and job descriptions to track them here.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📁</div><h3>No documents yet</h3><p>Upload resumes, cover letters, and job descriptions to track them here.</p></div></td></tr>';
     return;
   }
   tbody.innerHTML = filteredDocs.map(function(d) {
@@ -8302,6 +8325,7 @@ function renderDocsTable() {
     return '<tr>' +
       '<td>' + icon + ' <strong>' + (d.file_name||'—') + '</strong>' +
         (fileSizeStr ? '<div style="font-size:11px;color:var(--text-light)">' + fileSizeStr + '</div>' : '') + '</td>' +
+      '<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-secondary)">' + (ext || '?') + '</span></td>' +
       '<td><span class="badge ' + badgeCls + '">' + (d.doc_type||'—') + '</span></td>' +
       '<td>' + (d.company || '—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role || '—') + '</td>' +
