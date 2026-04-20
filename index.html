@@ -822,12 +822,6 @@ a { color: var(--burgundy); text-decoration: none; }
         <span class="nav-icon">👥</span><span>Contacts</span>
       </div>
       <div class="nav-section-label">Documents</div>
-      <div class="nav-item" data-page="resumes">
-        <span class="nav-icon">📄</span><span>Resumes</span>
-      </div>
-      <div class="nav-item" data-page="coverletters">
-        <span class="nav-icon">✉️</span><span>Cover Letters</span>
-      </div>
       <div class="nav-item" data-page="interviewprep">
         <span class="nav-icon">🎯</span><span>Interview Prep</span>
       </div>
@@ -840,8 +834,8 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="outreachbuilder">
         <span class="nav-icon">📨</span><span>Outreach Builder</span>
       </div>
-      <div class="nav-item" data-page="uploads">
-        <span class="nav-icon">📁</span><span>My Documents</span>
+      <div class="nav-item" data-page="documents">
+        <span class="nav-icon">📁</span><span>Documents</span>
       </div>
       <div class="nav-section-label">Intelligence</div>
       <div class="nav-item" data-page="ai">
@@ -1089,77 +1083,6 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
 
     <!-- ── RESUMES ────────────────────────────────────────────────── -->
-    <div class="page" id="page-resumes">
-      <div class="page-header">
-        <div class="page-header-left">
-          <h2>Resume Versions</h2>
-          <p>Track every tailored resume by company and role</p>
-        </div>
-        <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">📄 Base Documents</button>
-          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Resume');})()">⬆ Upload Resume</button>
-          <button class="btn btn-primary" onclick="openAddResume()">+ Add Version</button>
-        </div>
-      </div>
-
-      <!-- Base Documents Banner -->
-      <div id="base-doc-banner" style="display:none;margin:0 32px 0;padding:12px 16px;background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);font-size:12px;color:var(--burgundy);display:flex;align-items:center;justify-content:space-between">
-        <span>✓ Base resume loaded — Claude will use it automatically for all AI features.</span>
-        <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">Edit</button>
-      </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Version Name</th>
-              <th>Target Role</th>
-              <th>Target Company</th>
-              <th>Date Created</th>
-              <th>Base Version</th>
-              <th>Keywords</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="resumes-tbody">
-            <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ── COVER LETTERS ──────────────────────────────────────────── -->
-    <div class="page" id="page-coverletters">
-      <div class="page-header">
-        <div class="page-header-left">
-          <h2>Cover Letters</h2>
-          <p>Stored versions linked to applications</p>
-        </div>
-        <div class="page-header-actions">
-          <button class="btn btn-secondary btn-sm" onclick="(async()=>{await openUploadDoc('Cover Letter');})()">⬆ Upload Cover Letter</button>
-          <button class="btn btn-primary" onclick="openAddCoverLetter()">+ Add Cover Letter</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Version Name</th>
-              <th>Target Role</th>
-              <th>Target Company</th>
-              <th>Date Created</th>
-              <th>AI Generated</th>
-              <th>Notes</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="cl-tbody">
-            <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- ── AI TOOLS ───────────────────────────────────────────────── -->
     <div class="page" id="page-ai">
       <div class="page-header">
@@ -1931,50 +1854,111 @@ a { color: var(--burgundy); text-decoration: none; }
 
     <!-- ── EMAIL TEMPLATES PAGE ────────────────────────────────────── -->
     <!-- ── MY DOCUMENTS PAGE ──────────────────────────────────────── -->
-    <div class="page" id="page-uploads">
+    <div class="page" id="page-documents">
       <div class="page-header">
         <div class="page-header-left">
-          <h2>My Documents</h2>
-          <p>Upload and track resumes, cover letters, and job descriptions</p>
+          <h2>Documents</h2>
+          <p>Resumes, cover letters, and uploaded files</p>
         </div>
-        <div class="page-header-actions">
-          <button class="btn btn-primary" onclick="(async()=>{await openUploadModal();})()">⬆ Upload Document</button>
+        <div class="page-header-actions" id="docs-header-actions">
+          <button class="btn btn-secondary btn-sm" id="docs-base-btn" onclick="openBaseDocModal()" style="display:none">📄 Base Documents</button>
+          <button class="btn btn-primary" id="docs-add-btn" onclick="(async()=>{await openUploadModal();})()">⬆ Upload Document</button>
         </div>
       </div>
-      <div class="filter-bar">
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs();document.getElementById('clear-docs-search').style.display=this.value?'block':'none'">
-          <button class="search-clear" id="clear-docs-search" onclick="document.getElementById('docs-search').value='';filterDocs();this.style.display='none'">✕</button>
+
+      <!-- Tab switcher -->
+      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
+        <button id="dt-all"       onclick="switchDocsTab('all')"       style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">📁 All Documents</button>
+        <button id="dt-resumes"   onclick="switchDocsTab('resumes')"   style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📄 Resumes</button>
+        <button id="dt-coverletters" onclick="switchDocsTab('coverletters')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">✉️ Cover Letters</button>
+      </div>
+
+      <!-- Tab: All Documents -->
+      <div id="dt-panel-all">
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" type="text" placeholder="Search by name, company, role..." id="docs-search" oninput="filterDocs();document.getElementById('clear-docs-search').style.display=this.value?'block':'none'">
+            <button class="search-clear" id="clear-docs-search" onclick="document.getElementById('docs-search').value='';filterDocs();this.style.display='none'">✕</button>
+          </div>
+          <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
+            <option value="">All Types</option>
+            <option>Resume</option>
+            <option>Cover Letter</option>
+            <option>Job Description</option>
+            <option>Other</option>
+          </select>
+          <span class="filter-count" id="docs-count"></span>
         </div>
-        <select class="filter-select" id="docs-type-filter" onchange="filterDocs()">
-          <option value="">All Types</option>
-          <option>Resume</option>
-          <option>Cover Letter</option>
-          <option>Job Description</option>
-          <option>Other</option>
-        </select>
-        <span class="filter-count" id="docs-count"></span>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th onclick="sortDocs('file_name')">File Name ↕</th>
+                <th onclick="sortDocs('doc_type')">Type ↕</th>
+                <th onclick="sortDocs('company')">Company ↕</th>
+                <th onclick="sortDocs('role')">Role ↕</th>
+                <th>Linked Application</th>
+                <th>Contact</th>
+                <th onclick="sortDocs('created_at')">Uploaded ↕</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="docs-tbody">
+              <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th onclick="sortDocs('file_name')">File Name ↕</th>
-              <th onclick="sortDocs('doc_type')">Type ↕</th>
-              <th onclick="sortDocs('company')">Company ↕</th>
-              <th onclick="sortDocs('role')">Role ↕</th>
-              <th>Linked Application</th>
-              <th>Contact</th>
-              <th onclick="sortDocs('created_at')">Uploaded ↕</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="docs-tbody">
-            <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-          </tbody>
-        </table>
+
+      <!-- Tab: Resumes -->
+      <div id="dt-panel-resumes" style="display:none">
+        <div id="base-doc-banner" style="display:none;margin:16px 32px 0;padding:12px 16px;background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);font-size:12px;color:var(--burgundy);display:flex;align-items:center;justify-content:space-between">
+          <span>&#10003; Base resume loaded — Claude will use it automatically for all AI features.</span>
+          <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">Edit</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Version Name</th>
+                <th>Target Role</th>
+                <th>Target Company</th>
+                <th>Date Created</th>
+                <th>Base Version</th>
+                <th>Keywords</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="resumes-tbody">
+              <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <!-- Tab: Cover Letters -->
+      <div id="dt-panel-coverletters" style="display:none">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Version Name</th>
+                <th>Target Role</th>
+                <th>Target Company</th>
+                <th>Date Created</th>
+                <th>AI Generated</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cl-tbody">
+              <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
   </main>
@@ -3010,8 +2994,7 @@ function navigateTo(page) {
   if (page === 'tasks') loadTasksPage();
   if (page === 'applications') loadApps();
   if (page === 'contacts') loadContacts();
-  if (page === 'resumes') loadResumes();
-  if (page === 'coverletters') loadCoverLetters();
+
   if (page === 'library') { loadWritingStyle(); loadPrompts(); }
   if (page === 'resources') loadResources();
 
@@ -3021,7 +3004,7 @@ function navigateTo(page) {
   if (page === 'resumetailor') loadRTPage();
   if (page === 'coverlettergenerator') loadCLGPage();
   if (page === 'outreachbuilder') loadOBPage();
-  if (page === 'uploads') loadDocsPage();
+  if (page === 'documents') { loadDocsPage(); loadResumes(); }
 }
 
 // Use event delegation on the sidebar so all nav items work regardless of when they were added
@@ -8185,6 +8168,36 @@ let docSortField = 'created_at';
 let docSortDir = 'desc';
 let uploadFile = null;
 
+// ── DOCUMENTS TAB SWITCHER ──────────────────────────────────────────────
+function switchDocsTab(tab) {
+  var tabs = ['all', 'resumes', 'coverletters'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('dt-' + t);
+    var panel = document.getElementById('dt-panel-' + t);
+    var active = t === tab;
+    if (btn) {
+      btn.style.color = active ? 'var(--burgundy)' : 'var(--text-secondary)';
+      btn.style.borderBottom = active ? '2px solid var(--burgundy)' : '2px solid transparent';
+    }
+    if (panel) panel.style.display = active ? 'block' : 'none';
+  });
+  // Update header actions
+  var baseBtn = document.getElementById('docs-base-btn');
+  var addBtn  = document.getElementById('docs-add-btn');
+  if (tab === 'all') {
+    if (baseBtn) baseBtn.style.display = 'none';
+    if (addBtn)  { addBtn.textContent = '⬆ Upload Document'; addBtn.onclick = async function(){ await openUploadModal(); }; }
+  } else if (tab === 'resumes') {
+    if (baseBtn) baseBtn.style.display = '';
+    if (addBtn)  { addBtn.textContent = '+ Add Version'; addBtn.onclick = openAddResume; }
+    loadResumes();
+  } else if (tab === 'coverletters') {
+    if (baseBtn) baseBtn.style.display = 'none';
+    if (addBtn)  { addBtn.textContent = '+ Add Cover Letter'; addBtn.onclick = openAddCoverLetter; }
+    loadCoverLetters();
+  }
+}
+
 async function loadDocsPage() {
   // Populate dropdowns
   await refreshDocs();
@@ -8607,7 +8620,7 @@ async function submitUpload() {
     toast(uploadFile.name + ' uploaded successfully.', 'success');
 
     // Refresh docs table if already on uploads page, otherwise navigate there
-    const uploadsPage = document.getElementById('page-uploads');
+    const uploadsPage = document.getElementById('page-documents');
     if (uploadsPage && uploadsPage.classList.contains('active')) {
       await loadDocsPage();
     } else {
