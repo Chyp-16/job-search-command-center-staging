@@ -6070,16 +6070,51 @@ let baseResumeText = '';
 let baseCoverLetterText = '';
 
 async function loadBaseDocs() {
-  // First try: uploaded_documents with is_base_resume = true (new system)
+  // First try: uploaded_documents with is_base_resume = true
   var udData = await dbGet('uploaded_documents', 'select=*&is_base_resume=eq.true&doc_type=eq.Resume&order=created_at.desc&limit=1');
   var udBase = Array.isArray(udData) && udData.length > 0 ? udData[0] : null;
 
   if (udBase && udBase.storage_path) {
-    // File is in storage — get signed URL and extract text via mammoth if docx
-    // For now, signal that a base is set so banner shows
-    baseResumeText = ''; // text extraction handled separately
+    // Show banner immediately
     var banner = document.getElementById('base-doc-banner');
     if (banner) banner.style.display = 'flex';
+    // Extract text from the uploaded file via signed URL
+    try {
+      var sigRes = await fetch(WORKER_URL + '/storage/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        body: JSON.stringify({ path: udBase.storage_path })
+      });
+      var sigData = await sigRes.json();
+      var signedUrl = sigData.signedURL || sigData.signedUrl || '';
+      if (!signedUrl.startsWith('http')) signedUrl = 'https://qkgnjuluajlfrlprbplt.supabase.co/storage/v1' + signedUrl;
+
+      var fileRes = await fetch(signedUrl);
+      var arrayBuffer = await fileRes.arrayBuffer();
+
+      var ext = (udBase.file_name || '').split('.').pop().toLowerCase();
+      if (ext === 'docx' || ext === 'doc') {
+        if (typeof mammoth !== 'undefined') {
+          var result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+          baseResumeText = result.value || '';
+        }
+      } else if (ext === 'txt') {
+        baseResumeText = new TextDecoder().decode(arrayBuffer);
+      } else if (ext === 'pdf' && typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        var pages = [];
+        for (var i = 1; i <= pdf.numPages; i++) {
+          var page = await pdf.getPage(i);
+          var tc = await page.getTextContent();
+          pages.push(tc.items.map(function(item) { return item.str; }).join(' '));
+        }
+        baseResumeText = pages.join('\n\n');
+      }
+    } catch(e) {
+      console.warn('Could not extract base resume text:', e.message);
+      baseResumeText = '';
+    }
     return;
   }
 
@@ -7428,6 +7463,16 @@ function _getRTFilename() {
 // Final resume — clean template format, no yellow highlights
 function exportRTDocx() {
   if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
+  // Guard: detect AI response asking for resume rather than tailored output
+  var lc = rtOutput.toLowerCase();
+  var looksLikeRequest = (lc.includes("could you please") || lc.includes("i need the") ||
+    lc.includes("wasn't included") || lc.includes("please provide") ||
+    lc.includes("i notice you") || lc.includes("can you share") ||
+    (lc.includes("resume") && lc.includes("?") && rtOutput.length < 800));
+  if (looksLikeRequest) {
+    toast('The AI response doesn’t look like a resume. Check your base resume is set in Documents → Resumes tab.', 'error');
+    return;
+  }
   var clean = rtOutput.replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi, '');
   buildResumeDocx(clean, _getRTFilename() + '_Resume');
 }
