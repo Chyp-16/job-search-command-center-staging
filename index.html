@@ -1938,7 +1938,15 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>File Name</th><th>Format</th><th>Company</th><th>Role</th><th>Uploaded</th><th>Base Resume</th><th></th></tr></thead>
+            <thead><tr>
+              <th id="rth-file_name" data-label="File Name" onclick="sortResumes('file_name')" style="cursor:pointer">File Name &#8597;</th>
+              <th>Format</th>
+              <th id="rth-company" data-label="Company" onclick="sortResumes('company')" style="cursor:pointer">Company &#8597;</th>
+              <th id="rth-role" data-label="Role" onclick="sortResumes('role')" style="cursor:pointer">Role &#8597;</th>
+              <th id="rth-created_at" data-label="Uploaded" onclick="sortResumes('created_at')" style="cursor:pointer">Uploaded &#8595;</th>
+              <th>Base Resume</th>
+              <th></th>
+            </tr></thead>
             <tbody id="resumes-tbody"><tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr></tbody>
           </table>
         </div>
@@ -1951,7 +1959,15 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>File Name</th><th>Format</th><th>Company</th><th>Role</th><th>Uploaded</th><th>Notes</th><th></th></tr></thead>
+            <thead><tr>
+              <th id="clth-file_name" data-label="File Name" onclick="sortCL('file_name')" style="cursor:pointer">File Name &#8597;</th>
+              <th>Format</th>
+              <th id="clth-company" data-label="Company" onclick="sortCL('company')" style="cursor:pointer">Company &#8597;</th>
+              <th id="clth-role" data-label="Role" onclick="sortCL('role')" style="cursor:pointer">Role &#8597;</th>
+              <th id="clth-created_at" data-label="Uploaded" onclick="sortCL('created_at')" style="cursor:pointer">Uploaded &#8595;</th>
+              <th>Notes</th>
+              <th></th>
+            </tr></thead>
             <tbody id="cl-tbody"><tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr></tbody>
           </table>
         </div>
@@ -5297,6 +5313,16 @@ async function pushContactToHubSpot(contact) {
 async function loadResumes() {
   var data = await dbGet('uploaded_documents', 'select=*&doc_type=eq.Resume&order=created_at.desc');
   var resumes = Array.isArray(data) ? data : [];
+  // Sort: base first, then by active sort field
+  resumes.sort(function(a, b) {
+    if (a.is_base_resume && !b.is_base_resume) return -1;
+    if (!a.is_base_resume && b.is_base_resume) return 1;
+    var av = (a[resumeSortField] || '').toString().toLowerCase();
+    var bv = (b[resumeSortField] || '').toString().toLowerCase();
+    if (!av && bv) return 1; if (av && !bv) return -1;
+    var cmp = av.localeCompare(bv);
+    return resumeSortDir === 'asc' ? cmp : -cmp;
+  });
   var tbody = document.getElementById('resumes-tbody');
   if (!tbody) return;
   var hasBase = resumes.some(function(r) { return r.is_base_resume; });
@@ -5357,6 +5383,14 @@ async function deleteResume(id) {
 async function loadCoverLetters() {
   var data = await dbGet('uploaded_documents', 'select=*&doc_type=eq.Cover Letter&order=created_at.desc');
   var cls = Array.isArray(data) ? data : [];
+  // Sort by active sort field
+  cls.sort(function(a, b) {
+    var av = (a[clSortField] || '').toString().toLowerCase();
+    var bv = (b[clSortField] || '').toString().toLowerCase();
+    if (!av && bv) return 1; if (av && !bv) return -1;
+    var cmp = av.localeCompare(bv);
+    return clSortDir === 'asc' ? cmp : -cmp;
+  });
   var tbody = document.getElementById('cl-tbody');
   if (!tbody) return;
   if (cls.length === 0) {
@@ -8221,6 +8255,10 @@ let allDocs = [];
 let filteredDocs = [];
 let docSortField = 'created_at';
 let docSortDir = 'desc';
+let resumeSortField = 'created_at';
+let resumeSortDir = 'desc';
+let clSortField = 'created_at';
+let clSortDir = 'desc';
 let uploadFile = null;
 
 // ── DOCUMENTS TAB SWITCHER ──────────────────────────────────────────────
@@ -8297,6 +8335,32 @@ function sortDocs(field) {
   renderDocsTable();
 }
 
+function _sortIndicator(field, activeField, dir) {
+  if (field !== activeField) return ' <span style="color:var(--border-strong);font-size:10px">&#8597;</span>';
+  return dir === 'asc' ? ' <span style="color:var(--burgundy);font-size:10px">&#8593;</span>' : ' <span style="color:var(--burgundy);font-size:10px">&#8595;</span>';
+}
+
+function sortResumes(field) {
+  if (resumeSortField === field) resumeSortDir = resumeSortDir === 'asc' ? 'desc' : 'asc';
+  else { resumeSortField = field; resumeSortDir = 'asc'; }
+  // Update header indicators
+  ['file_name','company','role','created_at'].forEach(function(f) {
+    var th = document.getElementById('rth-' + f);
+    if (th) th.innerHTML = th.dataset.label + _sortIndicator(f, resumeSortField, resumeSortDir);
+  });
+  loadResumes();
+}
+
+function sortCL(field) {
+  if (clSortField === field) clSortDir = clSortDir === 'asc' ? 'desc' : 'asc';
+  else { clSortField = field; clSortDir = 'asc'; }
+  ['file_name','company','role','created_at'].forEach(function(f) {
+    var th = document.getElementById('clth-' + f);
+    if (th) th.innerHTML = th.dataset.label + _sortIndicator(f, clSortField, clSortDir);
+  });
+  loadCoverLetters();
+}
+
 const DOC_TYPE_BADGE = {
   'Resume': 'badge-inprogress',
   'Cover Letter': 'badge-outreach',
@@ -8307,6 +8371,21 @@ const DOC_TYPE_BADGE = {
 function renderDocsTable() {
   const tbody = document.getElementById('docs-tbody');
   if (!tbody) return;
+  // Default: base resumes first, then newest to oldest
+  filteredDocs.sort(function(a, b) {
+    if (a.is_base_resume && !b.is_base_resume) return -1;
+    if (!a.is_base_resume && b.is_base_resume) return 1;
+    if (docSortField === 'created_at') {
+      var da = a.created_at || '';
+      var db = b.created_at || '';
+      return docSortDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+    }
+    var av = (a[docSortField] || '').toString().toLowerCase();
+    var bv = (b[docSortField] || '').toString().toLowerCase();
+    if (!av && bv) return 1; if (av && !bv) return -1;
+    var cmp = av.localeCompare(bv);
+    return docSortDir === 'asc' ? cmp : -cmp;
+  });
   if (filteredDocs.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📁</div><h3>No documents yet</h3><p>Upload resumes, cover letters, and job descriptions to track them here.</p></div></td></tr>';
     return;
@@ -8710,16 +8789,16 @@ async function submitUpload() {
     document.getElementById('upload-progress-bar').style.width = '100%';
     document.getElementById('upload-progress-text').textContent = 'Upload complete.';
 
+    var uploadedDocType = docType;
     closeModal('modal-upload');
     toast(uploadFile.name + ' uploaded successfully.', 'success');
 
-    // Refresh docs table if already on uploads page, otherwise navigate there
-    const uploadsPage = document.getElementById('page-documents');
-    if (uploadsPage && uploadsPage.classList.contains('active')) {
-      await loadDocsPage();
-    } else {
-      navigateTo('uploads');
-      await loadDocsPage();
+    // Refresh only the relevant tab — no page navigation
+    await refreshDocs();
+    if (uploadedDocType === 'Resume') {
+      loadResumes();
+    } else if (uploadedDocType === 'Cover Letter') {
+      loadCoverLetters();
     }
   } catch(e) {
     document.getElementById('upload-progress-text').textContent = 'Error: ' + e.message;
