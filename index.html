@@ -7528,7 +7528,7 @@ function buildResumeDocx(text, filename, markedUp) {
   function rpr(font, sz, color, bold, italic, highlight) {
     return '<w:rPr>' +
       '<w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>' +
-      (bold   ? '<w:b/><w:bCs/>'  : '') +
+      (bold   ? '<w:b/><w:bCs/>'  : '<w:b w:val="0"/><w:bCs w:val="0"/>') +
       (italic ? '<w:i/><w:iCs/>'  : '') +
       '<w:color w:val="'+(color||BK)+'"/>' +
       (highlight ? '<w:highlight w:val="yellow"/>' : '') +
