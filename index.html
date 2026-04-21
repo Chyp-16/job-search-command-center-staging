@@ -1534,15 +1534,28 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="rt-keywords-nice" placeholder="e.g. HubSpot, demand generation, B2B">
               </div>
               <div class="form-group">
+                <label class="form-label">Company Name *</label>
+                <input class="form-input" type="text" id="rt-company" placeholder="e.g. Salesforce">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Job Title *</label>
+                <input class="form-input" type="text" id="rt-role" placeholder="e.g. VP of Marketing">
+              </div>
+              <div class="form-group">
                 <label class="form-label">Link to Application (optional)</label>
-                <select class="form-select" id="rt-link-app">
+                <select class="form-select" id="rt-link-app" onchange="autoFillRTFromApp(this.value)">
                   <option value="">— Don't link —</option>
                 </select>
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
                 <label class="form-label">Job Description (optional — paste or upload)</label>
-                <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                <div id="rt-jd-dropzone" style="border:2px dashed var(--border-strong);border-radius:var(--radius);padding:8px;transition:all 0.2s"
+                     ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)';this.style.background='var(--burgundy-muted)'"
+                     ondragleave="this.style.borderColor='var(--border-strong)';this.style.background=''"
+                     ondrop="handleRTJDDrop(event)">
+                  <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here, or drag &amp; drop a file (.pdf, .docx, .txt)..." style="border:none;padding:0;background:transparent;width:100%;resize:vertical"></textarea>
+                </div>
                 <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
                   <input type="file" id="rt-jd-file-page" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUploadPage(event)">
                   <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file-page').click()">📎 Upload JD File</button>
@@ -1557,11 +1570,12 @@ a { color: var(--burgundy); text-decoration: none; }
           </div>
         </div>
         <div class="dash-card" id="rt-output-panel" style="display:none">
-          <div class="dash-card-header">✦ Tailored Resume Analysis
+          <div class="dash-card-header">✦ Tailored Resume &mdash; <span id="rt-output-title" style="font-weight:400;color:var(--text-secondary);font-size:13px"></span>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
-              <button class="btn btn-primary btn-sm" onclick="createAppFromRT()">+ New Application</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTMarkedUp()">⬇ Marked Up</button>
+              <button class="btn btn-primary btn-sm" onclick="exportRTDocx()">⬇ Final Resume</button>
+              <button class="btn btn-secondary btn-sm" onclick="createAppFromRT()">+ New Application</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -7357,6 +7371,11 @@ async function runResumeTailor() {
     const result = await callAIResume([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
     contentEl.textContent = result.replace(/\[\/?Y[LH][WH]?\]/gi, '').replace(/\[\/?YLW\]/gi, '').replace(/\[\/?YH\]/gi, '');
+    // Update output panel title with company/role
+    var coV = (document.getElementById('rt-company')||{}).value || '';
+    var roV = (document.getElementById('rt-role')||{}).value || '';
+    var titleEl = document.getElementById('rt-output-title');
+    if (titleEl) titleEl.textContent = coV && roV ? coV + ' — ' + roV : (coV || roV || '');
     const linkedId = document.getElementById('rt-link-app').value || null;
     await dbPost('ai_outputs', { output_type: 'resume_tailor', linked_application_id: linkedId, content: result });
     if (linkedId) {
@@ -7389,18 +7408,59 @@ function createAppFromRT() {
 }
 
 function clearRT() {
-  ['rt-jd','rt-keywords-req','rt-keywords-nice'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['rt-jd','rt-keywords-req','rt-keywords-nice','rt-company','rt-role'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  var n=document.getElementById('rt-jd-file-page-name'); if(n) n.textContent='';
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
+function _getRTFilename() {
+  var co = cleanForFilename((document.getElementById('rt-company')||{}).value || '');
+  var ro = cleanForFilename((document.getElementById('rt-role')||{}).value || '');
+  if (!co || !ro) {
+    var linkedAppId = (document.getElementById('rt-link-app')||{}).value;
+    var app = allApps.find(function(a) { return a.id === linkedAppId; });
+    co = co || cleanForFilename(app ? app.company : '') || 'Company';
+    ro = ro || cleanForFilename(app ? app.job_title : '') || 'Role';
+  }
+  return 'JayWadhwa_' + co + '_' + ro;
+}
+
+// Final resume — clean template format, no yellow highlights
 function exportRTDocx() {
-  var linkedAppId = document.getElementById('rt-link-app').value;
-  var app = allApps.find(function(a) { return a.id === linkedAppId; });
-  var co = cleanForFilename(app ? app.company : '') || 'Company';
-  var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
-  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
   if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
-  buildResumeDocx(rtOutput, fname);
+  var clean = rtOutput.replace(/\[YLW\]|\[\/YLW\]|\[YH\]|\[\/YH\]/gi, '');
+  buildResumeDocx(clean, _getRTFilename() + '_Resume');
+}
+
+// Marked-up resume — yellow highlights intact, old generic docx format
+function exportRTMarkedUp() {
+  if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
+  exportGenericDocx(rtOutput, _getRTFilename() + '_MarkedUp');
+}
+
+// Auto-fill Company + Job Title when an app is linked
+function autoFillRTFromApp(appId) {
+  if (!appId) return;
+  var app = allApps.find(function(a) { return a.id === appId; });
+  if (!app) return;
+  var coEl = document.getElementById('rt-company');
+  var roEl = document.getElementById('rt-role');
+  if (coEl && !coEl.value && app.company)   coEl.value = app.company;
+  if (roEl && !roEl.value && app.job_title) roEl.value = app.job_title;
+}
+
+// Drag-drop JD file into Resume Tailor
+function handleRTJDDrop(event) {
+  event.preventDefault();
+  var dz = document.getElementById('rt-jd-dropzone');
+  if (dz) { dz.style.borderColor = 'var(--border-strong)'; dz.style.background = ''; }
+  var file = event.dataTransfer.files[0];
+  if (!file) return;
+  var nameEl = document.getElementById('rt-jd-file-page-name');
+  if (nameEl) nameEl.textContent = file.name;
+  // Reuse existing file upload handler
+  var fakeEvent = { target: { files: [file] } };
+  handleRTFileUploadPage(fakeEvent);
 }
 
 function buildResumeDocx(text, filename) {
