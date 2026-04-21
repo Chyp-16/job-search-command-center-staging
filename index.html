@@ -3010,6 +3010,7 @@ function navigateTo(page) {
   if (navItem) navItem.classList.add('active');
   const pageEl = document.getElementById('page-' + page);
   if (pageEl) pageEl.classList.add('active');
+  try { localStorage.setItem('jscc_page', page); } catch(e) {}
   if (page === 'dashboard') { refreshDashboard(); checkBackupReminder(); }
   if (page === 'tasks') loadTasksPage();
   if (page === 'applications') loadApps();
@@ -3023,6 +3024,9 @@ function navigateTo(page) {
   if (page === 'aiwriting') { loadRTPage(); loadCLGPage(); loadOBPage(); loadInterviewPrepPage(); }
   if (page === 'documents') { switchDocsTab('resumes'); loadDocsPage(); }
 }
+
+// Alias for navigateTo — used in onclick attributes
+function showPage(page) { navigateTo(page); }
 
 // Use event delegation on the sidebar so all nav items work regardless of when they were added
 document.querySelector('.sidebar-nav').addEventListener('click', function(e) {
@@ -9959,7 +9963,16 @@ async function runJobSearch() {
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
-refreshDashboard();
+// Restore last visited page on refresh
+(function() {
+  var lastPage = null;
+  try { lastPage = localStorage.getItem('jscc_page'); } catch(e) {}
+  if (lastPage && lastPage !== 'dashboard' && document.getElementById('page-' + lastPage)) {
+    navigateTo(lastPage);
+  } else {
+    refreshDashboard();
+  }
+})();
 // Auto-seed prompts on first load
 setTimeout(seedPrompts, 1500);
 // Load base documents
