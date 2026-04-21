@@ -7662,19 +7662,18 @@ function buildResumeDocx(text, filename) {
     'EXPERIENCE','EXPERTISE','RECOGNITION','AFFILIATION','SUMMARY','CLIENT WIN'
   ];
 
-  // classLine: strips tags for CLASSIFICATION ONLY — never use for rendering
+  // classLine: strips ALL markup for CLASSIFICATION ONLY — never use for rendering
   function classLine(t) {
     return t.trim()
       .replace(/^#{1,3}\s+/,'')
       .replace(/\[\/?YLW\]/gi,'').replace(/\[\/?YH\]/gi,'')
-      .replace(/^\*\*(.+)\*\*$/,'$1')
+      .replace(/\*\*/g,'')
       .trim();
   }
-  // renderLine: strips heading/section markers but KEEPS [YLW] tags for rendering
+  // renderLine: strips heading markers, keeps [YLW] tags and ** for rendering
   function renderLine(t) {
     return t.trim()
       .replace(/^#{1,3}\s+/,'')
-      .replace(/^\*\*(.+)\*\*$/,'$1')
       .trim();
   }
 
@@ -7684,8 +7683,10 @@ function buildResumeDocx(text, filename) {
   }
   function isJobTitle(t) {
     var c = classLine(t);
+    // All-caps line
     if (/^[A-Z][A-Z\s,|&\/\\\-\.]{8,}$/.test(c) && !c.includes(':') && c.length < 100 && !isSectionHdr(t)) return true;
-    if (/\|/.test(c) && !/\d{4}/.test(c) && c.length < 120 && !isSectionHdr(t) && /[A-Z]/.test(c)) return true;
+    // Title Case with pipe but no year
+    if (/\|/.test(c) && !/\d{4}/.test(c) && c.length < 120 && !isSectionHdr(t) && /[A-Z]/.test(c[0])) return true;
     return false;
   }
   function isCoLine(t) {
@@ -7699,43 +7700,41 @@ function buildResumeDocx(text, filename) {
   }
   function isEduDegree(t) {
     var c = classLine(t);
-    return /^(BS|BA|MS|MA|MBA|PhD|BFA|MFA|BS,|BA,|MS,|MA,|Bachelor|Master|Doctor)/i.test(c) && !isCoLine(t) && !isSectionHdr(t);
+    return /^(BS|BA|MS|MA|MBA|PhD|BFA|MFA|Bachelor|Master|Doctor)/i.test(c) && !isCoLine(t) && !isSectionHdr(t);
   }
   function isEduSchool(t) {
     var c = classLine(t);
     return /\b(University|College|Institute|School)\b/i.test(c) && !/\d{4}/.test(c) && !isSectionHdr(t) && c.length < 120;
-  }
-  function isAffiliation(t) {
-    var c = classLine(t);
-    // Lines like "**Guest Lecturer** | DePaul..." or "**Board Member** | Oakton..."
-    return /^\*\*[^*]+\*\*\s*[|\-]/.test(t.trim()) || /^(Guest|Board|Founder|Advisory|Member|Director)/i.test(c);
   }
 
   var bodyXml = '';
   var inExp = false;
   var inEdu = false;
   var inAff = false;
+  var inAddl = false; // Additional Brand/Leadership — auto-bullet ESPN/MSNBC lines
+  var inWins = false; // Select Client Wins — auto-bullet un-dashed items
   var lastWasCoLine = false;
 
-  // Strip duplicate header lines that appear in AI output
-  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area'];
+  // Strip header/name lines and horizontal rules that appear in AI output
+  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area','Jay Wadhwa'];
   var filteredLines = text.split('\n').filter(function(rawLine) {
-    return !headerPhrases.some(function(hp){ return rawLine.includes(hp); });
+    var cl = classLine(rawLine);
+    // Strip exact name, header info, and divider lines
+    if (headerPhrases.some(function(hp){ return rawLine.includes(hp); })) return false;
+    if (/^[-=_]{2,}$/.test(cl)) return false; // strip ---, ===, ___
+    if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
+    return true;
   });
 
   filteredLines.forEach(function(rawLine) {
     var isBulletRaw = /^\s*[-*\u2022]\s+/.test(rawLine);
-    var cl = classLine(rawLine);  // for classification
-    var rl = renderLine(rawLine); // for rendering (keeps YLW tags)
+    var cl = classLine(rawLine);
+    var rl = renderLine(rawLine);
     if (!cl) return;
 
-    // Bullets — use raw YLW-aware render text, stripped of leading dash
+    // Bullets
     if (isBulletRaw) {
-      var bulText = rl.replace(/^[-*\u2022]\s+/, '');
-      // Bold Emmy/Promax entries red
-      if (/Emmy Award|Promax|BDA Award/i.test(bulText)) {
-        bulText = bulText.replace(/(\d+\s+Emmy Awards?)/g,'**$1**').replace(/(\d+\s+Promax[^"]*?Awards?)/g,'**$1**');
-      }
+      var bulText = rl.replace(/^\s*[-*\u2022]\s+/, '');
       bodyXml += bul(bulText);
       lastWasCoLine = false;
       return;
@@ -7746,9 +7745,14 @@ function buildResumeDocx(text, filename) {
       var isExpertise    = /EXPERTISE/.test(cl.toUpperCase());
       var isEducation    = /EDUCATION/.test(cl.toUpperCase());
       var isAffiliations = /AFFILI/.test(cl.toUpperCase());
-      inExp = isExpertise;
-      inEdu = isEducation;
-      inAff = isAffiliations;
+      var isAddlBrand    = /ADDITIONAL/.test(cl.toUpperCase());
+      var isWins         = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
+      inExp  = isExpertise;
+      inEdu  = isEducation;
+      inAff  = isAffiliations;
+      inAddl = isAddlBrand;
+      inWins = isWins;
+      if (!isWins) inWins = false;
       lastWasCoLine = false;
       if (isExpertise) bodyXml += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
       bodyXml += sHdr(cl);
@@ -7765,11 +7769,9 @@ function buildResumeDocx(text, filename) {
     // Inside Education section
     if (inEdu) {
       if (isEduDegree(cl)) {
-        // Degree name: bold, Red #972b32
         bodyXml += P(ppr({sp:['60','30']}),
           '<w:r>'+rpr(CA,'20',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
       } else if (isEduSchool(cl)) {
-        // School name: black, NOT bold
         bodyXml += P(ppr({sp:['0','60']}),
           '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
       } else {
@@ -7778,12 +7780,9 @@ function buildResumeDocx(text, filename) {
       return;
     }
 
-    // Inside Professional Affiliations section
+    // Inside Professional Affiliations — bold role only, plain org
     if (inAff) {
-      // Format: **Role/Title** | Organization — only role bold, rest black normal
-      var affRaw = rl;
-      // Strip any leading **...**
-      var affMatch = affRaw.match(/^\*\*([^*]+)\*\*\s*(.*)$/);
+      var affMatch = rl.match(/^\*\*([^*]+)\*\*\s*(.*)$/);
       if (affMatch) {
         bodyXml += P(ppr({sp:['0','40']}),
           '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(affMatch[1])+'</w:t></w:r>' +
@@ -7791,6 +7790,20 @@ function buildResumeDocx(text, filename) {
       } else {
         bodyXml += bPara(rl);
       }
+      return;
+    }
+
+    // Inside Select Client Wins — auto-bullet all non-bullet lines
+    if (inWins) {
+      bodyXml += bul(rl.replace(/^\s*[-*\u2022]\s*/,''));
+      lastWasCoLine = false;
+      return;
+    }
+
+    // Inside Additional Brand/Leadership — auto-bullet ESPN Classic and MSNBC lines
+    if (inAddl) {
+      bodyXml += bul(rl.replace(/^\s*[-*\u2022]\s*/,''));
+      lastWasCoLine = false;
       return;
     }
 
@@ -7822,11 +7835,8 @@ function buildResumeDocx(text, filename) {
       return;
     }
 
-    // Default: body paragraph — keep YLW tags, auto-bold ESPN/MSNBC
-    var processedLine = rl
-      .replace(/ESPN Classic/g, '**ESPN Classic**')
-      .replace(/MSNBC/g, '**MSNBC**');
-    bodyXml += bPara(processedLine);
+    // Default: body paragraph
+    bodyXml += bPara(rl);
   });
 
   // ── ASSEMBLE DOCUMENT XML ──────────────────────────────────────────────
