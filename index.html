@@ -1916,7 +1916,7 @@ a { color: var(--burgundy); text-decoration: none; }
                 <th onclick="sortDocs('role')">Role ↕</th>
                 <th>Linked Application</th>
                 <th>Contact</th>
-                <th onclick="sortDocs('created_at')">Uploaded ↕</th>
+                <th onclick="sortDocs('file_date')">File Date ↓</th>
                 <th></th>
               </tr>
             </thead>
@@ -1943,7 +1943,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <th>Format</th>
               <th id="rth-company" data-label="Company" onclick="sortResumes('company')" style="cursor:pointer">Company &#8597;</th>
               <th id="rth-role" data-label="Role" onclick="sortResumes('role')" style="cursor:pointer">Role &#8597;</th>
-              <th id="rth-created_at" data-label="Uploaded" onclick="sortResumes('created_at')" style="cursor:pointer">Uploaded &#8595;</th>
+              <th id="rth-file_date" data-label="File Date" onclick="sortResumes('file_date')" style="cursor:pointer">File Date &#8595;</th>
               <th>Base Resume</th>
               <th></th>
             </tr></thead>
@@ -1964,7 +1964,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <th>Format</th>
               <th id="clth-company" data-label="Company" onclick="sortCL('company')" style="cursor:pointer">Company &#8597;</th>
               <th id="clth-role" data-label="Role" onclick="sortCL('role')" style="cursor:pointer">Role &#8597;</th>
-              <th id="clth-created_at" data-label="Uploaded" onclick="sortCL('created_at')" style="cursor:pointer">Uploaded &#8595;</th>
+              <th id="clth-file_date" data-label="File Date" onclick="sortCL('file_date')" style="cursor:pointer">File Date &#8595;</th>
               <th>Notes</th>
               <th></th>
             </tr></thead>
@@ -5317,8 +5317,12 @@ async function loadResumes() {
   resumes.sort(function(a, b) {
     if (a.is_base_resume && !b.is_base_resume) return -1;
     if (!a.is_base_resume && b.is_base_resume) return 1;
-    var av = (a[resumeSortField] || '').toString().toLowerCase();
-    var bv = (b[resumeSortField] || '').toString().toLowerCase();
+    var _getVal = function(obj, field) {
+      if (field === 'file_date') return obj.file_date || obj.created_at || '';
+      return (obj[field] || '').toString().toLowerCase();
+    };
+    var av = _getVal(a, resumeSortField);
+    var bv = _getVal(b, resumeSortField);
     if (!av && bv) return 1; if (av && !bv) return -1;
     var cmp = av.localeCompare(bv);
     return resumeSortDir === 'asc' ? cmp : -cmp;
@@ -5340,7 +5344,7 @@ async function loadResumes() {
       '<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-secondary)">' + (ext || '?') + '</span></td>' +
       '<td>' + (r.company || '&mdash;') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (r.role || '&mdash;') + '</td>' +
-      '<td style="font-size:12px">' + fmt(r.created_at ? r.created_at.split('T')[0] : null) + '</td>' +
+      '<td style="font-size:12px">' + fmt(r.file_date || (r.created_at ? r.created_at.split('T')[0] : null)) + '</td>' +
       '<td>' + (isBase
         ? '<span class="badge badge-inprogress">&#11088; Base</span>'
         : '<button class="btn btn-secondary btn-sm" style="font-size:11px" data-rid="' + r.id + '" onclick="setBaseResume(this.dataset.rid)">Set as Base</button>') + '</td>' +
@@ -5385,8 +5389,12 @@ async function loadCoverLetters() {
   var cls = Array.isArray(data) ? data : [];
   // Sort by active sort field
   cls.sort(function(a, b) {
-    var av = (a[clSortField] || '').toString().toLowerCase();
-    var bv = (b[clSortField] || '').toString().toLowerCase();
+    var _getCLVal = function(obj, field) {
+      if (field === 'file_date') return obj.file_date || obj.created_at || '';
+      return (obj[field] || '').toString().toLowerCase();
+    };
+    var av = _getCLVal(a, clSortField);
+    var bv = _getCLVal(b, clSortField);
     if (!av && bv) return 1; if (av && !bv) return -1;
     var cmp = av.localeCompare(bv);
     return clSortDir === 'asc' ? cmp : -cmp;
@@ -5404,7 +5412,7 @@ async function loadCoverLetters() {
       '<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-secondary)">' + (ext || '?') + '</span></td>' +
       '<td>' + (c.company || '&mdash;') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.role || '&mdash;') + '</td>' +
-      '<td style="font-size:12px">' + fmt(c.created_at ? c.created_at.split('T')[0] : null) + '</td>' +
+      '<td style="font-size:12px">' + fmt(c.file_date || (c.created_at ? c.created_at.split('T')[0] : null)) + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + ((c.notes||'').slice(0,50) || '&mdash;') + '</td>' +
       '<td><div class="table-actions">' +
         (c.storage_path ? '<button class="btn btn-secondary btn-sm" data-docid="' + c.id + '" data-path="' + (c.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid,this.dataset.path)" title="Download">&#11015;</button> ' : '') +
@@ -8253,11 +8261,11 @@ async function exportFromTemplate(templateFile, replacements, downloadName) {
 // ── MY DOCUMENTS ────────────────────────────────────────────────────────
 let allDocs = [];
 let filteredDocs = [];
-let docSortField = 'created_at';
+let docSortField = 'file_date';
 let docSortDir = 'desc';
-let resumeSortField = 'created_at';
+let resumeSortField = 'file_date';
 let resumeSortDir = 'desc';
-let clSortField = 'created_at';
+let clSortField = 'file_date';
 let clSortDir = 'desc';
 let uploadFile = null;
 
@@ -8375,9 +8383,9 @@ function renderDocsTable() {
   filteredDocs.sort(function(a, b) {
     if (a.is_base_resume && !b.is_base_resume) return -1;
     if (!a.is_base_resume && b.is_base_resume) return 1;
-    if (docSortField === 'created_at') {
-      var da = a.created_at || '';
-      var db = b.created_at || '';
+    if (docSortField === 'file_date' || docSortField === 'created_at') {
+      var da = a.file_date || a.created_at || '';
+      var db = b.file_date || b.created_at || '';
       return docSortDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
     }
     var av = (a[docSortField] || '').toString().toLowerCase();
@@ -8407,7 +8415,7 @@ function renderDocsTable() {
       '<td style="font-size:12px;color:var(--text-secondary)">' + (d.role || '—') + '</td>' +
       '<td style="font-size:12px">' + (appName || '—') + '</td>' +
       '<td style="font-size:12px">' + (contactName || '—') + '</td>' +
-      '<td style="font-size:12px">' + fmt(d.created_at ? d.created_at.split('T')[0] : null) + '</td>' +
+      '<td style="font-size:12px">' + fmt(d.file_date || (d.created_at ? d.created_at.split('T')[0] : null)) + '</td>' +
       '<td><div class="table-actions">' +
         (hasPath
           ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
@@ -8771,6 +8779,9 @@ async function submitUpload() {
     }
 
     // Save record to database
+    var fileDate = uploadFile.lastModified
+      ? new Date(uploadFile.lastModified).toISOString().split('T')[0]
+      : null;
     const record = {
       file_name: uploadFile.name,
       file_type: uploadFile.type,
@@ -8780,6 +8791,7 @@ async function submitUpload() {
       role: role || null,
       notes: notes || null,
       file_size: uploadFile.size,
+      file_date: fileDate,
       linked_application_id: linkedAppId,
       linked_contact_id: linkedContactId,
     };
