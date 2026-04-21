@@ -1930,47 +1930,29 @@ a { color: var(--burgundy); text-decoration: none; }
       <!-- Tab: Resumes -->
       <div id="dt-panel-resumes" style="display:none">
         <div id="base-doc-banner" style="display:none;margin:16px 32px 0;padding:12px 16px;background:var(--burgundy-muted);border:1px solid var(--burgundy);border-radius:var(--radius);font-size:12px;color:var(--burgundy);display:flex;align-items:center;justify-content:space-between">
-          <span>&#10003; Base resume loaded — Claude will use it automatically for all AI features.</span>
-          <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">Edit</button>
+          <span>&#10003; Base resume set &mdash; Claude uses it for all AI features.</span>
+          <button class="btn btn-secondary btn-sm" onclick="openBaseDocModal()">Edit Base Text</button>
+        </div>
+        <div style="margin:16px 32px 0;border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:20px;text-align:center;cursor:pointer;background:var(--bg)" onclick="openUploadDocType('Resume')" ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'" ondragleave="this.style.borderColor='var(--border-strong)'" ondrop="handleDocTabDrop(event,'Resume')">
+          <span style="font-size:13px;color:var(--text-secondary)">&#128196; Drop a resume here or <strong style="color:var(--burgundy)">click to upload</strong></span>
         </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>Version Name</th>
-                <th>Target Role</th>
-                <th>Target Company</th>
-                <th>Date Created</th>
-                <th>Base Version</th>
-                <th>Keywords</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="resumes-tbody">
-              <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-            </tbody>
+            <thead><tr><th>File Name</th><th>Format</th><th>Company</th><th>Role</th><th>Uploaded</th><th>Base Resume</th><th></th></tr></thead>
+            <tbody id="resumes-tbody"><tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr></tbody>
           </table>
         </div>
       </div>
 
       <!-- Tab: Cover Letters -->
       <div id="dt-panel-coverletters" style="display:none">
+        <div style="margin:16px 32px 0;border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:20px;text-align:center;cursor:pointer;background:var(--bg)" onclick="openUploadDocType('Cover Letter')" ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'" ondragleave="this.style.borderColor='var(--border-strong)'" ondrop="handleDocTabDrop(event,'Cover Letter')">
+          <span style="font-size:13px;color:var(--text-secondary)">&#9993; Drop a cover letter here or <strong style="color:var(--burgundy)">click to upload</strong></span>
+        </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>Version Name</th>
-                <th>Target Role</th>
-                <th>Target Company</th>
-                <th>Date Created</th>
-                <th>AI Generated</th>
-                <th>Notes</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="cl-tbody">
-              <tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
-            </tbody>
+            <thead><tr><th>File Name</th><th>Format</th><th>Company</th><th>Role</th><th>Uploaded</th><th>Notes</th><th></th></tr></thead>
+            <tbody id="cl-tbody"><tr><td colspan="7"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -5311,88 +5293,92 @@ async function pushContactToHubSpot(contact) {
 
 
 // ── RESUMES ────────────────────────────────────────────────────────────
+// ── RESUME TAB (from uploaded_documents) ────────────────────────────────
 async function loadResumes() {
-  const data = await dbGet('resumes', 'select=*&order=date_created.desc');
-  const resumes = Array.isArray(data) ? data : [];
-  const tbody = document.getElementById('resumes-tbody');
+  var data = await dbGet('uploaded_documents', 'select=*&doc_type=eq.Resume&order=created_at.desc');
+  var resumes = Array.isArray(data) ? data : [];
+  var tbody = document.getElementById('resumes-tbody');
+  if (!tbody) return;
+  var hasBase = resumes.some(function(r) { return r.is_base_resume; });
+  var banner = document.getElementById('base-doc-banner');
+  if (banner) banner.style.display = hasBase ? 'flex' : 'none';
   if (resumes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📄</div><h3>No resume versions yet</h3><p>Add your first version to start tracking.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">&#128196;</div><h3>No resumes uploaded yet</h3><p>Drag a file above or click to upload.</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = resumes.map(r => {
-    const req = Array.isArray(r.keywords_required) ? r.keywords_required : [];
-    const nice = Array.isArray(r.keywords_nice) ? r.keywords_nice : [];
-    return `<tr>
-      <td><strong>${r.version_name}</strong></td>
-      <td>${r.target_role || '—'}</td>
-      <td>${r.target_company || '—'}</td>
-      <td>${fmt(r.date_created)}</td>
-      <td>${r.is_base_version ? '<span class="badge badge-inprogress">Base</span>' : '—'}</td>
-      <td style="font-size:11px;color:var(--text-secondary)">${req.length + nice.length > 0 ? `${req.length} required, ${nice.length} nice-to-have` : '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="action-btn danger" onclick="deleteResume('${r.id}')" title="Delete">🗑</button>
-        </div>
-      </td>
-    </tr>`;
+  tbody.innerHTML = resumes.map(function(r) {
+    var ext = (r.file_name || '').split('.').pop().toLowerCase();
+    var isBase = r.is_base_resume;
+    return '<tr>' +
+      '<td><strong>' + (r.file_name || '&mdash;') + '</strong></td>' +
+      '<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-secondary)">' + (ext || '?') + '</span></td>' +
+      '<td>' + (r.company || '&mdash;') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (r.role || '&mdash;') + '</td>' +
+      '<td style="font-size:12px">' + fmt(r.created_at ? r.created_at.split('T')[0] : null) + '</td>' +
+      '<td>' + (isBase
+        ? '<span class="badge badge-inprogress">&#11088; Base</span>'
+        : '<button class="btn btn-secondary btn-sm" style="font-size:11px" data-rid="' + r.id + '" onclick="setBaseResume(this.dataset.rid)">Set as Base</button>') + '</td>' +
+      '<td><div class="table-actions">' +
+        (r.storage_path ? '<button class="btn btn-secondary btn-sm" data-docid="' + r.id + '" data-path="' + (r.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid,this.dataset.path)" title="Download">&#11015;</button> ' : '') +
+        '<button class="action-btn" data-docid="' + r.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">&#9999;</button>' +
+        '<button class="action-btn danger" data-docid="' + r.id + '" data-path="' + (r.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid,this.dataset.path)" title="Delete">&#128465;</button>' +
+      '</div></td>' +
+    '</tr>';
   }).join('');
 }
 
-function openAddResume() {
-  ['rf-name','rf-role','rf-company','rf-req','rf-nice','rf-notes'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
-  document.getElementById('rf-date').value = today();
-  document.getElementById('rf-base').checked = false;
-  openModal('modal-resume');
-}
-
-async function saveResume() {
-  const version_name = getVal('rf-name');
-  if (!version_name) { toast('Version name required.', 'error'); return; }
-  const req = getVal('rf-req') ? getVal('rf-req').split(',').map(s=>s.trim()).filter(Boolean) : [];
-  const nice = getVal('rf-nice') ? getVal('rf-nice').split(',').map(s=>s.trim()).filter(Boolean) : [];
-  const payload = {
-    version_name, target_role: getVal('rf-role'), target_company: getVal('rf-company'),
-    date_created: getVal('rf-date'), is_base_version: document.getElementById('rf-base').checked,
-    keywords_required: req, keywords_nice: nice, notes: getVal('rf-notes'),
-  };
+async function setBaseResume(id) {
   try {
-    await dbPost('resumes', payload);
-    closeModal('modal-resume');
-    loadResumes();
-    toast('Resume version saved.', 'success');
+    var all = await dbGet('uploaded_documents', 'select=id&is_base_resume=eq.true&doc_type=eq.Resume');
+    if (Array.isArray(all)) {
+      for (var i = 0; i < all.length; i++) {
+        await dbPatch('uploaded_documents', all[i].id, { is_base_resume: false });
+      }
+    }
+    await dbPatch('uploaded_documents', id, { is_base_resume: true });
+    await loadResumes();
+    await loadBaseDocs();
+    toast('Base resume set. All AI tools will use this file.', 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
+function openAddResume() {
+  openUploadDocType('Resume');
+}
+
 async function deleteResume(id) {
-  if (!confirm('Delete this resume version?')) return;
-  await dbDelete('resumes', id);
+  if (!confirm('Delete this resume?')) return;
+  await dbDelete('uploaded_documents', id);
   loadResumes();
   toast('Resume deleted.');
 }
 
-// ── COVER LETTERS ──────────────────────────────────────────────────────
+// ── COVER LETTERS TAB (from uploaded_documents) ─────────────────────────
 async function loadCoverLetters() {
-  const data = await dbGet('cover_letters', 'select=*&order=date_created.desc');
-  const cls = Array.isArray(data) ? data : [];
-  const tbody = document.getElementById('cl-tbody');
+  var data = await dbGet('uploaded_documents', 'select=*&doc_type=eq.Cover Letter&order=created_at.desc');
+  var cls = Array.isArray(data) ? data : [];
+  var tbody = document.getElementById('cl-tbody');
+  if (!tbody) return;
   if (cls.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">✉️</div><h3>No cover letters yet</h3><p>Add or generate cover letters here.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">&#9993;</div><h3>No cover letters uploaded yet</h3><p>Drag a file above or click to upload.</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = cls.map(c => `<tr>
-    <td><strong>${c.version_name}</strong></td>
-    <td>${c.target_role||'—'}</td>
-    <td>${c.target_company||'—'}</td>
-    <td>${fmt(c.date_created)}</td>
-    <td>${c.ai_generated?'<span class="badge badge-outreach">AI</span>':'—'}</td>
-    <td style="font-size:12px;color:var(--text-secondary)">${(c.notes||'').slice(0,60)||'—'}</td>
-    <td>
-      <div class="table-actions">
-        <button class="action-btn" onclick="viewCL('${c.id}')" title="View">👁</button>
-        <button class="action-btn danger" onclick="deleteCL('${c.id}')" title="Delete">🗑</button>
-      </div>
-    </td>
-  </tr>`).join('');
+  tbody.innerHTML = cls.map(function(c) {
+    var ext = (c.file_name || '').split('.').pop().toLowerCase();
+    return '<tr>' +
+      '<td><strong>' + (c.file_name || '&mdash;') + '</strong></td>' +
+      '<td><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--bg);border:1px solid var(--border-strong);color:var(--text-secondary)">' + (ext || '?') + '</span></td>' +
+      '<td>' + (c.company || '&mdash;') + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + (c.role || '&mdash;') + '</td>' +
+      '<td style="font-size:12px">' + fmt(c.created_at ? c.created_at.split('T')[0] : null) + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + ((c.notes||'').slice(0,50) || '&mdash;') + '</td>' +
+      '<td><div class="table-actions">' +
+        (c.storage_path ? '<button class="btn btn-secondary btn-sm" data-docid="' + c.id + '" data-path="' + (c.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid,this.dataset.path)" title="Download">&#11015;</button> ' : '') +
+        '<button class="action-btn" data-docid="' + c.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">&#9999;</button>' +
+        '<button class="action-btn danger" data-docid="' + c.id + '" data-path="' + (c.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid,this.dataset.path)" title="Delete">&#128465;</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
 }
 
 function openAddCoverLetter() {
@@ -6019,17 +6005,28 @@ let baseResumeText = '';
 let baseCoverLetterText = '';
 
 async function loadBaseDocs() {
-  // Load from Supabase resumes table where is_base_version = true
-  const data = await dbGet('resumes', 'select=*&is_base_version=eq.true&order=created_at.desc&limit=1');
-  const base = Array.isArray(data) && data.length > 0 ? data[0] : null;
+  // First try: uploaded_documents with is_base_resume = true (new system)
+  var udData = await dbGet('uploaded_documents', 'select=*&is_base_resume=eq.true&doc_type=eq.Resume&order=created_at.desc&limit=1');
+  var udBase = Array.isArray(udData) && udData.length > 0 ? udData[0] : null;
+
+  if (udBase && udBase.storage_path) {
+    // File is in storage — get signed URL and extract text via mammoth if docx
+    // For now, signal that a base is set so banner shows
+    baseResumeText = ''; // text extraction handled separately
+    var banner = document.getElementById('base-doc-banner');
+    if (banner) banner.style.display = 'flex';
+    return;
+  }
+
+  // Fallback: resumes table (legacy text-paste system)
+  var data = await dbGet('resumes', 'select=*&is_base_version=eq.true&order=created_at.desc&limit=1');
+  var base = Array.isArray(data) && data.length > 0 ? data[0] : null;
   if (base && base.notes) {
-    // We store base doc text in the notes field as JSON
     try {
-      const parsed = JSON.parse(base.notes);
+      var parsed = JSON.parse(base.notes);
       baseResumeText = parsed.resume || '';
       baseCoverLetterText = parsed.cover_letter || '';
-      // Show the banner on resumes page
-      const banner = document.getElementById('base-doc-banner');
+      var banner = document.getElementById('base-doc-banner');
       if (banner && baseResumeText) banner.style.display = 'flex';
     } catch(e) {
       baseResumeText = base.notes || '';
@@ -8247,11 +8244,11 @@ function switchDocsTab(tab) {
     if (addBtn)  { addBtn.textContent = '⬆ Upload Document'; addBtn.onclick = async function(){ await openUploadModal(); }; }
   } else if (tab === 'resumes') {
     if (baseBtn) baseBtn.style.display = '';
-    if (addBtn)  { addBtn.textContent = '+ Add Version'; addBtn.onclick = openAddResume; }
+    if (addBtn)  { addBtn.style.display = ''; addBtn.textContent = '⬆ Upload Resume'; addBtn.onclick = function(){ openUploadDocType('Resume'); }; }
     loadResumes();
   } else if (tab === 'coverletters') {
     if (baseBtn) baseBtn.style.display = 'none';
-    if (addBtn)  { addBtn.textContent = '+ Add Cover Letter'; addBtn.onclick = openAddCoverLetter; }
+    if (addBtn)  { addBtn.style.display = ''; addBtn.textContent = '⬆ Upload Cover Letter'; addBtn.onclick = function(){ openUploadDocType('Cover Letter'); }; }
     loadCoverLetters();
   }
 }
@@ -8381,6 +8378,8 @@ async function editDocRecord(id) {
   if (!d) return;
   await openUploadModal();
   setTimeout(function() {
+    var hdr = document.querySelector('#modal-upload .modal-header h3');
+    if (hdr) hdr.textContent = 'Edit Document';
     document.getElementById('upload-company').value = d.company || '';
     document.getElementById('upload-role').value = d.role || '';
     document.getElementById('upload-doc-type').value = d.doc_type || 'Resume';
@@ -8414,6 +8413,40 @@ async function saveDocEdits(id) {
 }
 
 // ── UPLOAD MODAL ─────────────────────────────────────────────────────────
+function openUploadDocType(docType) {
+  window.setTimeout(function() {
+    openUploadModal().then(function() {
+      window.setTimeout(function() {
+        var el = document.getElementById('upload-doc-type');
+        if (el) el.value = docType;
+      }, 150);
+    });
+  }, 0);
+}
+
+function handleDocTabDrop(event, docType) {
+  event.preventDefault();
+  var file = event.dataTransfer.files[0];
+  if (!file) return;
+  var zone = event.currentTarget;
+  zone.style.borderColor = 'var(--border-strong)';
+  zone.style.background = 'var(--bg)';
+  openUploadModal().then(function() {
+    window.setTimeout(function() {
+      var el = document.getElementById('upload-doc-type');
+      if (el) el.value = docType;
+      // Set the file into the upload modal
+      uploadFile = file;
+      var nameEl = document.getElementById('upload-file-name');
+      var infoEl = document.getElementById('upload-file-info');
+      var dropEl = document.getElementById('upload-dropzone');
+      if (nameEl) nameEl.textContent = file.name;
+      if (infoEl) infoEl.style.display = 'flex';
+      if (dropEl) dropEl.style.display = 'none';
+    }, 150);
+  });
+}
+
 async function openUploadDoc(docType) {
   // Ensure apps and contacts are loaded for the dropdowns
   if (!allApps.length) {
@@ -8434,6 +8467,8 @@ async function openUploadDoc(docType) {
 async function openUploadModal(preSelectAppId) {
   uploadFile = null;
   clearUploadFile();
+  var hdrU = document.querySelector('#modal-upload .modal-header h3');
+  if (hdrU) hdrU.textContent = '⬆ Upload Document';
   document.getElementById('upload-doc-type').value = 'Resume';
   document.getElementById('upload-company').value = '';
   document.getElementById('upload-role').value = '';
