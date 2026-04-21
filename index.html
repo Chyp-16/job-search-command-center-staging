@@ -7663,7 +7663,12 @@ function buildResumeDocx(text, filename) {
   ];
 
   function cleanLine(t) {
-    return t.trim().replace(/^#{1,3}\s+/,'').replace(/^\*\*(.+)\*\*$/,'$1').trim();
+    return t.trim()
+      .replace(/^#{1,3}\s+/,'')
+      .replace(/^\*\*(.+)\*\*$/,'$1')
+      .replace(/\[\/?YLW\]/gi,'')
+      .replace(/\[\/?YH\]/gi,'')
+      .trim();
   }
   function isSectionHdr(t) {
     var u = t.replace(/\*\*/g,'').trim().toUpperCase().replace(/[^A-Z &|]/g,'');
@@ -7671,7 +7676,11 @@ function buildResumeDocx(text, filename) {
   }
   function isJobTitle(t) {
     var c = t.replace(/\*\*/g,'').trim();
-    return /^[A-Z][A-Z\s,|&\/\\\-\.]{8,}$/.test(c) && !c.includes(':') && c.length < 100 && !isSectionHdr(c);
+    // All-caps line (classic job title)
+    if (/^[A-Z][A-Z\s,|&\/\\\-\.]{8,}$/.test(c) && !c.includes(':') && c.length < 100 && !isSectionHdr(c)) return true;
+    // Title Case with pipe separator but NO year (e.g. "Director of Marketing | Commercial Real Estate")
+    if (/\|/.test(c) && !/\d{4}/.test(c) && c.length < 120 && !isSectionHdr(c) && /[A-Z]/.test(c)) return true;
+    return false;
   }
   function isCoLine(t) {
     var c = t.replace(/\*\*/g,'').trim();
@@ -7682,18 +7691,25 @@ function buildResumeDocx(text, filename) {
     var c = t.replace(/\*\*/g,'').trim();
     return /(Results|Leadership|Wins|Track Record)[\s:]*$/.test(c) && !/^[-*\u2022]/.test(c) && c.length < 90 && !isJobTitle(c);
   }
-  function isBullet(t) { return /^[-*\u2022]\s+/.test(t.trim()); }
+  // isBullet replaced by isBulletRaw check in forEach loop
 
   var bodyXml = '';
   var inExp = false;
   var lastWasCoLine = false;
 
-  text.split('\n').forEach(function(rawLine) {
+  // Strip duplicate header lines that may appear in AI output
+  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area'];
+  var filteredLines = text.split('\n').filter(function(rawLine) {
+    return !headerPhrases.some(function(hp){ return rawLine.includes(hp); });
+  });
+
+  filteredLines.forEach(function(rawLine) {
+    var isBulletRaw = /^\s*[-*\u2022]\s+/.test(rawLine);
     var line = cleanLine(rawLine);
     if (!line) return;
 
-    // Bullets
-    if (isBullet(line)) {
+    // Bullets — check raw line to preserve leading dash before cleaning
+    if (isBulletRaw) {
       bodyXml += bul(line.replace(/^[-*\u2022]\s+/, ''));
       lastWasCoLine = false;
       return;
@@ -7701,8 +7717,13 @@ function buildResumeDocx(text, filename) {
 
     // Section headers
     if (isSectionHdr(line)) {
-      inExp = /EXPERTISE/.test(line.replace(/\*\*/g,'').toUpperCase());
+      var isExpertise = /EXPERTISE/.test(line.replace(/\*\*/g,'').toUpperCase());
+      inExp = isExpertise;
       lastWasCoLine = false;
+      // Page break before Core Expertise
+      if (isExpertise) {
+        bodyXml += '<w:p><w:r><w:lastRenderedPageBreak/><w:br w:type="page"/></w:r></w:p>';
+      }
       bodyXml += sHdr(line);
       return;
     }
@@ -7746,7 +7767,11 @@ function buildResumeDocx(text, filename) {
     }
 
     // Default: body paragraph
-    bodyXml += bPara(line);
+    // Auto-bold ESPN Classic and MSNBC if not already bold
+    var processedLine = line
+      .replace(/(?<!\*\*)ESPN Classic(?!\*\*)/g, '**ESPN Classic**')
+      .replace(/(?<!\*\*)MSNBC(?!\*\*)/g, '**MSNBC**');
+    bodyXml += bPara(processedLine);
   });
 
   // ── ASSEMBLE DOCUMENT XML ──────────────────────────────────────────────
