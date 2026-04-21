@@ -7480,13 +7480,6 @@ function exportRTDocx() {
 // Marked-up resume — same template format, yellow highlights intact
 function exportRTMarkedUp() {
   if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
-  // Debug: check whether AI actually returned YLW tags
-  var hasYLW = /\[YLW\]/i.test(rtOutput);
-  console.log('[MarkedUp] YLW tags present:', hasYLW, '| Output preview:', rtOutput.slice(0, 300));
-  if (!hasYLW) {
-    toast('No changes were marked by AI (no [YLW] tags found). Run Resume Tailor again — the AI must produce highlighted changes.', 'error');
-    return;
-  }
   buildResumeDocx(rtOutput, _getRTFilename() + '_MarkedUp', true);
 }
 
@@ -7531,15 +7524,15 @@ function buildResumeDocx(text, filename, markedUp) {
     return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Build w:rPr XML block
+  // Build w:rPr XML block — element order per OOXML schema
   function rpr(font, sz, color, bold, italic, highlight) {
     return '<w:rPr>' +
       '<w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>' +
-      (bold   ? '<w:b/><w:bCs/>'  : '<w:b w:val="0"/><w:bCs w:val="0"/>') +
+      (bold   ? '<w:b/><w:bCs/>'  : '') +
       (italic ? '<w:i/><w:iCs/>'  : '') +
       '<w:color w:val="'+(color||BK)+'"/>' +
-      '<w:sz w:val="'+(sz||'20')+'"/><w:szCs w:val="'+(sz||'20')+'"/>' +
       (highlight ? '<w:highlight w:val="yellow"/>' : '') +
+      '<w:sz w:val="'+(sz||'20')+'"/><w:szCs w:val="'+(sz||'20')+'"/>' +
       '</w:rPr>';
   }
 
