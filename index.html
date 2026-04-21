@@ -7432,10 +7432,10 @@ function exportRTDocx() {
   buildResumeDocx(clean, _getRTFilename() + '_Resume');
 }
 
-// Marked-up resume — yellow highlights intact, old generic docx format
+// Marked-up resume — same template format, yellow highlights intact
 function exportRTMarkedUp() {
   if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
-  exportGenericDocx(rtOutput, _getRTFilename() + '_MarkedUp');
+  buildResumeDocx(rtOutput, _getRTFilename() + '_MarkedUp');
 }
 
 // Auto-fill Company + Job Title when an app is linked
@@ -7466,117 +7466,254 @@ function handleRTJDDrop(event) {
 function buildResumeDocx(text, filename) {
   if (typeof JSZip === 'undefined') { toast('JSZip not loaded.', 'error'); return; }
 
-  var BG = '972b32', BL = '2E5090', BK = '000000';
-  var CA = 'Calibri', CL = 'Calibri Light', GH = 'Century Gothic';
+  // ── v4 APPROVED SPEC ─────────────────────────────────────────────────
+  // Colors matching approved build_resume.js
+  var BG = '972b32';   // burgundy — name, job titles, expertise sub-headers
+  var BL = '2E5090';   // blue — section header border only
+  var BK = '000000';   // black — body, company lines, section header text
+  var DA = '0D0D0D';   // dark — title block
+
+  // Fonts
+  var CA = 'Calibri';
+  var CL = 'Calibri Light';
+  var GH = 'Century Gothic';
 
   function esc(s) {
     return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function rpr(font, sz, color, bold, italic) {
+  // Build w:rPr XML
+  function mkRpr(font, sz, color, bold, italic, highlight) {
     return '<w:rPr>' +
       '<w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>' +
-      (bold ? '<w:b/><w:bCs/>' : '') +
-      (italic ? '<w:i/><w:iCs/>' : '') +
+      (bold    ? '<w:b/><w:bCs/>'  : '') +
+      (italic  ? '<w:i/><w:iCs/>'  : '') +
       '<w:color w:val="'+(color||BK)+'"/>' +
       '<w:sz w:val="'+(sz||'20')+'"/><w:szCs w:val="'+(sz||'20')+'"/>' +
+      (highlight ? '<w:highlight w:val="yellow"/>' : '') +
       '</w:rPr>';
   }
 
-  // Parse **bold** into runs. Non-bold uses CL unless isBold overrides to CA
+  // Parse **bold** and [YLW]...[/YLW] into w:r runs
+  // Non-bold segments use `font` param (default CL); bold segments use CA
   function iRuns(text, font, sz, color, italic) {
-    var parts = text.split(/\*\*([^*]+)\*\*/g);
-    return parts.map(function(p, i) {
-      var b = i%2===1;
-      return '<w:r>' + rpr(b?CA:font, sz, color, b, italic&&!b) +
-        '<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
-    }).join('');
+    font = font || CL; sz = sz || '20'; color = color || BK;
+    if (!text) return '<w:r>'+mkRpr(font,sz,color,false,italic,false)+'<w:t></w:t></w:r>';
+    text = text.replace(/\[YH\]/gi,'[YLW]').replace(/\[\/YH\]/gi,'[/YLW]');
+    var out = '';
+    var rem = text;
+    while (rem.length > 0) {
+      var bm = /\*\*([^*]+)\*\*/.exec(rem);
+      var ym = /\[YLW\](.*?)\[\/YLW\]/i.exec(rem);
+      var cands = [];
+      if (bm) cands.push({idx:bm.index, len:bm[0].length, inner:bm[1], bold:true});
+      if (ym) cands.push({idx:ym.index, len:ym[0].length, inner:ym[1], ylw:true});
+      cands.sort(function(a,b){return a.idx-b.idx;});
+      var nx = cands[0]||null;
+      if (nx) {
+        if (nx.idx>0) out += '<w:r>'+mkRpr(font,sz,color,false,italic&&!nx.bold,false)+'<w:t xml:space="preserve">'+esc(rem.slice(0,nx.idx))+'</w:t></w:r>';
+        var f2 = nx.bold ? CA : font;
+        out += '<w:r>'+mkRpr(f2,sz,color,nx.bold||false,italic&&!nx.bold,nx.ylw||false)+'<w:t xml:space="preserve">'+esc(nx.inner)+'</w:t></w:r>';
+        rem = rem.slice(nx.idx+nx.len);
+      } else {
+        out += '<w:r>'+mkRpr(font,sz,color,false,italic,false)+'<w:t xml:space="preserve">'+esc(rem)+'</w:t></w:r>';
+        break;
+      }
+    }
+    return out;
   }
 
-  function pp(opts) {
+  // Paragraph property XML
+  function mkPpr(opts) {
+    opts = opts||{};
     var s = '<w:pPr>';
-    if (opts && opts.align)   s += '<w:jc w:val="'+opts.align+'"/>';
-    if (opts && opts.sp)      s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
-    if (opts && opts.ind)     s += '<w:ind w:left="'+opts.ind+'"/>';
-    if (opts && opts.border)  s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="'+BL+'"/></w:pBdr>';
-    if (opts && opts.numId)   s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    if (opts.center)  s += '<w:jc w:val="center"/>';
+    if (opts.sp)      s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
+    if (opts.ind)     s += '<w:ind w:left="'+opts.ind+'"/>';
+    if (opts.bhang)   s += '<w:ind w:left="'+opts.bhang[0]+'" w:hanging="'+opts.bhang[1]+'"/>';
+    if (opts.border)  s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="'+BL+'"/></w:pBdr>';
+    if (opts.numId)   s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    if (opts.tabs)    s += '<w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs>';
+    if (opts.hborder) s += '<w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/></w:pBdr>';
     return s + '</w:pPr>';
   }
 
-  function P(runs, opts) { return '<w:p>'+pp(opts)+runs+'</w:p>'; }
+  function P(ppr, runs) { return '<w:p>'+ppr+runs+'</w:p>'; }
 
-  function sHdr(t)  { return P(iRuns(t.toUpperCase(),CA,'28',BK), {align:'center',sp:['200','80'],border:true}); }
-  function jTitle(t){ return P('<w:r>'+rpr(CA,'20',BG,true)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>', {sp:['120','30']}); }
-  function coLine(t){ return P('<w:r>'+rpr(CA,'20',BK,true)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>', {sp:['0','30']}); }
-  function bPara(t,a){ return P(iRuns(t,CL,'20',BK,false),{sp:['0',a||'60']}); }
-  function iPara(t)  { return P(iRuns(t,CL,'20',BK,true),{sp:['0','60']}); }
-  function expSub(t) { return P('<w:r>'+rpr(CA,'22',BG,true)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>',{sp:['80','20']}); }
-  function expBody(t){ return P(iRuns(t,CL,'20',BK,false),{sp:['0','50'],ind:'432'}); }
-  function rHdr(t)   { return P('<w:r>'+rpr(CA,'20',BK,true)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>',{sp:['60','40']}); }
-  function bul(t)    { return P(iRuns(t,CL,'20',BK,false),{numId:true,sp:['0','40']}); }
+  // ── STYLE FUNCTIONS matching v4 build_resume.js exactly ──────────────
 
-  // Detect line types
-  function isAllCaps(t) { return /^[A-Z][A-Z\s,|&\/\\\-]{6,}$/.test(t.trim()) && !t.includes(':'); }
-  function isSecHdr(t) {
-    var u = t.trim().toUpperCase().replace(/[^A-Z ]/g,'');
-    return ['SELECT CLIENT','PROFESSIONAL EXP','CORE EXPERTISE','AWARDS','EDUCATION',
-            'PROFESSIONAL AFF','ADDITIONAL BRAND'].some(function(h){ return u.indexOf(h)===0; });
+  // Section header: bold, BLACK, centered, Calibri 14pt (sz=28), blue bottom border
+  function sHdr(t) {
+    return P(mkPpr({center:true, sp:['200','80'], border:true}),
+      '<w:r>'+mkRpr(CA,'28',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(t.toUpperCase())+'</w:t></w:r>');
   }
-  function isCoLine(t) { return /[|]/.test(t) && /\d{4}/.test(t) && t.length < 130; }
-  function isResultHdr(t) { return /(Results|Leadership)[\s:]*$/.test(t) && !/^[-*]/.test(t) && t.length < 80; }
 
-  var lines = text.split('\n');
-  var body = '';
-  var inExp = false;
-  var expNext = false;
+  // Job title: red, bold, Calibri 10pt (sz=20)
+  function jTitle(t) {
+    return P(mkPpr({sp:['120','30']}),
+      '<w:r>'+mkRpr(CA,'20',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>');
+  }
 
-  lines.forEach(function(raw) {
-    var line = raw.trim().replace(/^#{1,3}\s+/,'');
+  // Company line: bold, NOT italic, black, Calibri 10pt
+  function coLine(t) {
+    return P(mkPpr({sp:['0','30']}),
+      '<w:r>'+mkRpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>');
+  }
+
+  // Italic body para (job description under company)
+  function iPara(t, spAfter) {
+    return P(mkPpr({sp:['0',spAfter||'40']}), iRuns(t,CL,'20',BK,true));
+  }
+
+  // Normal body para (Calibri Light, supports **bold** and [YLW])
+  function bPara(t, spBefore, spAfter) {
+    return P(mkPpr({sp:[spBefore||'0',spAfter||'60']}), iRuns(t,CL,'20',BK,false));
+  }
+
+  // Result sub-header: bold, black, Calibri 10pt
+  function rHdr(t, spBefore) {
+    return P(mkPpr({sp:[spBefore||'40','40']}),
+      '<w:r>'+mkRpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+  }
+
+  // Bullet: Calibri Light, supports **bold** and [YLW]
+  function bul(t) {
+    return P(mkPpr({numId:true, sp:['0','40']}), iRuns(t,CL,'20',BK,false));
+  }
+
+  // Expertise sub-header: red, left, Calibri 11pt (sz=22), bold
+  function expSub(t) {
+    return P(mkPpr({sp:['80','20']}),
+      '<w:r>'+mkRpr(CA,'22',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>');
+  }
+
+  // Expertise body: Calibri Light, indented 432 DXA
+  function expBody(t, spAfter) {
+    return P(mkPpr({sp:['0',spAfter||'50'], ind:'432'}), iRuns(t,CL,'20',BK,false));
+  }
+
+  // ── FIXED HEADER (always Jay's contact info) ──────────────────────
+  var hdr =
+    // Name row — Century Gothic, NOT bold, burgundy, 22pt (sz=44)
+    P(mkPpr({tabs:true, sp:['0','0']}),
+      '<w:r>'+mkRpr(GH,'44',BG,false,false,false)+'<w:t>Jay Wadhwa</w:t></w:r>' +
+      '<w:r>'+mkRpr(GH,'44',BG,false,false,false)+'<w:tab/></w:r>' +
+      '<w:r>'+mkRpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">847-910-9377 | </w:t></w:r>' +
+      '<w:r>'+mkRpr(CL,'18',BG,true,false,false)+'<w:t>jvwadhwa@gmail.com</w:t></w:r>'
+    ) +
+    // Location row
+    P(mkPpr({tabs:true, sp:['0','80']}),
+      '<w:r>'+mkRpr(CL,'18',BK,false,false,false)+'<w:tab/></w:r>' +
+      '<w:r>'+mkRpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>' +
+      '<w:r>'+mkRpr(CL,'18',BG,true,false,false)+'<w:t>linkedin.com/in/jwadhwa</w:t></w:r>'
+    ) +
+    // Horizontal rule
+    P(mkPpr({hborder:true, sp:['0','80']}), '');
+
+  // ── PARSE AI OUTPUT INTO PARAGRAPHS ──────────────────────────────────
+  var SECTION_KEYWORDS = ['SELECT CLIENT','PROFESSIONAL EXP','CORE EXPERTISE',
+    'AWARDS','EDUCATION','PROFESSIONAL AFF','TECHNICAL','ADDITIONAL BRAND'];
+
+  function isSectionHdr(t) {
+    var u = t.trim().toUpperCase().replace(/[^A-Z ]/g,'');
+    return SECTION_KEYWORDS.some(function(k){ return u.indexOf(k)===0; });
+  }
+  function isJobTitle(t) {
+    // All caps, no lowercase, reasonable length, no colon
+    return /^[A-Z][A-Z\s,|&\/\\\-]{8,}$/.test(t.trim()) && !t.includes(':') && t.length < 100;
+  }
+  function isCoLine(t) {
+    // Has pipe and a 4-digit year
+    return /[|]/.test(t) && /\d{4}/.test(t) && t.length < 150 && !isSectionHdr(t);
+  }
+  function isResultHdr(t) {
+    return /(Results|Leadership|Wins)[\s:]*$/.test(t) && !/^[-*\u2022]/.test(t.trim()) && t.length < 90 && !isJobTitle(t);
+  }
+  function isBullet(t) {
+    return /^[-*\u2022]\s+/.test(t.trim());
+  }
+
+  var bodyXml = '';
+  var inExp = false;          // inside Core Expertise section
+  var lastWasCoLine = false;  // next non-bullet non-empty is italic desc
+
+  text.split('\n').forEach(function(rawLine) {
+    var line = rawLine.trim().replace(/^#{1,3}\s+/, '');
     if (!line) return;
 
-    if (/^[-*\u2022]\s+/.test(line)) { body += bul(line.replace(/^[-*\u2022]\s+/,'')); return; }
-    if (isSecHdr(line)) { inExp = /EXPERTISE/.test(line.toUpperCase()); expNext=false; body += sHdr(line); return; }
-    if (inExp) {
-      if (!line.includes('|') && line.length < 70) { body += expSub(line); expNext=true; return; }
-      body += expBody(line); expNext=false; return;
+    if (isBullet(line)) {
+      bodyXml += bul(line.replace(/^[-*\u2022]\s+/, ''));
+      lastWasCoLine = false;
+      return;
     }
-    if (isAllCaps(line)) { body += jTitle(line); return; }
-    if (isCoLine(line))  { body += coLine(line); return; }
-    if (isResultHdr(line)){ body += rHdr(line.replace(/\*\*/g,'')); return; }
-    if (!line.includes('**') && line.length < 300) { body += iPara(line); return; }
-    body += bPara(line);
+
+    if (isSectionHdr(line)) {
+      inExp = /EXPERTISE/.test(line.toUpperCase());
+      lastWasCoLine = false;
+      bodyXml += sHdr(line);
+      return;
+    }
+
+    if (inExp) {
+      if (line.includes('|') && line.length > 60) {
+        // Pipe-delimited skills list = expertise body
+        bodyXml += expBody(line);
+      } else {
+        // Short line = sub-header category name
+        bodyXml += expSub(line);
+      }
+      return;
+    }
+
+    if (isJobTitle(line)) {
+      bodyXml += jTitle(line);
+      lastWasCoLine = false;
+      return;
+    }
+
+    if (isCoLine(line)) {
+      bodyXml += coLine(line);
+      lastWasCoLine = true;
+      return;
+    }
+
+    if (isResultHdr(line)) {
+      bodyXml += rHdr(line, '60');
+      lastWasCoLine = false;
+      return;
+    }
+
+    // If we just had a company line, this is italic job description
+    if (lastWasCoLine) {
+      bodyXml += iPara(line);
+      lastWasCoLine = false;
+      return;
+    }
+
+    // Default: normal body paragraph
+    bodyXml += bPara(line);
   });
 
-  // Fixed header
-  var hdr =
-    '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs><w:spacing w:before="0" w:after="0"/></w:pPr>' +
-      '<w:r>'+rpr(GH,'44',BG,false)+'<w:t>Jay Wadhwa</w:t></w:r>' +
-      '<w:r>'+rpr(GH,'44',BG,false)+'<w:tab/></w:r>' +
-      '<w:r>'+rpr(CL,'18',BG,false)+'<w:t xml:space="preserve">847-910-9377 | </w:t></w:r>' +
-      '<w:r>'+rpr(CL,'18',BG,true)+'<w:t>jvwadhwa@gmail.com</w:t></w:r>' +
-    '</w:p>' +
-    '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs><w:spacing w:before="0" w:after="80"/></w:pPr>' +
-      '<w:r>'+rpr(CL,'18',BK,false)+'<w:tab/></w:r>' +
-      '<w:r>'+rpr(CL,'18',BG,false)+'<w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>' +
-      '<w:r>'+rpr(CL,'18',BG,true)+'<w:t>linkedin.com/in/jwadhwa</w:t></w:r>' +
-    '</w:p>' +
-    '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="80"/></w:pPr></w:p>';
-
+  // ── ASSEMBLE DOCUMENT XML ─────────────────────────────────────────────
   var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:body>' + hdr + body +
-    '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
-    '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>' +
-    '</w:sectPr></w:body></w:document>';
+    '<w:body>' + hdr + bodyXml +
+    '<w:sectPr>' +
+      '<w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>' +
+    '</w:sectPr>' +
+    '</w:body></w:document>';
 
   var numXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
     '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0">' +
       '<w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/>' +
-      '<w:lvlJc w:val="left"/><w:pPr><w:ind w:left="540" w:hanging="270"/></w:pPr>' +
+      '<w:lvlJc w:val="left"/>' +
+      '<w:pPr><w:ind w:left="540" w:hanging="270"/></w:pPr>' +
       '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>' +
     '</w:lvl></w:abstractNum>' +
-    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
+    '</w:numbering>';
 
   var ctXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -7607,12 +7744,13 @@ function buildResumeDocx(text, filename) {
     .then(function(blob) {
       var safe = (filename||'JayWadhwa_Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
       var url = URL.createObjectURL(blob);
-      var a = document.createElement('a'); a.href = url; a.download = safe + '.docx'; a.click();
+      var a = document.createElement('a'); a.href=url; a.download=safe+'.docx'; a.click();
       URL.revokeObjectURL(url);
       toast('Resume exported. Open in Word to review.', 'success');
     })
-    .catch(function(e) { toast('Export failed: ' + e.message, 'error'); });
+    .catch(function(e) { toast('Export failed: '+e.message,'error'); });
 }
+
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
 let clgOutput = '';
