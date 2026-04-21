@@ -2654,6 +2654,10 @@ a { color: var(--burgundy); text-decoration: none; }
           </div>
         </div>
         <div class="form-group">
+          <label class="form-label">File Date <span style="font-size:11px;color:var(--text-secondary);font-weight:400">(auto-detected from file — edit if needed)</span></label>
+          <input class="form-input" type="date" id="upload-file-date">
+        </div>
+        <div class="form-group">
           <label class="form-label">Notes (optional)</label>
           <textarea class="form-textarea" id="upload-notes" rows="2" placeholder="e.g. Final version submitted, tailored for SaaS roles..."></textarea>
         </div>
@@ -8471,6 +8475,7 @@ async function editDocRecord(id) {
     document.getElementById('upload-role').value = d.role || '';
     document.getElementById('upload-doc-type').value = d.doc_type || 'Resume';
     document.getElementById('upload-notes').value = d.notes || '';
+    document.getElementById('upload-file-date').value = d.file_date || '';
     if (d.linked_application_id) document.getElementById('upload-link-app').value = d.linked_application_id;
     if (d.linked_contact_id) {
       var preC = _uploadContactPickerAll.find(function(c) { return c.id === d.linked_contact_id; });
@@ -8490,6 +8495,7 @@ async function saveDocEdits(id) {
     role: (document.getElementById('upload-role').value||'').trim() || null,
     doc_type: document.getElementById('upload-doc-type').value,
     notes: (document.getElementById('upload-notes').value||'').trim() || null,
+    file_date: document.getElementById('upload-file-date').value || null,
     linked_application_id: document.getElementById('upload-link-app').value || null,
     linked_contact_id: _uploadContactPickerSel.length > 0 ? _uploadContactPickerSel[0].id : null,
   };
@@ -8557,6 +8563,7 @@ async function openUploadModal(preSelectAppId) {
   var hdrU = document.querySelector('#modal-upload .modal-header h3');
   if (hdrU) hdrU.textContent = '⬆ Upload Document';
   document.getElementById('upload-doc-type').value = 'Resume';
+  document.getElementById('upload-file-date').value = '';
   document.getElementById('upload-company').value = '';
   document.getElementById('upload-role').value = '';
   document.getElementById('upload-notes').value = '';
@@ -8654,6 +8661,11 @@ function setUploadFile(file) {
   uploadFile = file;
   document.getElementById('upload-file-name').textContent = file.name + ' (' + (file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+'MB' : Math.round(file.size/1024)+'KB') + ')';
   document.getElementById('upload-file-info').style.display = 'flex';
+  // Auto-fill file date from last modified
+  if (file.lastModified) {
+    var fd = document.getElementById('upload-file-date');
+    if (fd) fd.value = new Date(file.lastModified).toISOString().split('T')[0];
+  }
   // Auto-detect type from filename
   const lower = file.name.toLowerCase();
   if (lower.includes('resume') || lower.includes('cv')) document.getElementById('upload-doc-type').value = 'Resume';
@@ -8779,9 +8791,9 @@ async function submitUpload() {
     }
 
     // Save record to database
-    var fileDate = uploadFile.lastModified
-      ? new Date(uploadFile.lastModified).toISOString().split('T')[0]
-      : null;
+    var fileDateEl = document.getElementById('upload-file-date');
+    var fileDate = (fileDateEl && fileDateEl.value) ? fileDateEl.value
+      : (uploadFile.lastModified ? new Date(uploadFile.lastModified).toISOString().split('T')[0] : null);
     const record = {
       file_name: uploadFile.name,
       file_type: uploadFile.type,
