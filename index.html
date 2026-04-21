@@ -7480,7 +7480,14 @@ function exportRTDocx() {
 // Marked-up resume — same template format, yellow highlights intact
 function exportRTMarkedUp() {
   if (!rtOutput) { toast('No resume output to export.', 'error'); return; }
-  buildResumeDocx(rtOutput, _getRTFilename() + '_MarkedUp');
+  // Debug: check whether AI actually returned YLW tags
+  var hasYLW = /\[YLW\]/i.test(rtOutput);
+  console.log('[MarkedUp] YLW tags present:', hasYLW, '| Output preview:', rtOutput.slice(0, 300));
+  if (!hasYLW) {
+    toast('No changes were marked by AI (no [YLW] tags found). Run Resume Tailor again — the AI must produce highlighted changes.', 'error');
+    return;
+  }
+  buildResumeDocx(rtOutput, _getRTFilename() + '_MarkedUp', true);
 }
 
 // Auto-fill Company + Job Title when an app is linked
@@ -7508,7 +7515,7 @@ function handleRTJDDrop(event) {
   handleRTFileUploadPage(fakeEvent);
 }
 
-function buildResumeDocx(text, filename) {
+function buildResumeDocx(text, filename, markedUp) {
   if (typeof JSZip === 'undefined') { toast('JSZip not loaded.', 'error'); return; }
 
   // ── v4 APPROVED SPEC — DO NOT MODIFY WITHOUT JAY'S APPROVAL ─────────
@@ -7670,11 +7677,12 @@ function buildResumeDocx(text, filename) {
       .replace(/\*\*/g,'')
       .trim();
   }
-  // renderLine: strips heading markers, keeps [YLW] tags and ** for rendering
+  // renderLine: strips heading markers and (for Final export) YLW tags.
+  // Preserves YLW tags for Marked Up export so runs() can apply yellow highlight.
   function renderLine(t) {
-    return t.trim()
-      .replace(/^#{1,3}\s+/,'')
-      .trim();
+    var s = t.trim().replace(/^#{1,3}\s+/,'').trim();
+    if (!markedUp) s = s.replace(/\[\/?YLW\]/gi,'').replace(/\[\/?YH\]/gi,'');
+    return s;
   }
 
   function isSectionHdr(t) {
