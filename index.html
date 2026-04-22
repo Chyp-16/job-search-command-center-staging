@@ -7714,6 +7714,7 @@ function buildResumeDocx(text, filename, markedUp) {
   var inAff = false;
   var inAddl = false; // Additional Brand/Leadership — auto-bullet ESPN/MSNBC lines
   var inWins = false; // Select Client Wins — auto-bullet un-dashed items
+  var inResults = false; // Under a result sub-header — auto-bullet achievement lines
   var lastWasCoLine = false;
 
   // Strip header/name lines and horizontal rules that appear in AI output
@@ -7755,11 +7756,12 @@ function buildResumeDocx(text, filename, markedUp) {
       var isAffiliations = /AFFILI/.test(cl.toUpperCase());
       var isAddlBrand    = /ADDITIONAL/.test(cl.toUpperCase());
       var isWins         = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
-      inExp  = isExpertise;
-      inEdu  = isEducation;
-      inAff  = isAffiliations;
-      inAddl = isAddlBrand;
-      inWins = isWins;
+      inExp     = isExpertise;
+      inEdu     = isEducation;
+      inAff     = isAffiliations;
+      inAddl    = isAddlBrand;
+      inWins    = isWins;
+      inResults = false;
       if (!isWins) inWins = false;
       lastWasCoLine = false;
       if (isExpertise) bodyXml += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
@@ -7830,6 +7832,7 @@ function buildResumeDocx(text, filename, markedUp) {
     // Job titles
     if (isJobTitle(cl)) {
       bodyXml += jTitle(cl);
+      inResults = false;
       lastWasCoLine = false;
       return;
     }
@@ -7837,13 +7840,15 @@ function buildResumeDocx(text, filename, markedUp) {
     // Company/date lines
     if (isCoLine(cl)) {
       bodyXml += coLine(cl);
+      inResults = false;
       lastWasCoLine = true;
       return;
     }
 
-    // Result sub-headers
+    // Result sub-headers — enter auto-bullet mode
     if (isResultHdr(cl)) {
       bodyXml += rHdr(cl, '60');
+      inResults = true;
       lastWasCoLine = false;
       return;
     }
@@ -7851,6 +7856,13 @@ function buildResumeDocx(text, filename, markedUp) {
     // First paragraph after company line = italic job description
     if (lastWasCoLine) {
       bodyXml += iPara(rl);
+      lastWasCoLine = false;
+      return;
+    }
+
+    // Inside result block — auto-bullet achievement lines
+    if (inResults) {
+      bodyXml += bul(rl.replace(/^\s*[-\u2022]\s*/,''));
       lastWasCoLine = false;
       return;
     }
