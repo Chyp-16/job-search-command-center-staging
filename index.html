@@ -7563,18 +7563,18 @@ function buildResumeDocx(text, filename, markedUp) {
     return out;
   }
 
-  // Build w:pPr XML block
+  // Build w:pPr XML block — strict OOXML element order
   function ppr(opts) {
     opts = opts||{};
     var s = '<w:pPr>';
-    if (opts.center) s += '<w:jc w:val="center"/>';
-    if (opts.sp)     s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
-    if (opts.ind)    s += '<w:ind w:left="'+opts.ind+'"/>';
-    if (opts.bhang)  s += '<w:ind w:left="'+opts.bhang[0]+'" w:hanging="'+opts.bhang[1]+'"/>';
+    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs>';
     if (opts.bbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="'+BL+'"/></w:pBdr>';
     if (opts.hbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/></w:pBdr>';
     if (opts.num)    s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
-    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs>';
+    if (opts.sp)     s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
+    if (opts.ind)    s += '<w:ind w:left="'+opts.ind+'"/>';
+    if (opts.bhang)  s += '<w:ind w:left="'+opts.bhang[0]+'" w:hanging="'+opts.bhang[1]+'"/>';
+    if (opts.center) s += '<w:jc w:val="center"/>';
     return s + '</w:pPr>';
   }
 
