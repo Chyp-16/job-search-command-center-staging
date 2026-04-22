@@ -7728,14 +7728,21 @@ function buildResumeDocx(text, filename, markedUp) {
   });
 
   filteredLines.forEach(function(rawLine) {
-    var isBulletRaw = /^\s*[-*\u2022]\s+/.test(rawLine);
+    var isBulletRaw = /^\s*[-*\u2022]\s+/.test(rawLine) || /^\s*\[\/?YLW\][^[]*[-*\u2022]\s+/i.test(rawLine) || /^\s*\[YLW\]\s*[-*\u2022]\s*/i.test(rawLine);
     var cl = classLine(rawLine);
     var rl = renderLine(rawLine);
     if (!cl) return;
 
     // Bullets
     if (isBulletRaw) {
-      var bulText = rl.replace(/^\s*[-*\u2022]\s+/, '');
+      // Strip leading [YLW] wrapper if present, then strip bullet marker
+      var bulText = rl
+        .replace(/^\s*\[YLW\]\s*/i, '')   // remove leading [YLW] tag
+        .replace(/^\s*[-*\u2022]\s+/, ''); // remove bullet marker
+      // Re-wrap in [YLW] if the original line started with [YLW] (whole-line highlight)
+      if (markedUp && /^\s*\[YLW\]/i.test(rawLine)) {
+        bulText = '[YLW]' + bulText.replace(/\[\/YLW\]\s*$/i, '') + '[/YLW]';
+      }
       bodyXml += bul(bulText);
       lastWasCoLine = false;
       return;
@@ -7781,22 +7788,34 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Inside Professional Affiliations — bold role only, plain org
+    // Inside Professional Affiliations — bold role only, plain org, all black
     if (inAff) {
-      var affMatch = rl.match(/^\*\*([^*]+)\*\*\s*(.*)$/);
-      if (affMatch) {
+      // Use cl (stripped of ** and YLW) to extract role | org, then render bold role + plain org
+      var affCl = cl; // classLine already stripped ** and YLW
+      // Try to split on | or – to find role vs org
+      var pipeSplit = affCl.match(/^([^|]+)\|(.*)$/);
+      var dashSplit = !pipeSplit && affCl.match(/^([^\u2013\u2014]+)[\u2013\u2014](.*)$/);
+      if (pipeSplit) {
         bodyXml += P(ppr({sp:['0','40']}),
-          '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(affMatch[1])+'</w:t></w:r>' +
-          '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(' '+affMatch[2].replace(/^[|\-\s]+/,''))+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(pipeSplit[1].trim())+'</w:t></w:r>' +
+          '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(' | '+pipeSplit[2].trim())+'</w:t></w:r>');
+      } else if (dashSplit) {
+        bodyXml += P(ppr({sp:['0','40']}),
+          '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(dashSplit[1].trim())+'</w:t></w:r>' +
+          '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(' – '+dashSplit[2].trim())+'</w:t></w:r>');
       } else {
-        bodyXml += bPara(rl);
+        // No separator — entire line is a role title, render bold black
+        bodyXml += P(ppr({sp:['0','40']}),
+          '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(affCl)+'</w:t></w:r>');
       }
       return;
     }
 
     // Inside Select Client Wins — auto-bullet all non-bullet lines
     if (inWins) {
-      bodyXml += bul(rl.replace(/^\s*[-*\u2022]\s*/,''));
+      // rl already has ** markers for bold — pass directly to bul() which calls runs()
+      // Strip only leading bullet marker chars, not ** bold markers
+      bodyXml += bul(rl.replace(/^\s*[-\u2022]\s*/,''));
       lastWasCoLine = false;
       return;
     }
