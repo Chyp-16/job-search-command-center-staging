@@ -7888,6 +7888,7 @@ function buildResumeDocx(text, filename, markedUp) {
     '<Default Extension="xml" ContentType="application/xml"/>' +
     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
     '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
     '</Types>';
 
   var relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -7897,14 +7898,25 @@ function buildResumeDocx(text, filename, markedUp) {
 
   var wRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
     '</Relationships>';
+
+  // Minimal styles.xml — required for word/_rels/document.xml.rels styles relationship
+  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+    '<w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light"/>' +
+    '<w:sz w:val="20"/><w:szCs w:val="20"/>' +
+    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '</w:styles>';
 
   var zip = new JSZip();
   zip.file('[Content_Types].xml', ctXml);
   zip.file('_rels/.rels', relsXml);
   zip.file('word/document.xml', docXml);
   zip.file('word/numbering.xml', numXml);
+  zip.file('word/styles.xml', stylesXml);
   zip.file('word/_rels/document.xml.rels', wRelsXml);
 
   zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
