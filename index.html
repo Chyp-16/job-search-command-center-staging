@@ -7902,13 +7902,26 @@ function buildResumeDocx(text, filename, markedUp) {
     '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
     '</Relationships>';
 
-  // Minimal styles.xml — required for word/_rels/document.xml.rels styles relationship
+  // styles.xml — includes Normal style required for Word to honor list numbering
   var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:docDefaults><w:rPrDefault><w:rPr>' +
-    '<w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light"/>' +
-    '<w:sz w:val="20"/><w:szCs w:val="20"/>' +
-    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '<w:docDefaults>' +
+      '<w:rPrDefault><w:rPr>' +
+        '<w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/>' +
+        '<w:sz w:val="20"/><w:szCs w:val="20"/>' +
+      '</w:rPr></w:rPrDefault>' +
+    '</w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">' +
+      '<w:name w:val="Normal"/>' +
+      '<w:qFormat/>' +
+    '</w:style>' +
+    '<w:style w:type="paragraph" w:styleId="ListParagraph">' +
+      '<w:name w:val="List Paragraph"/>' +
+      '<w:basedOn w:val="Normal"/>' +
+      '<w:uiPriority w:val="34"/>' +
+      '<w:qFormat/>' +
+      '<w:pPr><w:ind w:left="720"/></w:pPr>' +
+    '</w:style>' +
     '</w:styles>';
 
   var zip = new JSZip();
