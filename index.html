@@ -7684,10 +7684,10 @@ function buildResumeDocx(text, filename, markedUp) {
   }
   function isJobTitle(t) {
     var c = classLine(t);
-    // All-caps line
+    // All-caps line (no lowercase letters)
     if (/^[A-Z][A-Z\s,|&\/\\\-\.]{8,}$/.test(c) && !c.includes(':') && c.length < 100 && !isSectionHdr(t)) return true;
-    // Title Case with pipe but no year
-    if (/\|/.test(c) && !/\d{4}/.test(c) && c.length < 120 && !isSectionHdr(t) && /[A-Z]/.test(c[0])) return true;
+    // All-caps with pipe and no year (e.g. "DIRECTOR | NBC SPORTS") — must have NO lowercase
+    if (/\|/.test(c) && !/\d{4}/.test(c) && c.length < 120 && !isSectionHdr(t) && !/[a-z]/.test(c)) return true;
     return false;
   }
   function isCoLine(t) {
@@ -7697,7 +7697,9 @@ function buildResumeDocx(text, filename, markedUp) {
   }
   function isResultHdr(t) {
     var c = classLine(t);
-    return /(Results|Leadership|Wins|Track Record)[\s:]*$/.test(c) && !/^[-*\u2022]/.test(c) && c.length < 90 && !isJobTitle(t);
+    var endsInKeyword = /(Results|Leadership|Wins|Track Record|Achievements|Transformations|Performance)[\s:]*$/.test(c);
+    var isAwardOrOther = /^(Award|Other|Additional)/i.test(c) && !/\d{4}/.test(c);
+    return (endsInKeyword || isAwardOrOther) && !/^[-*\u2022]/.test(c) && c.length < 120 && !isJobTitle(t) && !isSectionHdr(t);
   }
   function isEduDegree(t) {
     var c = classLine(t);
@@ -7829,6 +7831,14 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
+    // Result sub-headers — enter auto-bullet mode (BEFORE isJobTitle to prevent misclassification)
+    if (isResultHdr(cl)) {
+      bodyXml += rHdr(cl, '60');
+      inResults = true;
+      lastWasCoLine = false;
+      return;
+    }
+
     // Job titles
     if (isJobTitle(cl)) {
       bodyXml += jTitle(cl);
@@ -7842,14 +7852,6 @@ function buildResumeDocx(text, filename, markedUp) {
       bodyXml += coLine(cl);
       inResults = false;
       lastWasCoLine = true;
-      return;
-    }
-
-    // Result sub-headers — enter auto-bullet mode
-    if (isResultHdr(cl)) {
-      bodyXml += rHdr(cl, '60');
-      inResults = true;
-      lastWasCoLine = false;
       return;
     }
 
