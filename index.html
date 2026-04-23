@@ -4569,7 +4569,8 @@ async function syncHubSpot() {
       } catch(fetchErr) {
         clearTimeout(timeout);
         showHubSpotSetupGuide();
-        if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+        if (btn)  { btn.disabled  = false; btn.textContent  = '⟳ Sync HubSpot'; }
+    if (btn2) { btn2.disabled = false; btn2.textContent = '⟳ Sync HubSpot'; }
         return;
       }
 
@@ -9511,8 +9512,10 @@ async function syncNextActionsFromTasks() {
 }
 
 async function syncHubSpotTasks() {
-  const btn = document.getElementById('tasks-sync-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+  const btn  = document.getElementById('tasks-sync-btn');
+  const btn2 = document.getElementById('tasks-page-sync-btn');
+  if (btn)  { btn.disabled  = true; btn.textContent  = '⟳ Syncing...'; }
+  if (btn2) { btn2.disabled = true; btn2.textContent = '⟳ Syncing...'; }
   const listEl = document.getElementById('tasks-list');
 
   try {
@@ -9634,70 +9637,192 @@ async function saveOutreachSteps(mode) {
 }
 
 // ── TASK TEMPLATE PICKER ────────────────────────────────────────────────
+
+// Get name/company context from currently selected contact in task modal
+function _getTaskContactContext(mode) {
+  var contactSelId = mode === 'edit' ? 'edit-task-contact' : 'task-contact';
+  var sel = document.getElementById(contactSelId);
+  var hsId = sel ? sel.value : '';
+  if (!hsId) return null;
+  var contact = allContacts.find(function(c) { return c.hubspot_contact_id === hsId; });
+  if (!contact) return null;
+  var app = contact.linked_application_id ? allApps.find(function(a) { return a.id === contact.linked_application_id; }) : null;
+  return {
+    name: contact.name || '',
+    company: (app ? app.company : contact.company) || contact.company || '',
+    role: app ? (app.job_title || '') : '',
+    hsId: hsId,
+    contact: contact,
+    app: app
+  };
+}
+
+// Auto-fill [NAME], [COMPANY], [ROLE], [TITLE] placeholders from contact context
+function _applyContactContext(text, ctx) {
+  if (!ctx || !text) return text;
+  return text
+    .replace(/\[NAME\]/gi, ctx.name)
+    .replace(/\[FIRST NAME\]/gi, (ctx.name || '').split(' ')[0])
+    .replace(/\[COMPANY\]/gi, ctx.company)
+    .replace(/\[ROLE\]/gi, ctx.role)
+    .replace(/\[TITLE\]/gi, ctx.role)
+    .replace(/\[JOB TITLE\]/gi, ctx.role);
+}
+
 async function openTaskTemplatePicker(mode) {
   // Load templates if not already loaded
-  if (allTemplates.length === 0) {
-    await loadTemplates();
-  }
+  if (allTemplates.length === 0) await loadTemplates();
 
   // Remove existing picker if open
   var existing = document.getElementById('task-template-picker-overlay');
-  if (existing) { existing.remove(); return; }
+  if (existing) { existing.remove(); var bk=document.getElementById('task-template-picker-backdrop'); if(bk)bk.remove(); return; }
 
   var subjectId = mode === 'edit' ? 'edit-task-subject' : 'task-subject';
   var notesId   = mode === 'edit' ? 'edit-task-notes'   : 'task-notes';
+  var ctx = _getTaskContactContext(mode);
+
+  function closePickerOverlay() {
+    var ov=document.getElementById('task-template-picker-overlay');
+    var bk=document.getElementById('task-template-picker-backdrop');
+    if(ov)ov.remove(); if(bk)bk.remove();
+  }
 
   // Build overlay
   var overlay = document.createElement('div');
   overlay.id = 'task-template-picker-overlay';
-  overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-lg);z-index:10000;width:400px;max-width:90vw';
+  overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-lg);z-index:10000;width:440px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column';
 
-  var title = document.createElement('div');
-  title.style.cssText = 'font-family:var(--font-display);font-size:16px;font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center';
-  title.innerHTML = '📋 Choose a Template <button onclick="document.getElementById(&quot;task-template-picker-overlay&quot;).remove();document.getElementById(&quot;task-template-picker-backdrop&quot;).remove();" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-secondary)">✕</button>';
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0';
+  header.innerHTML = '<span style="font-family:var(--font-display);font-size:16px;font-weight:600">📋 Templates</span>' +
+    '<button onclick="(function(){var ov=document.getElementById(&quot;task-template-picker-overlay&quot;);var bk=document.getElementById(&quot;task-template-picker-backdrop&quot;);if(ov)ov.remove();if(bk)bk.remove();})()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-secondary)">✕</button>';
 
+  // Tabs
+  var tabBar = document.createElement('div');
+  tabBar.style.cssText = 'display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px;flex-shrink:0';
+
+  function makeTabBtn(label, id, active) {
+    var b = document.createElement('button');
+    b.id = id;
+    b.textContent = label;
+    b.style.cssText = 'padding:7px 16px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid ' + (active ? 'var(--burgundy)' : 'transparent') + ';color:' + (active ? 'var(--burgundy)' : 'var(--text-secondary)') + ';margin-bottom:-1px;font-family:var(--font-body)';
+    return b;
+  }
+
+  var tabApp = makeTabBtn('App Templates', 'picker-tab-app', true);
+  var tabHS  = makeTabBtn('HubSpot Templates', 'picker-tab-hs', false);
+  tabBar.appendChild(tabApp);
+  tabBar.appendChild(tabHS);
+
+  // List container
   var list = document.createElement('div');
-  list.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto';
+  list.style.cssText = 'display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1';
 
-  var templates = allTemplates.filter(function(t) { return t.name !== '__writing_style__'; });
-  if (templates.length === 0) {
-    list.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary);text-align:center">No templates yet. Add some in Library → Email Templates.</div>';
-  } else {
+  function renderAppTemplates() {
+    tabApp.style.borderBottomColor = 'var(--burgundy)'; tabApp.style.color = 'var(--burgundy)';
+    tabHS.style.borderBottomColor  = 'transparent';     tabHS.style.color  = 'var(--text-secondary)';
+    list.innerHTML = '';
+    var templates = allTemplates.filter(function(t) { return t.name !== '__writing_style__'; });
+    if (templates.length === 0) {
+      list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No app templates yet.<br>Add them in Library → Email Templates.</div>';
+      return;
+    }
     templates.forEach(function(t) {
-      var btn = document.createElement('div');
-      btn.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
-      btn.innerHTML = '<div style="font-weight:600;font-size:13px">' + t.name + (t.type ? ' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">(' + t.type + ')</span>' : '') + '</div>' +
+      var item = document.createElement('div');
+      item.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
+      item.innerHTML = '<div style="font-weight:600;font-size:13px">' + t.name + (t.type ? ' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">(' + t.type + ')</span>' : '') + '</div>' +
         (t.subject ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Subject: ' + t.subject + '</div>' : '') +
-        (t.body ? '<div style="font-size:11px;color:var(--text-light);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.body.slice(0, 80) + '...</div>' : '');
-      btn.onmouseover = function() { this.style.background = 'var(--burgundy-muted)'; };
-      btn.onmouseout  = function() { this.style.background = ''; };
-      btn.onclick = function() {
+        (t.body ? '<div style="font-size:11px;color:var(--text-light);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.body.slice(0,80) + '...</div>' : '');
+      item.onmouseover = function() { this.style.background='var(--burgundy-muted)'; };
+      item.onmouseout  = function() { this.style.background=''; };
+      item.onclick = function() {
         var subjectEl = document.getElementById(subjectId);
         var notesEl   = document.getElementById(notesId);
-        if (subjectEl && t.subject) subjectEl.value = t.subject;
-        if (notesEl   && t.body)    notesEl.value   = t.body;
-        var ov = document.getElementById('task-template-picker-overlay');
-        var bk = document.getElementById('task-template-picker-backdrop');
-        if (ov) ov.remove();
-        if (bk) bk.remove();
-        toast('Template applied.', 'success');
+        var subject = _applyContactContext(t.subject || '', ctx);
+        var body    = _applyContactContext(t.body || '', ctx);
+        if (subjectEl && subject) subjectEl.value = subject;
+        if (notesEl   && body)   notesEl.value   = body;
+        closePickerOverlay();
+        toast('Template applied' + (ctx ? ' with contact details.' : '.'), 'success');
       };
-      list.appendChild(btn);
+      list.appendChild(item);
     });
   }
 
-  overlay.appendChild(title);
+  function renderHubSpotTemplates() {
+    tabHS.style.borderBottomColor  = 'var(--burgundy)'; tabHS.style.color  = 'var(--burgundy)';
+    tabApp.style.borderBottomColor = 'transparent';     tabApp.style.color = 'var(--text-secondary)';
+    list.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary);text-align:center">Loading HubSpot templates...</div>';
+    fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var hsTemplates = Array.isArray(data) ? data : (data.results || []);
+        list.innerHTML = '';
+        if (hsTemplates.length === 0) {
+          list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot marketing templates found.<br><a href="https://app.hubspot.com/email/242599414/templates" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
+          return;
+        }
+        hsTemplates.forEach(function(t) {
+          var name = t.name || t.subject || 'Untitled';
+          var subject = t.subject || '';
+          var item = document.createElement('div');
+          item.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
+          item.innerHTML = '<div style="font-weight:600;font-size:13px">' + name + ' <span style="font-size:10px;background:var(--burgundy-muted);color:var(--burgundy);padding:1px 6px;border-radius:10px;margin-left:4px">HubSpot</span></div>' +
+            (subject ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Subject: ' + subject + '</div>' : '') +
+            '<div style="font-size:11px;color:var(--text-light);margin-top:4px">Click to use subject in task</div>';
+          item.onmouseover = function() { this.style.background='var(--burgundy-muted)'; };
+          item.onmouseout  = function() { this.style.background=''; };
+          item.onclick = function() {
+            var subjectEl = document.getElementById(subjectId);
+            if (subjectEl && subject) subjectEl.value = _applyContactContext(subject, ctx);
+            closePickerOverlay();
+            toast('HubSpot template subject applied.', 'success');
+          };
+          list.appendChild(item);
+        });
+      })
+      .catch(function() {
+        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">Could not load HubSpot templates.</div>';
+      });
+  }
+
+  tabApp.onclick = renderAppTemplates;
+  tabHS.onclick  = renderHubSpotTemplates;
+
+  // OB Sequence copy button — show if contact has linked OB output
+  if (ctx && ctx.app) {
+    var obSection = document.createElement('div');
+    obSection.style.cssText = 'margin-bottom:10px;flex-shrink:0';
+    var obOutputs = Array.isArray(ctx.app.ai_output) ? ctx.app.ai_output.filter(function(o){ return o.type==='outreach_sequence'||o.type==='outreach_builder'||o.type==='outreach'; }) : [];
+    if (obOutputs.length > 0) {
+      var latest = obOutputs[obOutputs.length - 1];
+      var obBtn = document.createElement('button');
+      obBtn.className = 'btn btn-secondary';
+      obBtn.style.cssText = 'width:100%;font-size:12px;padding:7px 12px;justify-content:center';
+      obBtn.textContent = '📋 Copy Outreach Sequence — ' + (ctx.company || ctx.app.company || '');
+      obBtn.onclick = function() {
+        navigator.clipboard.writeText(latest.content || '').then(function() {
+          toast('Outreach sequence copied to clipboard.', 'success');
+          closePickerOverlay();
+        });
+      };
+      obSection.appendChild(obBtn);
+    }
+    if (obSection.children.length > 0) overlay.appendChild(obSection);
+  }
+
+  overlay.appendChild(header);
+  overlay.appendChild(tabBar);
   overlay.appendChild(list);
   document.body.appendChild(overlay);
+  renderAppTemplates();
 
   // Backdrop
   var backdrop = document.createElement('div');
   backdrop.id = 'task-template-picker-backdrop';
   backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9999';
-  backdrop.onclick = function() {
-    overlay.remove();
-    backdrop.remove();
-  };
+  backdrop.onclick = closePickerOverlay;
   document.body.appendChild(backdrop);
 }
 
