@@ -2772,7 +2772,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
-          <textarea class="form-textarea" id="task-notes" rows="3" placeholder="Add context or talking points..."></textarea>
+          <textarea class="form-textarea" id="task-notes" rows="6" placeholder="Add context or talking points..."></textarea>
         </div>
         <div class="form-group">
           <label class="form-label">Link to Contact (optional)</label>
@@ -2829,7 +2829,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
-          <textarea class="form-textarea" id="edit-task-notes" rows="3" placeholder="Add context or talking points..."></textarea>
+          <textarea class="form-textarea" id="edit-task-notes" rows="6" placeholder="Add context or talking points..."></textarea>
         </div>
         <div class="form-group">
           <label class="form-label">Link to Contact (optional)</label>
@@ -9529,22 +9529,24 @@ async function syncHubSpotTasks() {
     clearTimeout(timeout);
 
     if (!r.ok) {
-      listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">HubSpot tasks sync requires the /hubspot/tasks Worker route. See setup instructions.</div>';
+      if (listEl) listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">HubSpot tasks sync requires the /hubspot/tasks Worker route.</div>';
+      toast('Sync failed: Worker route not available.', 'error');
       return;
     }
 
     const data = await r.json();
     hubspotTasks = Array.isArray(data.results) ? data.results : [];
-    // Try to extract portal ID from task data
     if (data.portalId) window._hubspotPortalId = data.portalId;
     renderTasksList();
     renderTaskReminders();
     renderTasksPage();
     toast('Tasks synced: ' + hubspotTasks.length + ' tasks loaded.', 'success');
   } catch(e) {
-    listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load tasks. Add /hubspot/tasks route to your Cloudflare Worker to enable this feature.</div>';
+    if (listEl) listEl.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary)">Could not load tasks: ' + e.message + '</div>';
+    toast('Could not sync tasks: ' + e.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '⟳ Sync HubSpot'; }
+    if (btn)  { btn.disabled  = false; btn.textContent  = '⟳ Sync HubSpot'; }
+    if (btn2) { btn2.disabled = false; btn2.textContent = '⟳ Sync HubSpot'; }
   }
 }
 
@@ -9754,37 +9756,34 @@ async function openTaskTemplatePicker(mode) {
     tabHS.style.borderBottomColor  = 'var(--burgundy)'; tabHS.style.color  = 'var(--burgundy)';
     tabApp.style.borderBottomColor = 'transparent';     tabApp.style.color = 'var(--text-secondary)';
     list.innerHTML = '<div style="padding:16px;font-size:13px;color:var(--text-secondary);text-align:center">Loading HubSpot templates...</div>';
-    fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var hsTemplates = Array.isArray(data) ? data : (data.results || []);
-        list.innerHTML = '';
-        if (hsTemplates.length === 0) {
-          list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot marketing templates found.<br><a href="https://app.hubspot.com/email/242599414/templates" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
-          return;
-        }
-        hsTemplates.forEach(function(t) {
-          var name = t.name || t.subject || 'Untitled';
-          var subject = t.subject || '';
-          var item = document.createElement('div');
-          item.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
-          item.innerHTML = '<div style="font-weight:600;font-size:13px">' + name + ' <span style="font-size:10px;background:var(--burgundy-muted);color:var(--burgundy);padding:1px 6px;border-radius:10px;margin-left:4px">HubSpot</span></div>' +
-            (subject ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Subject: ' + subject + '</div>' : '') +
-            '<div style="font-size:11px;color:var(--text-light);margin-top:4px">Click to use subject in task</div>';
-          item.onmouseover = function() { this.style.background='var(--burgundy-muted)'; };
-          item.onmouseout  = function() { this.style.background=''; };
-          item.onclick = function() {
-            var subjectEl = document.getElementById(subjectId);
-            if (subjectEl && subject) subjectEl.value = _applyContactContext(subject, ctx);
-            closePickerOverlay();
-            toast('HubSpot template subject applied.', 'success');
-          };
-          list.appendChild(item);
-        });
-      })
-      .catch(function() {
-        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">Could not load HubSpot templates.</div>';
+    // Use the existing fetchHubSpotTemplates() which correctly parses HubSpot template structure
+    fetchHubSpotTemplates().then(function(hsTemplates) {
+      list.innerHTML = '';
+      if (!hsTemplates || hsTemplates.length === 0) {
+        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot templates found.<br><a href="https://app.hubspot.com/email/242599414/templates" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
+        return;
+      }
+      hsTemplates.forEach(function(t) {
+        var item = document.createElement('div');
+        item.style.cssText = 'padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;transition:background 0.15s';
+        item.innerHTML = '<div style="font-weight:600;font-size:13px">' + t.name + ' <span style="font-size:10px;background:var(--burgundy-muted);color:var(--burgundy);padding:1px 6px;border-radius:10px;margin-left:4px">HubSpot</span></div>' +
+          (t.subject ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Subject: ' + t.subject + '</div>' : '') +
+          (t.body ? '<div style="font-size:11px;color:var(--text-light);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.body.slice(0,80) + '...</div>' : '');
+        item.onmouseover = function() { this.style.background='var(--burgundy-muted)'; };
+        item.onmouseout  = function() { this.style.background=''; };
+        item.onclick = function() {
+          var subjectEl = document.getElementById(subjectId);
+          var notesEl   = document.getElementById(notesId);
+          if (subjectEl && t.subject) subjectEl.value = _applyContactContext(t.subject, ctx);
+          if (notesEl   && t.body)   notesEl.value   = _applyContactContext(t.body,    ctx);
+          closePickerOverlay();
+          toast('HubSpot template applied.', 'success');
+        };
+        list.appendChild(item);
       });
+    }).catch(function() {
+      list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">Could not load HubSpot templates.</div>';
+    });
   }
 
   tabApp.onclick = renderAppTemplates;
