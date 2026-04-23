@@ -821,6 +821,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="contacts">
         <span class="nav-icon">👥</span><span>Contacts</span>
       </div>
+      <div class="nav-item" data-page="email" onclick="openEmailCompose(event)">
+        <span class="nav-icon">✉️</span><span>Email</span>
+      </div>
       <div class="nav-section-label">Documents</div>
       <div class="nav-item" data-page="aiwriting">
         <span class="nav-icon">✦</span><span>AI Writing</span>
@@ -4930,10 +4933,26 @@ function renderTemplatesTable() {
       '<td style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + preview + '</td>' +
       '<td><div class="table-actions">' +
         '<button class="action-btn" data-tid="' + t.id + '" onclick="editTemplate(this.dataset.tid)" title="Edit">✏️</button>' +
+        '<button class="action-btn" data-tid="' + t.id + '" onclick="sendTemplateEmail(this.dataset.tid)" title="Send Email">✉️</button>' +
         '<button class="action-btn danger" data-tid="' + t.id + '" onclick="deleteTemplate(this.dataset.tid)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
+}
+
+function sendTemplateEmail(id) {
+  var t = allTemplates.find(function(x) { return x.id === id; });
+  if (!t) return;
+  window._allEmailTemplates = [t];
+  // Pre-populate the standalone compose modal with this template
+  openEmailCompose(null).then(function() {
+    setTimeout(function() {
+      var subj = document.getElementById('email-compose-subject');
+      var body = document.getElementById('email-compose-body');
+      if (subj && t.subject) subj.value = t.subject;
+      if (body && t.body)    body.value = t.body;
+    }, 100);
+  });
 }
 
 function openAddTemplate() {
@@ -5001,65 +5020,40 @@ async function fetchHubSpotTemplates() {
   try {
     const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } });
     const data = await r.json();
+    // CRM object type 0-48: properties are hs_name, hs_subject, hs_body_html, hs_body_preview
     var results = data.results || [];
-    // Sort by name for easier browsing
-    results.sort(function(a, b) { return (a.name||'').localeCompare(b.name||''); });
+    results.sort(function(a, b) {
+      var an = (a.properties && a.properties.hs_name) || '';
+      var bn = (b.properties && b.properties.hs_name) || '';
+      return an.localeCompare(bn);
+    });
+    function htmlToText(html) {
+      if (!html) return '';
+      return html
+        .replace(/<br[^>]*>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+    function fixMerge(s) {
+      return (s || '')
+        .replace(/\{\{\s*company\.name\s*\}\}/g, '[COMPANY]')
+        .replace(/\{\{\s*contact\.firstname\s*\}\}/g, '[FIRST NAME]')
+        .replace(/\{\{\s*contact\.fullname\s*\}\}/g, '[NAME]')
+        .replace(/\{\{\s*contact\.email\s*\}\}/g, '[EMAIL]');
+    }
     return results.map(function(t) {
-      // Extract plain text from HubSpot template
-      var name = t.name || 'Untitled';
-      var subject = t.content?.emailBody?.subject || t.subject || '';
-      // Get plain text body from HubSpot template structure
-      var body = '';
-      try {
-        var c2 = t.content || {};
-        // Try widgets object (Sales templates store content here)
-        if (c2.widgets) {
-          Object.values(c2.widgets).forEach(function(w) {
-            var html = (w.body && w.body.html) || (w.content && w.content.html) || '';
-            if (html) body += html + '\n';
-          });
-        }
-        // Try emailBody
-        if (!body && c2.emailBody && c2.emailBody.body) {
-          body = c2.emailBody.body;
-        }
-        // Try flexAreas widgets
-        if (!body && c2.flexAreas) {
-          Object.values(c2.flexAreas).forEach(function(area) {
-            (area.sections || []).forEach(function(sec) {
-              (sec.columns || []).forEach(function(col) {
-                (col.widgets || []).forEach(function(w) {
-                  var html = (w.body && w.body.html) || '';
-                  if (html) body += html + '\n';
-                });
-              });
-            });
-          });
-        }
-        if (body) {
-          body = body
-            .replace(/<br[^>]*>/gi, '\n')
-            .replace(/<\/p>/gi, '\n')
-            .replace(/<\/div>/gi, '\n')
-            .replace(/<[^>]+>/g, '')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-        // Convert HubSpot merge tags
-        var fixMerge = function(s) {
-          return (s || '')
-            .replace(/\{\{\s*company\.name\s*\}\}/g, '{{company}}')
-            .replace(/\{\{\s*contact\.firstname\s*\}\}/g, '{{name}}')
-            .replace(/\{\{\s*contact\.fullname\s*\}\}/g, '{{name}}');
-        };
-        subject = fixMerge(subject);
-        body = fixMerge(body);
-      } catch(e) { console.warn('Template parse error:', e.message); }
-            return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
+      var p = t.properties || {};
+      var name    = p.hs_name    || 'Untitled';
+      var subject = fixMerge(p.hs_subject || '');
+      var body    = fixMerge(htmlToText(p.hs_body_html || p.hs_body_preview || ''));
+      return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
     });
   } catch(e) {
     console.warn('Could not fetch HubSpot templates:', e.message);
@@ -5135,6 +5129,79 @@ async function openGmailCompose() {
   document.body.appendChild(picker);
   window._gmailBackdrop = backdrop;
 }
+
+// ── STANDALONE EMAIL COMPOSE (left rail nav) ─────────────────────────────
+async function openEmailCompose(e) {
+  // Prevent nav page switch — email opens as modal, not a page
+  if (e) e.stopPropagation();
+
+  // Load templates
+  var hsTemplates = await fetchHubSpotTemplates();
+  var localTemplates = (allTemplates || []).filter(function(t){ return t.name !== '__writing_style__'; });
+  var all = hsTemplates.concat(localTemplates);
+  window._allEmailTemplates = all;
+
+  var existing = document.getElementById('email-compose-picker');
+  if (existing) { existing.remove(); var bk=document.getElementById('email-compose-backdrop'); if(bk)bk.remove(); return; }
+
+  var modal = document.createElement('div');
+  modal.id = 'email-compose-picker';
+  modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;width:520px;max-width:94vw;max-height:88vh;overflow-y:auto';
+
+  var toInput = '<div class="form-group" style="margin-bottom:12px"><label class="form-label">To</label><input class="form-input" id="email-compose-to" type="email" value="jvwadhwa@gmail.com" placeholder="recipient@email.com"></div>';
+  var subjInput = '<div class="form-group" style="margin-bottom:12px"><label class="form-label">Subject</label><input class="form-input" id="email-compose-subject" type="text" placeholder="Subject line..."></div>';
+  var bodyInput = '<div class="form-group" style="margin-bottom:12px"><label class="form-label">Body</label><textarea class="form-textarea" id="email-compose-body" rows="10" placeholder="Email body..."></textarea></div>';
+
+  var tmplOpts = '<option value="">— No template —</option>';
+  if (hsTemplates.length > 0) {
+    tmplOpts += '<optgroup label="── HubSpot Templates ──">' + hsTemplates.map(function(t){ return '<option value="hs_'+t.id+'">'+t.name+'</option>'; }).join('') + '</optgroup>';
+  }
+  if (localTemplates.length > 0) {
+    tmplOpts += '<optgroup label="── App Templates ──">' + localTemplates.map(function(t){ return '<option value="'+t.id+'">'+t.name+(t.type?' ('+t.type+')':'')+'</option>'; }).join('') + '</optgroup>';
+  }
+  var tmplRow = '<div class="form-group" style="margin-bottom:16px"><label class="form-label">Load Template</label><select class="form-select" id="email-compose-template" onchange="applyEmailComposeTemplate(this.value)">'+tmplOpts+'</select></div>';
+
+  var closeEC = 'var m=document.getElementById(&quot;email-compose-picker&quot;);var b=document.getElementById(&quot;email-compose-backdrop&quot;);if(m)m.remove();if(b)b.remove();';
+  modal.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<span style="font-family:var(--font-display);font-size:18px;font-weight:600">✉️ Compose Email</span>' +
+    '<button onclick="' + closeEC + '" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>' +
+    '</div>' +
+    tmplRow + toInput + subjInput + bodyInput +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">' +
+    '<button class="btn btn-secondary" onclick="' + closeEC + '">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="sendEmailCompose()">📧 Open in Gmail</button>' +
+    '</div>';
+
+  var backdrop = document.createElement('div');
+  backdrop.id = 'email-compose-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998';
+  backdrop.onclick = function() { modal.remove(); backdrop.remove(); };
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+}
+
+function applyEmailComposeTemplate(id) {
+  if (!id) return;
+  var t = (window._allEmailTemplates || []).find(function(x){ return x.id===id||'hs_'+x.id===id; });
+  if (!t) return;
+  var subj = document.getElementById('email-compose-subject');
+  var body = document.getElementById('email-compose-body');
+  if (subj && t.subject) subj.value = t.subject;
+  if (body && t.body)    body.value = t.body;
+}
+
+function sendEmailCompose() {
+  var to      = (document.getElementById('email-compose-to')     || {}).value || 'jvwadhwa@gmail.com';
+  var subject = (document.getElementById('email-compose-subject') || {}).value || '';
+  var body    = (document.getElementById('email-compose-body')    || {}).value || '';
+  var mailtoLink = 'mailto:' + encodeURIComponent(to) +
+    '?subject=' + encodeURIComponent(subject) +
+    '&body='    + encodeURIComponent(body);
+  window.open(mailtoLink, '_blank');
+}
+
+// ── END STANDALONE EMAIL COMPOSE ──────────────────────────────────────────
 
 function closeEmailPicker() {
   var p = document.getElementById('email-compose-picker');
@@ -9760,7 +9827,7 @@ async function openTaskTemplatePicker(mode) {
     fetchHubSpotTemplates().then(function(hsTemplates) {
       list.innerHTML = '';
       if (!hsTemplates || hsTemplates.length === 0) {
-        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot templates found.<br><a href="https://app.hubspot.com/email/242599414/templates" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
+        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot templates found.<br><a href="https://app-na2.hubspot.com/sales-templates/242599414" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
         return;
       }
       hsTemplates.forEach(function(t) {
