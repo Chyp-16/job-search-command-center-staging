@@ -1043,6 +1043,7 @@ a { color: var(--burgundy); text-decoration: none; }
           </select>
           <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
           <button class="btn btn-secondary btn-sm" onclick="syncHubSpot()" id="hs-sync-btn">⟳ Sync HubSpot</button>
+          <button class="btn btn-secondary" onclick="openMergeContactsModal()">⇋ Merge Duplicates</button>
           <button class="btn btn-primary" onclick="openAddContact()">+ Add Contact</button>
         </div>
       </div>
@@ -1062,7 +1063,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <th onclick="sortContacts('name')" id="ch-name">Name ↕</th>
               <th onclick="sortContacts('company')" id="ch-company">Company ↕</th>
               <th onclick="sortContacts('title')" id="ch-title">Title ↕</th>
-              <th onclick="sortContacts('contact_type')" id="ch-contact_type">Type ↕</th>
+              <th onclick="sortContacts('contact_type')" id="ch-contact_type">Role ↕</th>
               <th onclick="sortContacts('last_contact_date')" id="ch-last_contact_date">Last Contact ↕</th>
               <th onclick="sortContacts('next_action')" id="ch-next_action">Next Action ↕</th>
               <th onclick="sortContacts('next_action_date')" id="ch-next_action_date">Next Date ↕</th>
@@ -2186,9 +2187,14 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Contact Type</label>
-          <select class="form-select" id="cf-type">
-            <option>Recruiter</option><option>Hiring Manager</option><option>HR / Talent Acquisition</option><option>Networking</option>
-          </select>
+          <div id="cf-type-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" value="Recruiter"> Recruiter</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" value="Hiring Manager"> Hiring Manager</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" value="HR / Talent Acquisition"> HR / Talent Acquisition</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" value="Networking"> Networking</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" value="Executive"> Executive</label>
+          </div>
+          <input type="hidden" id="cf-type">
         </div>
         <div class="form-group">
           <label class="form-label">Company</label>
@@ -3854,7 +3860,7 @@ async function loadDetailContacts(company, appId) {
     var contactsHtml = related.length === 0
       ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No contacts at this company yet.</div>'
       : related.map(function(c) {
-          const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+          const badgeCls = getContactBadge(c.contact_type);
           var linkedInHtml = c.linkedin_url ? '<a href="' + (normalizeLinkedIn(c.linkedin_url)||'#') + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
           return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
             '<div style="flex:1">' +
@@ -3862,7 +3868,7 @@ async function loadDetailContacts(company, appId) {
               '<div style="font-size:11px;color:var(--text-secondary)">' + (c.title||'') + '</div>' +
               (linkedInHtml ? '<div>' + linkedInHtml + '</div>' : '') +
             '</div>' +
-            '<span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span>' +
+            renderContactRoles(c.contact_type) +
             '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" onclick="viewContactFromApp(this.dataset.cid)">View</button>' +
           '<button class="action-btn danger" data-cid="' + c.id + '" data-aid="' + (appId||'') + '" onclick="unlinkContactFromApp(this.dataset.cid, this.dataset.aid)" title="Remove">✕</button>' +
           '</div>';
@@ -4037,7 +4043,21 @@ const CONTACT_TYPE_BADGE = {
   'Recruiter': 'badge-interview-recruiter',
   'Hiring Manager': 'badge-inprogress',
   'Networking': 'badge-outreach',
+  'HR / Talent Acquisition': 'badge-interview-recruiter',
+  'Executive': 'badge-applied',
 };
+function getContactBadge(contact_type) {
+  // Multi-role: first role determines badge color
+  var first = (contact_type || '').split(',')[0].trim();
+  return CONTACT_TYPE_BADGE[first] || 'badge-other';
+}
+function renderContactRoles(contact_type) {
+  if (!contact_type) return '<span class="badge badge-other">—</span>';
+  return contact_type.split(',').map(function(r) {
+    r = r.trim();
+    return '<span class="badge ' + (CONTACT_TYPE_BADGE[r] || 'badge-other') + '" style="margin-right:3px">' + r + '</span>';
+  }).join('');
+}
 
 async function migrateContactEmails() {
   // One-time migration: extract emails from notes field into email field
@@ -4110,7 +4130,7 @@ function renderContactsTable() {
     return;
   }
   tbody.innerHTML = filteredContacts.map(c => {
-    const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
+    const badgeCls = getContactBadge(c.contact_type);
     const overdueStyle = isOverdue(c.next_action_date) && c.next_action_date ? 'color:var(--burgundy);font-weight:600' : '';
     const hubspotLinked = c.hubspot_contact_id ? '<span title="Linked to HubSpot" style="color:#f97316;font-size:11px;margin-left:4px">● HS</span>' : '';
     return '<tr>' +
@@ -4145,7 +4165,7 @@ function buildContactDetailHTML(c) {
   return '<div class="detail-section">' +
     '<div class="detail-section-title">Contact Info</div>' +
     '<div class="detail-grid">' +
-      '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+      '<div class="detail-field"><span class="detail-field-label">Role</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
       '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
       '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
       '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
@@ -4370,7 +4390,7 @@ function viewContactFromApp(contactId) {
     document.getElementById('detail-body').innerHTML =
       '<div class="detail-section">' +
         '<div class="detail-grid">' +
-          '<div class="detail-field"><span class="detail-field-label">Type</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
+          '<div class="detail-field"><span class="detail-field-label">Role</span><span class="detail-field-value"><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Title</span><span class="detail-field-value">' + (c.title||'—') + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Company</span><span class="detail-field-value">' + (c.company||'—') + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Source</span><span class="detail-field-value">' + (c.connection_source||'—') + '</span></div>' +
@@ -4432,7 +4452,17 @@ function editContact(id) {
   document.getElementById('modal-contact-title').textContent = 'Edit Contact';
   const sv = (fid, val) => { const e = document.getElementById(fid); if(e) e.value = val || ''; };
   sv('cf-name', c.name); sv('cf-company', c.company); sv('cf-title', c.title);
-  sv('cf-type', c.contact_type); sv('cf-source', c.connection_source);
+  // Set multi-role checkboxes
+  (function() {
+    var wrap = document.getElementById('cf-type-wrap');
+    if (!wrap) return;
+    var roles = (c.contact_type || '').split(',').map(function(r){ return r.trim(); });
+    wrap.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
+      cb.checked = roles.indexOf(cb.value) !== -1;
+    });
+    document.getElementById('cf-type').value = c.contact_type || '';
+  })();
+  sv('cf-source', c.connection_source);
   sv('cf-last-date', c.last_contact_date); sv('cf-next-action', c.next_action);
   sv('cf-next-date', c.next_action_date); sv('cf-email', c.email); sv('cf-linkedin', c.linkedin_url); sv('cf-notes', c.notes);
   populateContactAppDropdown(c.linked_application_id || null);
@@ -4448,7 +4478,13 @@ async function saveContact() {
   const payload = {
     name, company: getVal('cf-company'), title: getVal('cf-title'),
     linked_application_id: getVal('cf-linked-app') || null,
-    contact_type: getVal('cf-type'), connection_source: getVal('cf-source'),
+    contact_type: (function() {
+      var wrap = document.getElementById('cf-type-wrap');
+      if (!wrap) return getVal('cf-type');
+      var checked = [];
+      wrap.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){ checked.push(cb.value); });
+      return checked.join(', ');
+    })(), connection_source: getVal('cf-source'),
     last_contact_date: (function() {
       var manual = getVal('cf-last-date') || null;
       var dates = [getVal('cf-o1d'), getVal('cf-o2d'), getVal('cf-o3d'), manual].filter(Boolean);
@@ -6472,7 +6508,38 @@ function _exportToDocxGeneric() {
       <h1>${title}</h1>
       <p style="font-size:9pt;color:#666;margin-bottom:16px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Jay Wadhwa Job Search Command Center</p>
       ${html}
-    </body>
+    
+<!-- Merge Contacts Modal -->
+<div id="merge-contacts-modal" style="display:none;position:fixed;inset:0;z-index:10000">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45)" onclick="closeMergeModal()"></div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;width:640px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-family:var(--font-display);font-size:18px;font-weight:600">⇋ Merge Duplicate Contacts</span>
+      <button onclick="closeMergeModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px">
+      <div style="flex:1">
+        <label class="form-label">Contact A</label>
+        <select class="form-select" id="merge-contact-a" onchange="renderMergePreview()">
+          <option value="">— Select —</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label class="form-label">Contact B</label>
+        <select class="form-select" id="merge-contact-b" onchange="renderMergePreview()">
+          <option value="">— Select —</option>
+        </select>
+      </div>
+    </div>
+    <div id="merge-preview" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="executeMerge()">⇋ Merge Contacts</button>
+    </div>
+  </div>
+</div>
+
+</body>
     </html>`;
 
   const blob = new Blob([fullHtml], { type: 'application/msword' });
@@ -10952,6 +11019,148 @@ async function executeJobSearch() {
     if (stopBtn) stopBtn.style.display = 'none';
   }
 }
+
+
+
+// ── MERGE CONTACTS ────────────────────────────────────────────────────────
+var _mergeResolutions = {};
+var _mergeContactA = null;
+var _mergeContactB = null;
+
+function openMergeContactsModal() {
+  var modal = document.getElementById('merge-contacts-modal');
+  if (!modal) return;
+  var sorted = allContacts.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  var opts = '<option value="">— Select —</option>' + sorted.map(function(c) {
+    return '<option value="' + c.id + '">' + (c.name||'Unknown') + (c.company ? ' \u2014 ' + c.company : '') + '</option>';
+  }).join('');
+  document.getElementById('merge-contact-a').innerHTML = opts;
+  document.getElementById('merge-contact-b').innerHTML = opts;
+  document.getElementById('merge-preview').innerHTML = '';
+  _mergeResolutions = {};
+  modal.style.display = 'block';
+}
+
+function closeMergeModal() {
+  var modal = document.getElementById('merge-contacts-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+var MERGE_FIELDS = [
+  { key: 'name',             label: 'Name' },
+  { key: 'contact_type',     label: 'Role' },
+  { key: 'title',            label: 'Title' },
+  { key: 'company',          label: 'Company' },
+  { key: 'email',            label: 'Email' },
+  { key: 'linkedin_url',     label: 'LinkedIn URL' },
+  { key: 'connection_source',label: 'Source' },
+  { key: 'notes',            label: 'Notes' },
+  { key: 'next_action',      label: 'Next Action' },
+];
+
+function renderMergePreview() {
+  var aId = document.getElementById('merge-contact-a').value;
+  var bId = document.getElementById('merge-contact-b').value;
+  var preview = document.getElementById('merge-preview');
+  if (!aId || !bId || aId === bId) {
+    preview.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">Select two different contacts to preview merge.</div>';
+    return;
+  }
+  _mergeContactA = allContacts.find(function(c){ return String(c.id)===String(aId); });
+  _mergeContactB = allContacts.find(function(c){ return String(c.id)===String(bId); });
+  if (!_mergeContactA || !_mergeContactB) return;
+  _mergeResolutions = {};
+
+  var tbody = '';
+  MERGE_FIELDS.forEach(function(f) {
+    var vA = (_mergeContactA[f.key] || '').trim();
+    var vB = (_mergeContactB[f.key] || '').trim();
+    if (vA === vB) {
+      _mergeResolutions[f.key] = vA;
+      tbody += '<tr><td style="padding:7px 10px;font-size:13px;font-weight:600">' + f.label + '</td>' +
+        '<td colspan="3" style="padding:7px 10px;font-size:13px;color:var(--text-secondary)">' + (vA||'<em style="opacity:.5">—</em>') + '</td></tr>';
+      return;
+    }
+    if (!vA || !vB) {
+      var winner = vA || vB;
+      _mergeResolutions[f.key] = winner;
+      tbody += '<tr><td style="padding:7px 10px;font-size:13px;font-weight:600">' + f.label + '</td>' +
+        '<td colspan="3" style="padding:7px 10px;font-size:13px;color:var(--success)">' + winner + ' <span style="font-size:11px;opacity:.6">(auto \u2013 only one has data)</span></td></tr>';
+      return;
+    }
+    // Real conflict
+    _mergeResolutions[f.key] = vA;
+    var canBoth = (f.key === 'contact_type' || f.key === 'notes');
+    var bothVal = f.key === 'contact_type'
+      ? Array.from(new Set((vA+', '+vB).split(',').map(function(r){return r.trim();}))).join(', ')
+      : vA+'; '+vB;
+    tbody += '<tr style="background:#fff5f5">' +
+      '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:var(--burgundy)">' + f.label + ' \u26a0</td>' +
+      '<td style="padding:7px 10px"><label style="display:flex;gap:5px;align-items:flex-start;cursor:pointer;font-size:12px">' +
+        '<input type="radio" name="mr-' + f.key + '" checked data-field="' + f.key + '" data-val="A" data-vala="' + encodeURIComponent(vA) + '" data-valb="' + encodeURIComponent(vB) + '" data-valboth="' + encodeURIComponent(bothVal) + '" onchange="onMergeRadio(this)"> ' + vA +
+      '</label></td>' +
+      '<td style="padding:7px 10px"><label style="display:flex;gap:5px;align-items:flex-start;cursor:pointer;font-size:12px">' +
+        '<input type="radio" name="mr-' + f.key + '" data-field="' + f.key + '" data-val="B" data-vala="' + encodeURIComponent(vA) + '" data-valb="' + encodeURIComponent(vB) + '" data-valboth="' + encodeURIComponent(bothVal) + '" onchange="onMergeRadio(this)"> ' + vB +
+      '</label></td>' +
+      (canBoth ? '<td style="padding:7px 10px"><label style="display:flex;gap:5px;align-items:flex-start;cursor:pointer;font-size:12px">' +
+        '<input type="radio" name="mr-' + f.key + '" data-field="' + f.key + '" data-val="both" data-vala="' + encodeURIComponent(vA) + '" data-valb="' + encodeURIComponent(vB) + '" data-valboth="' + encodeURIComponent(bothVal) + '" onchange="onMergeRadio(this)"> Keep both' +
+      '</label></td>' : '<td></td>') +
+    '</tr>';
+  });
+
+  document.getElementById('merge-preview').innerHTML =
+    '<table style="width:100%;border-collapse:collapse">' +
+    '<thead><tr style="background:var(--bg-card);border-bottom:1px solid var(--border)">' +
+    '<th style="padding:7px 10px;text-align:left;font-size:12px;color:var(--text-secondary)">Field</th>' +
+    '<th style="padding:7px 10px;text-align:left;font-size:12px;color:var(--burgundy)">A: ' + (_mergeContactA.name||'') + '</th>' +
+    '<th style="padding:7px 10px;text-align:left;font-size:12px;color:#2563eb">B: ' + (_mergeContactB.name||'') + '</th>' +
+    '<th style="padding:7px 10px;text-align:left;font-size:12px;color:var(--text-secondary)">Keep Both</th>' +
+    '</tr></thead><tbody>' + tbody + '</tbody></table>' +
+    '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">\u26a0 = conflict. Contact B will be deleted after merge.</div>';
+}
+
+function onMergeRadio(el) {
+  var field = el.dataset.field;
+  var choice = el.dataset.val;
+  if (choice === 'A') _mergeResolutions[field] = decodeURIComponent(el.dataset.vala);
+  else if (choice === 'B') _mergeResolutions[field] = decodeURIComponent(el.dataset.valb);
+  else _mergeResolutions[field] = decodeURIComponent(el.dataset.valboth);
+}
+
+async function executeMerge() {
+  var aId = document.getElementById('merge-contact-a').value;
+  var bId = document.getElementById('merge-contact-b').value;
+  if (!aId || !bId || aId === bId) { toast('Select two different contacts.', 'error'); return; }
+  if (!_mergeContactA || !_mergeContactB) { toast('Preview the merge first.', 'error'); return; }
+  try {
+    await dbPatch('contacts', aId, _mergeResolutions);
+    await dbDelete('contacts', bId);
+    var aIdx = allContacts.findIndex(function(c){ return String(c.id)===String(aId); });
+    if (aIdx !== -1) Object.assign(allContacts[aIdx], _mergeResolutions);
+    allContacts = allContacts.filter(function(c){ return String(c.id)!==String(bId); });
+    var updated = allContacts.find(function(c){ return String(c.id)===String(aId); });
+    if (updated) pushContactToHubSpot(updated);
+    if (_mergeContactB.hubspot_contact_id) {
+      fetch(WORKER_URL + '/hubspot/contact/' + _mergeContactB.hubspot_contact_id, {
+        method: 'DELETE', headers: { 'Origin': location.origin }
+      }).catch(function(){});
+    }
+    closeMergeModal();
+    renderContactsTable();
+    toast('Contacts merged.', 'success');
+  } catch(e) {
+    toast('Merge failed: ' + e.message, 'error');
+  }
+}
+
+function dbDelete(table, id) {
+  return fetch(WORKER_URL + '/db/' + table + '?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin, 'Prefer': 'return=minimal' }
+  });
+}
+// ── END MERGE CONTACTS ────────────────────────────────────────────────────
+
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
