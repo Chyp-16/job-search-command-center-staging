@@ -5049,10 +5049,11 @@ async function fetchHubSpotTemplates() {
         .replace(/\{\{\s*contact\.email\s*\}\}/g, '[EMAIL]');
     }
     return results.map(function(t) {
-      var p = t.properties || {};
-      var name    = p.hs_name    || 'Untitled';
-      var subject = fixMerge(p.hs_subject || '');
-      var body    = fixMerge(htmlToText(p.hs_body_html || p.hs_body_preview || ''));
+      // Sales API returns flat fields: id, name, subject, body (already plain text)
+      var name    = t.name    || (t.properties && t.properties.hs_name) || 'Untitled';
+      var subject = fixMerge(t.subject || (t.properties && t.properties.hs_subject) || '');
+      var rawBody = t.body    || (t.properties && (t.properties.hs_body_html || t.properties.hs_body_preview)) || '';
+      var body    = fixMerge(htmlToText(rawBody));
       return { id: 'hs_' + t.id, name: name, subject: subject, body: body, source: 'hubspot' };
     });
   } catch(e) {
@@ -9827,7 +9828,7 @@ async function openTaskTemplatePicker(mode) {
     fetchHubSpotTemplates().then(function(hsTemplates) {
       list.innerHTML = '';
       if (!hsTemplates || hsTemplates.length === 0) {
-        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot templates found.<br><a href="https://app-na2.hubspot.com/sales-templates/242599414" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
+        list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-secondary);text-align:center">No HubSpot templates found.<br><a href="https://app-na2.hubspot.com/templates/242599414" target="_blank" style="color:var(--burgundy)">Manage in HubSpot →</a></div>';
         return;
       }
       hsTemplates.forEach(function(t) {
