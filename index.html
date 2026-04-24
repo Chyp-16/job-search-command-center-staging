@@ -8351,8 +8351,13 @@ async function fetchOBContext() {
   var btn = document.getElementById('ob-find-context-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Searching...'; }
   var contextEl = document.getElementById('ob-context');
-  var searchTarget = company || url;
-  var prompt = 'Search for 1-2 recent notable developments about ' + searchTarget + '. Focus on: funding, product launches, leadership changes, partnerships, revenue milestones, or strategic pivots from the past 6-12 months. Return a concise 2-3 sentence summary with specific dates, amounts, and names where available. No fluff.';
+  var prompt;
+  if (url) {
+    // Fetch directly from the company URL for accurate, specific context
+    prompt = 'Fetch the content at ' + url + ' and search for recent news about ' + (company || 'this company') + '. Focus on: funding, product launches, leadership changes, partnerships, revenue milestones, or strategic pivots from the past 6-12 months. Use ' + url + ' as the primary source. Return a concise 2-3 sentence summary with specific dates, amounts, and names where available. No fluff.';
+  } else {
+    prompt = 'Search for 1-2 recent notable developments about ' + company + '. Focus on: funding, product launches, leadership changes, partnerships, revenue milestones, or strategic pivots from the past 6-12 months. Return a concise 2-3 sentence summary with specific dates, amounts, and names where available. No fluff.';
+  }
   try {
     var result = await callAI([{ role: 'user', content: prompt }], 'You are a business research assistant. Return only factual, specific, recent company news. Be concise.', true);
     if (contextEl) contextEl.value = result.trim();
@@ -11153,12 +11158,6 @@ async function executeMerge() {
   }
 }
 
-function dbDelete(table, id) {
-  return fetch(WORKER_URL + '/db/' + table + '?id=eq.' + id, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin, 'Prefer': 'return=minimal' }
-  });
-}
 // ── END MERGE CONTACTS ────────────────────────────────────────────────────
 
 
