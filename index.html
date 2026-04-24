@@ -1292,6 +1292,17 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
 
               <div class="form-group">
+                <label class="form-label">Posted Within</label>
+                <select class="form-select" id="js-posted">
+                  <option value="1 day">1 day</option>
+                  <option value="3 days">3 days</option>
+                  <option value="1 week" selected>1 week</option>
+                  <option value="2 weeks">2 weeks</option>
+                  <option value="1 month">1 month</option>
+                </select>
+              </div>
+
+              <div class="form-group">
                 <label class="form-label">Salary Floor (Base)</label>
                 <input class="form-input" id="js-salary-floor" type="text" placeholder="e.g. $150,000">
               </div>
@@ -1318,7 +1329,8 @@ a { color: var(--burgundy); text-decoration: none; }
 
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
-              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runJobSearch()">✦ Find Matching Roles</button>
+              <button class="btn btn-primary" style="flex:1;padding:12px" id="js-run-btn" onclick="runJobSearch()">✦ Find Matching Roles</button>
+              <button class="btn btn-danger" id="js-stop-btn" style="display:none" onclick="stopJobSearch()">⏹ Stop</button>
               <button class="btn btn-secondary" onclick="saveJobSearchPrefs()">💾 Save Prefs</button>
               <button class="btn btn-secondary" onclick="clearJobSearchOutput()">Clear</button>
             </div>
@@ -1334,8 +1346,8 @@ a { color: var(--burgundy); text-decoration: none; }
               <button class="btn btn-secondary btn-sm" onclick="exportJobSearchDocx()">⬇ Export .docx</button>
             </div>
           </div>
-          <div style="padding:20px">
-            <div id="js-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:700px;overflow-y:auto"></div>
+          <div style="padding:24px 28px;background:var(--bg)">
+            <div id="js-output-content" style="font-family:'Calibri',Georgia,serif;font-size:14px;line-height:1.9;color:var(--text);max-height:740px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;background:#fff"></div>
           </div>
         </div>
 
@@ -10601,20 +10613,35 @@ const JS_INDUSTRIES = [
   { label: 'Nonprofit', selected: true },
   { label: 'Sports & Entertainment', selected: true },
   { label: 'AI / Emerging Tech', selected: true },
-  { label: 'Digital Health', selected: false },
+  { label: 'Healthcare', selected: false },
   { label: 'PE-Backed Startups', selected: true },
   { label: 'Agency / Consultancy', selected: false },
   { label: 'Retail / E-Commerce', selected: false },
 ];
 
 const JS_SIZES = [
-  { label: 'Startup (1-50)', value: '1-50', selected: true },
-  { label: 'Growth Stage (51-500)', value: '51-500', selected: true },
-  { label: 'Mid-Market (501-2000)', value: '501-2000', selected: true },
-  { label: 'Enterprise (2000+)', value: '2000+', selected: false },
+  { label: 'Startup 0-50',       value: '0-50',    selected: true },
+  { label: 'Growth Stage 51-100', value: '51-100',  selected: true },
+  { label: 'SMB 101-500',         value: '101-500', selected: true },
+  { label: 'Mid-Market 501-1000', value: '501-1000',selected: true },
+  { label: 'Enterprise 1001+',    value: '1001+',   selected: false },
 ];
 
 let jsOutput = '';
+let jsAbortController = null;
+
+function stopJobSearch() {
+  if (jsAbortController) { jsAbortController.abort(); jsAbortController = null; }
+  var runBtn  = document.getElementById('js-run-btn');
+  var stopBtn = document.getElementById('js-stop-btn');
+  if (runBtn)  { runBtn.disabled = false; runBtn.style.display = ''; }
+  if (stopBtn) stopBtn.style.display = 'none';
+  var contentEl = document.getElementById('js-output-content');
+  if (contentEl && contentEl.textContent.includes('Searching')) {
+    contentEl.textContent = 'Search stopped.';
+  }
+  toast('Search stopped.', 'info');
+}
 
 function saveJobSearchPrefs() {
   var prefs = {
@@ -10624,6 +10651,7 @@ function saveJobSearchPrefs() {
     roles:       document.getElementById('js-roles').value,
     location:    document.getElementById('js-location').value,
     notes:       document.getElementById('js-notes').value,
+    posted:      document.getElementById('js-posted') ? document.getElementById('js-posted').value : '1 week',
     otherIndustry: document.getElementById('js-other-industry') ? document.getElementById('js-other-industry').value : '',
     workTypes:   JS_WORK_TYPES.map(function(wt) { return wt.selected; }),
     industries:  JS_INDUSTRIES.map(function(ind) { return ind.selected; }),
@@ -10644,6 +10672,7 @@ function loadJobSearchPrefs() {
     if (prefs.roles)       document.getElementById('js-roles').value         = prefs.roles;
     if (prefs.location)    document.getElementById('js-location').value      = prefs.location;
     if (prefs.notes)       document.getElementById('js-notes').value         = prefs.notes;
+    if (prefs.posted && document.getElementById('js-posted')) document.getElementById('js-posted').value = prefs.posted;
     if (prefs.otherIndustry && document.getElementById('js-other-industry')) {
       document.getElementById('js-other-industry').value = prefs.otherIndustry;
     }
@@ -10763,24 +10792,33 @@ function buildJobSearchPrompt() {
   var totalComp   = document.getElementById('js-total-comp').value || '$225,000+';
   var exp         = document.getElementById('js-exp').value;
   var notes       = document.getElementById('js-notes').value.trim();
+  var postedEl    = document.getElementById('js-posted');
+  var posted      = postedEl ? postedEl.value : '1 week';
 
   var _selInds = JS_INDUSTRIES.filter(function(i) { return i.selected && i.label !== 'Other'; }).map(function(i) { return i.label; });
   var _otherEl = document.getElementById('js-other-industry');
   if (_otherEl && _otherEl.value.trim()) _selInds.push(_otherEl.value.trim());
-  var selectedSizes = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label + ' (' + s.value + ' employees)'; });
+  var selectedSizes = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label; });
   var workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
+
+  // Build exclude list from applied applications
+  var appliedRoles = allApps.filter(function(a) {
+    return (a.status || '').toLowerCase() === 'applied' && a.company && a.job_title;
+  }).map(function(a) { return a.job_title + ' at ' + a.company; });
 
   return 'Find 6-8 real current marketing leadership job postings matching:' +
     ' Roles: ' + roles.split(',').slice(0,4).join(',') + '.' +
     ' Location: ' + location + ' (' + workTypes + ').' +
     ' Industries: ' + _selInds.slice(0,6).join(', ') + '.' +
-    ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
+    ' Company sizes: ' + selectedSizes.join(', ') + '.' +
     ' Base salary min: ' + salaryFloor + '.' +
     ' Target total comp: ' + totalComp + '.' +
     ' Min years experience required: ' + exp + '+.' +
+    ' Posted within: ' + posted + '.' +
     (notes ? ' Notes: ' + notes + '.' : '') +
+    (appliedRoles.length > 0 ? '\n\nDo NOT include these roles I have already applied to: ' + appliedRoles.join('; ') + '.' : '') +
     '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
-    '\n\nOnly real postings from last 60 days. No fabricated URLs.';
+    '\n\nOnly real postings. No fabricated URLs.';
 }
 
 function runJobSearch() {
@@ -10819,16 +10857,23 @@ function runJobSearch() {
 async function executeJobSearch() {
   var promptEl = document.getElementById('js-prompt-edit');
   var prompt = promptEl ? promptEl.value.trim() : buildJobSearchPrompt();
-  // Close modal
   var m = document.getElementById('js-prompt-modal');
   var b = document.getElementById('js-prompt-backdrop');
   if (m) m.remove(); if (b) b.remove();
 
-  var panel = document.getElementById('js-output-panel');
+  var panel     = document.getElementById('js-output-panel');
   var contentEl = document.getElementById('js-output-content');
+  var runBtn    = document.getElementById('js-run-btn');
+  var stopBtn   = document.getElementById('js-stop-btn');
+
   panel.style.display = 'block';
-  contentEl.textContent = 'Searching for matching roles... This may take 30-60 seconds.';
+  contentEl.innerHTML = '<span style="color:var(--text-secondary);font-style:italic">Searching for matching roles… This may take 30–60 seconds.</span>';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (runBtn)  { runBtn.disabled = true; runBtn.style.display = 'none'; }
+  if (stopBtn) stopBtn.style.display = '';
+
+  jsAbortController = new AbortController();
 
   var jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
 
@@ -10837,22 +10882,34 @@ async function executeJobSearch() {
     var r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body: JSON.stringify(jsBody)
+      body: JSON.stringify(jsBody),
+      signal: jsAbortController.signal
     });
     var data = await r.json();
     var result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
+    // Polished report rendering
     var rendered = result
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--burgundy)">$1</strong>')
+      .replace(/^(\d+\.|#{1,3}\s*)/gm, '')
+      .replace(/---+/g, '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">')
+      .replace(/\n\n/g, '</p><p style="margin:0 0 12px">')
       .replace(/\n/g, '<br>');
-    contentEl.innerHTML = rendered;
-    contentEl.style.whiteSpace = 'normal';
+    contentEl.innerHTML = '<p style="margin:0 0 12px">' + rendered + '</p>';
     toast('Search complete.', 'success');
   } catch(e) {
-    contentEl.textContent = 'Error: ' + e.message;
-    toast('Search failed: ' + e.message, 'error');
+    if (e.name === 'AbortError') {
+      contentEl.innerHTML = '<span style="color:var(--text-secondary);font-style:italic">Search stopped.</span>';
+    } else {
+      contentEl.innerHTML = '<span style="color:var(--error)">Error: ' + e.message + '</span>';
+      toast('Search failed: ' + e.message, 'error');
+    }
+  } finally {
+    jsAbortController = null;
+    if (runBtn)  { runBtn.disabled = false; runBtn.style.display = ''; }
+    if (stopBtn) stopBtn.style.display = 'none';
   }
 }
 
