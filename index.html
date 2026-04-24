@@ -11040,15 +11040,57 @@ var _mergeContactB = null;
 function openMergeContactsModal() {
   var modal = document.getElementById('merge-contacts-modal');
   if (!modal) return;
+
+  // Detect duplicates by same name or same email
+  var detected = [];
+  var checked = {};
   var sorted = allContacts.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  sorted.forEach(function(c, i) {
+    var nameA = (c.name||'').toLowerCase().trim();
+    if (!nameA) return;
+    sorted.slice(i+1).forEach(function(d) {
+      var key = [c.id, d.id].sort().join('-');
+      if (checked[key]) return;
+      checked[key] = true;
+      var sameName = nameA === (d.name||'').toLowerCase().trim();
+      var sameEmail = c.email && d.email && c.email.toLowerCase() === d.email.toLowerCase();
+      if (sameName || sameEmail) detected.push([c, d]);
+    });
+  });
+
+  var dupHtml = '';
+  if (detected.length > 0) {
+    dupHtml = '<div style="margin-bottom:14px;padding:10px 14px;background:#fff8f8;border:1px solid var(--border);border-radius:var(--radius);font-size:13px">' +
+      '<div style="font-weight:600;margin-bottom:8px;color:var(--burgundy)">' + detected.length + ' likely duplicate' + (detected.length>1?'s':'') + ' detected:</div>' +
+      detected.slice(0,10).map(function(pair) {
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          '<span style="flex:1">' + (pair[0].name||'') + (pair[0].company?' &mdash; '+pair[0].company:'') + '</span>' +
+          '<span style="color:var(--text-secondary);font-size:11px">vs</span>' +
+          '<span style="flex:1">' + (pair[1].name||'') + (pair[1].company?' &mdash; '+pair[1].company:'') + '</span>' +
+          '<button class="btn btn-secondary btn-xs" onclick="preselectMergePair(\'' + pair[0].id + '\',\'' + pair[1].id + '\')">Select</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  } else {
+    dupHtml = '<div style="margin-bottom:14px;font-size:13px;color:var(--text-secondary)">No exact duplicates detected. Use the dropdowns below to manually select contacts to merge.</div>';
+  }
+
   var opts = '<option value="">— Select —</option>' + sorted.map(function(c) {
     return '<option value="' + c.id + '">' + (c.name||'Unknown') + (c.company ? ' \u2014 ' + c.company : '') + '</option>';
   }).join('');
   document.getElementById('merge-contact-a').innerHTML = opts;
   document.getElementById('merge-contact-b').innerHTML = opts;
-  document.getElementById('merge-preview').innerHTML = '';
+  document.getElementById('merge-preview').innerHTML = dupHtml;
   _mergeResolutions = {};
+  _mergeContactA = null;
+  _mergeContactB = null;
   modal.style.display = 'block';
+}
+
+function preselectMergePair(aId, bId) {
+  document.getElementById('merge-contact-a').value = aId;
+  document.getElementById('merge-contact-b').value = bId;
+  renderMergePreview();
 }
 
 function closeMergeModal() {
@@ -11142,23 +11184,49 @@ async function executeMerge() {
   var bId = document.getElementById('merge-contact-b').value;
   if (!aId || !bId || aId === bId) { toast('Select two different contacts.', 'error'); return; }
   if (!_mergeContactA || !_mergeContactB) { toast('Preview the merge first.', 'error'); return; }
+
+  // Strip empty string values — Supabase treats '' differently from null
+  var payload = {};
+  Object.keys(_mergeResolutions).forEach(function(k) {
+    payload[k] = _mergeResolutions[k] || null;
+  });
+
   try {
-    await dbPatch('contacts', aId, _mergeResolutions);
-    await dbDelete('contacts', bId);
+    // PATCH contact A with merged values
+    var patchRes = await fetch(WORKER_URL + '/db/contacts?id=eq.' + aId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(payload)
+    });
+    if (!patchRes.ok) throw new Error('Update failed: ' + patchRes.status);
+
+    // DELETE contact B
+    var delRes = await fetch(WORKER_URL + '/db/contacts?id=eq.' + bId, {
+      method: 'DELETE',
+      headers: { 'Origin': location.origin, 'Prefer': 'return=minimal' }
+    });
+    if (!delRes.ok) throw new Error('Delete failed: ' + delRes.status);
+
+    // Update in-memory state
     var aIdx = allContacts.findIndex(function(c){ return String(c.id)===String(aId); });
-    if (aIdx !== -1) Object.assign(allContacts[aIdx], _mergeResolutions);
+    if (aIdx !== -1) Object.assign(allContacts[aIdx], payload);
     allContacts = allContacts.filter(function(c){ return String(c.id)!==String(bId); });
+
+    // HubSpot sync
     var updated = allContacts.find(function(c){ return String(c.id)===String(aId); });
     if (updated) pushContactToHubSpot(updated);
-    if (_mergeContactB.hubspot_contact_id) {
+    if (_mergeContactB && _mergeContactB.hubspot_contact_id) {
       fetch(WORKER_URL + '/hubspot/contact/' + _mergeContactB.hubspot_contact_id, {
         method: 'DELETE', headers: { 'Origin': location.origin }
       }).catch(function(){});
     }
+
+    _mergeContactA = null; _mergeContactB = null; _mergeResolutions = {};
     closeMergeModal();
     renderContactsTable();
     toast('Contacts merged.', 'success');
   } catch(e) {
+    console.error('Merge error:', e);
     toast('Merge failed: ' + e.message, 'error');
   }
 }
