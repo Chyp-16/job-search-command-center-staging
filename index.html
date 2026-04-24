@@ -3134,16 +3134,16 @@ function isOverdue(d) {
 document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
 async function refreshDashboard() {
-  if (!allApps.length) {
-    const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
-    allApps = Array.isArray(data) ? data : [];
-  }
-  // Auto-sync HubSpot tasks and activity on dashboard load
+  // Always re-fetch on explicit refresh so stats reflect real-time data
+  const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
+  allApps = Array.isArray(data) ? data : [];
+
+  // Auto-sync HubSpot tasks and activity on first load only; manual refresh triggers sync too
   if (!window._hubspotAutoSynced) {
     window._hubspotAutoSynced = true;
-    syncHubSpotTasks();
-    syncHubSpotActivity();
   }
+  syncHubSpotTasks();
+  syncHubSpotActivity();
 
   const total = allApps.length;
   const responded = allApps.filter(a => ['Interview — Recruiter','Interview — Company','Initial Phone Call','In-Progress'].includes(a.status)).length;
@@ -5168,9 +5168,10 @@ async function openEmailCompose(e) {
     '<button onclick="' + closeEC + '" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>' +
     '</div>' +
     tmplRow + toInput + subjInput + bodyInput +
+    '<div id="gmail-status-area" style="margin-bottom:12px"></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">' +
     '<button class="btn btn-secondary" onclick="' + closeEC + '">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="sendEmailCompose()">📧 Open in Gmail</button>' +
+    '<button class="btn btn-primary" id="email-compose-send-btn" onclick="sendEmailCompose()">📧 Send Email</button>' +
     '</div>';
 
   var backdrop = document.createElement('div');
@@ -5180,6 +5181,7 @@ async function openEmailCompose(e) {
 
   document.body.appendChild(backdrop);
   document.body.appendChild(modal);
+  renderGmailStatus();
 }
 
 function applyEmailComposeTemplate(id) {
@@ -5193,14 +5195,75 @@ function applyEmailComposeTemplate(id) {
 }
 
 function sendEmailCompose() {
-  var to      = (document.getElementById('email-compose-to')     || {}).value || 'jvwadhwa@gmail.com';
+  var to      = (document.getElementById('email-compose-to')     || {}).value || '';
   var subject = (document.getElementById('email-compose-subject') || {}).value || '';
   var body    = (document.getElementById('email-compose-body')    || {}).value || '';
-  var mailtoLink = 'mailto:' + encodeURIComponent(to) +
-    '?subject=' + encodeURIComponent(subject) +
-    '&body='    + encodeURIComponent(body);
-  window.open(mailtoLink, '_blank');
+  if (!to) { toast('Enter a recipient email address.', 'error'); return; }
+
+  // Check if Gmail is connected
+  var gmailConnected = localStorage.getItem('gmail_connected') === 'true';
+  if (gmailConnected) {
+    // Send via Gmail API through Worker
+    var sendBtn = document.getElementById('email-compose-send-btn');
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'Sending...'; }
+    fetch(WORKER_URL + '/gmail/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ to: to, subject: subject, body: body })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error);
+      toast('Email sent via Gmail.', 'success');
+      var m=document.getElementById('email-compose-picker');
+      var b=document.getElementById('email-compose-backdrop');
+      if(m)m.remove(); if(b)b.remove();
+    })
+    .catch(function(e) {
+      toast('Send failed: ' + e.message, 'error');
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📧 Send Email'; }
+    });
+  } else {
+    // Fallback: mailto
+    var mailtoLink = 'mailto:' + encodeURIComponent(to) +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body='    + encodeURIComponent(body);
+    window.open(mailtoLink, '_blank');
+  }
 }
+
+function connectGmail() {
+  // Redirect to Worker OAuth start
+  window.location.href = WORKER_URL + '/gmail/auth?origin=' + encodeURIComponent(location.href);
+}
+
+function disconnectGmail() {
+  localStorage.removeItem('gmail_connected');
+  toast('Gmail disconnected.', 'success');
+  renderGmailStatus();
+}
+
+function renderGmailStatus() {
+  var el = document.getElementById('gmail-status-area');
+  if (!el) return;
+  var connected = localStorage.getItem('gmail_connected') === 'true';
+  el.innerHTML = connected
+    ? '<span style="font-size:12px;color:var(--success)">✓ Gmail connected (jvwadhwa@gmail.com)</span>' +
+      ' <button class="btn btn-secondary btn-xs" onclick="disconnectGmail()">Disconnect</button>'
+    : '<button class="btn btn-secondary btn-sm" onclick="connectGmail()">🔗 Connect Gmail</button>' +
+      '<span style="font-size:11px;color:var(--text-secondary);margin-left:8px">Connect to send directly without opening Gmail</span>';
+}
+
+// Check for OAuth callback (token stored in URL hash by Worker redirect)
+(function checkGmailCallback() {
+  if (location.search.includes('gmail_connected=true')) {
+    localStorage.setItem('gmail_connected', 'true');
+    // Clean URL
+    var clean = location.href.replace(/[?&]gmail_connected=true/, '');
+    history.replaceState(null, '', clean);
+    toast('Gmail connected. You can now send emails directly.', 'success');
+  }
+})();
 
 // ── END STANDALONE EMAIL COMPOSE ──────────────────────────────────────────
 
