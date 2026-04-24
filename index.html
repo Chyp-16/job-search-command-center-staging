@@ -2965,10 +2965,12 @@ async function dbPost(table, body, params) {
 async function dbPatch(table, id, body) {
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin, 'Prefer': 'return=representation' },
     body: JSON.stringify(body)
   });
-  return r.json();
+  if (!r.ok) throw new Error('PATCH failed: ' + r.status);
+  const text = await r.text();
+  return text ? JSON.parse(text) : [];
 }
 
 async function dbDelete(table, id) {
@@ -8270,7 +8272,7 @@ function populateOBContactDropdowns() {
   });
   var opts = '<option value="">— Select saved contact —</option>' +
     sorted.map(function(c) {
-      return '<option value="' + (c.id || '') + '" data-email="' + (c.email || '') + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '">' +
+      return '<option value="' + (c.id || '') + '" data-email="' + (c.email || '') + '" data-cname="' + (c.name || '').replace(/"/g, '&quot;') + '">' +
         (c.name || 'Unknown') + (c.company ? ' — ' + c.company : '') + '</option>';
     }).join('');
   recruiterEl.innerHTML = opts;
@@ -8285,6 +8287,8 @@ function applyOBContact(role) {
     var opt = sel.options[sel.selectedIndex];
     var emailEl = document.getElementById('ob-email');
     if (emailEl && opt && opt.dataset.email) emailEl.value = opt.dataset.email;
+    // data-cname avoids collision with reserved HTMLElement.name property
+
   }
 }
 
@@ -8293,12 +8297,12 @@ async function runOutreachBuilder() {
   const role = (document.getElementById('ob-role').value||'').trim();
   var _obRecEl = document.getElementById('ob-recruiter');
   const recruiter = _obRecEl && _obRecEl.selectedIndex > 0
-    ? (_obRecEl.options[_obRecEl.selectedIndex].dataset.name || _obRecEl.options[_obRecEl.selectedIndex].text.split('—')[0].trim())
+    ? (_obRecEl.options[_obRecEl.selectedIndex].dataset.cname || _obRecEl.options[_obRecEl.selectedIndex].text.split('—')[0].trim())
     : '';
   const email = (document.getElementById('ob-email').value||'').trim();
   var _obHmEl = document.getElementById('ob-hm');
   const hm = _obHmEl && _obHmEl.selectedIndex > 0
-    ? (_obHmEl.options[_obHmEl.selectedIndex].dataset.name || _obHmEl.options[_obHmEl.selectedIndex].text.split('—')[0].trim())
+    ? (_obHmEl.options[_obHmEl.selectedIndex].dataset.cname || _obHmEl.options[_obHmEl.selectedIndex].text.split('—')[0].trim())
     : '';
   const url = (document.getElementById('ob-url').value||'').trim();
   const context = (document.getElementById('ob-context').value||'').trim();
@@ -9358,6 +9362,7 @@ async function openUploadDoc(docType) {
   if (!allContacts.length) {
     const data = await dbGet('contacts', 'select=id,name,company&order=name.asc&limit=500');
     allContacts = Array.isArray(data) ? data : [];
+  populateOBContactDropdowns(); // refresh OB dropdowns whenever contacts load
   }
   await openUploadModal();
   setTimeout(function() {
