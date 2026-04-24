@@ -1330,7 +1330,7 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" id="js-run-btn" onclick="runJobSearch()">✦ Find Matching Roles</button>
-              <button class="btn btn-danger" id="js-stop-btn" style="display:none" onclick="stopJobSearch()">⏹ Stop</button>
+              <button class="btn btn-danger" id="js-stop-btn" style="display:none;background:#902B32;border-color:#902B32" onclick="stopJobSearch()">⏹ Stop</button>
               <button class="btn btn-secondary" onclick="saveJobSearchPrefs()">💾 Save Prefs</button>
               <button class="btn btn-secondary" onclick="clearJobSearchOutput()">Clear</button>
             </div>
@@ -1700,16 +1700,20 @@ a { color: var(--burgundy); text-decoration: none; }
                   <input class="form-input" type="text" id="ob-role" placeholder="VP of Marketing">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Recruiter / Primary Contact Name</label>
-                  <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
+                  <label class="form-label">Recruiter / Primary Contact</label>
+                  <select class="form-select" id="ob-recruiter" onchange="applyOBContact('recruiter')">
+                    <option value="">— Select saved contact —</option>
+                  </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Recruiter Email</label>
                   <input class="form-input" type="email" id="ob-email" placeholder="recruiter@company.com">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Hiring Manager / CEO Name</label>
-                  <input class="form-input" type="text" id="ob-hm" placeholder="First name">
+                  <label class="form-label">Hiring Manager / CEO</label>
+                  <select class="form-select" id="ob-hm" onchange="applyOBContact('hm')">
+                    <option value="">— Select saved contact —</option>
+                  </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Link to Application (optional)</label>
@@ -8186,14 +8190,49 @@ function loadOBPage() {
     opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     sel.appendChild(opt);
   });
+  // Populate recruiter and HM dropdowns from saved contacts
+  populateOBContactDropdowns();
+}
+
+function populateOBContactDropdowns() {
+  var recruiterEl = document.getElementById('ob-recruiter');
+  var hmEl = document.getElementById('ob-hm');
+  if (!recruiterEl || !hmEl) return;
+  var sorted = (allContacts || []).slice().sort(function(a, b) {
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  var opts = '<option value="">— Select saved contact —</option>' +
+    sorted.map(function(c) {
+      return '<option value="' + (c.id || '') + '" data-email="' + (c.email || '') + '" data-name="' + (c.name || '').replace(/"/g, '&quot;') + '">' +
+        (c.name || 'Unknown') + (c.company ? ' — ' + c.company : '') + '</option>';
+    }).join('');
+  recruiterEl.innerHTML = opts;
+  hmEl.innerHTML = opts;
+}
+
+function applyOBContact(role) {
+  var selId = role === 'recruiter' ? 'ob-recruiter' : 'ob-hm';
+  var sel = document.getElementById(selId);
+  if (!sel || !sel.value) return;
+  if (role === 'recruiter') {
+    var opt = sel.options[sel.selectedIndex];
+    var emailEl = document.getElementById('ob-email');
+    if (emailEl && opt && opt.dataset.email) emailEl.value = opt.dataset.email;
+  }
 }
 
 async function runOutreachBuilder() {
   const company = (document.getElementById('ob-company').value||'').trim();
   const role = (document.getElementById('ob-role').value||'').trim();
-  const recruiter = (document.getElementById('ob-recruiter').value||'').trim();
+  var _obRecEl = document.getElementById('ob-recruiter');
+  const recruiter = _obRecEl && _obRecEl.selectedIndex > 0
+    ? (_obRecEl.options[_obRecEl.selectedIndex].dataset.name || _obRecEl.options[_obRecEl.selectedIndex].text.split('—')[0].trim())
+    : '';
   const email = (document.getElementById('ob-email').value||'').trim();
-  const hm = (document.getElementById('ob-hm').value||'').trim();
+  var _obHmEl = document.getElementById('ob-hm');
+  const hm = _obHmEl && _obHmEl.selectedIndex > 0
+    ? (_obHmEl.options[_obHmEl.selectedIndex].dataset.name || _obHmEl.options[_obHmEl.selectedIndex].text.split('—')[0].trim())
+    : '';
   const url = (document.getElementById('ob-url').value||'').trim();
   const context = (document.getElementById('ob-context').value||'').trim();
   if (!role) { toast('Role title is required.', 'error'); return; }
@@ -8259,7 +8298,8 @@ async function fetchOBContext() {
 }
 
 function clearOB() {
-  ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['ob-company','ob-role','ob-email','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['ob-recruiter','ob-hm'].forEach(function(id){ const e=document.getElementById(id);if(e)e.selectedIndex=0; });
   const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
 }
 function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
