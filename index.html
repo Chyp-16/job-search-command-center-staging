@@ -1280,6 +1280,9 @@ a { color: var(--burgundy); text-decoration: none; }
                 <label class="form-label">Industries</label>
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px" id="js-industries-wrap">
                 </div>
+                <div id="js-other-industry-wrap" style="display:none;margin-top:8px">
+                  <input class="form-input" id="js-other-industry" type="text" placeholder="Enter additional industries...">
+                </div>
               </div>
 
               <div class="form-group">
@@ -1290,30 +1293,21 @@ a { color: var(--burgundy); text-decoration: none; }
 
               <div class="form-group">
                 <label class="form-label">Salary Floor (Base)</label>
-                <select class="form-select" id="js-salary-floor">
-                  <option value="125000">$125,000</option>
-                  <option value="150000" selected>$150,000</option>
-                  <option value="175000">$175,000</option>
-                  <option value="200000">$200,000</option>
-                </select>
+                <input class="form-input" id="js-salary-floor" type="text" placeholder="e.g. $150,000">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Target Total Comp</label>
-                <select class="form-select" id="js-total-comp">
-                  <option value="200000">$200,000+</option>
-                  <option value="225000" selected>$225,000+</option>
-                  <option value="250000">$250,000+</option>
-                  <option value="300000">$300,000+</option>
-                </select>
+                <input class="form-input" id="js-total-comp" type="text" placeholder="e.g. $225,000+">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Min Years Experience Required</label>
                 <select class="form-select" id="js-exp">
-                  <option value="5">5+ years</option>
-                  <option value="10" selected>10+ years</option>
-                  <option value="15">15+ years</option>
+                  <option value="5">5+ Years</option>
+                  <option value="10" selected>10+ Years</option>
+                  <option value="15">15+ Years</option>
+                  <option value="20">20+ Years</option>
                 </select>
               </div>
 
@@ -1325,6 +1319,7 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runJobSearch()">✦ Find Matching Roles</button>
+              <button class="btn btn-secondary" onclick="saveJobSearchPrefs()">💾 Save Prefs</button>
               <button class="btn btn-secondary" onclick="clearJobSearchOutput()">Clear</button>
             </div>
           </div>
@@ -10621,7 +10616,49 @@ const JS_SIZES = [
 
 let jsOutput = '';
 
+function saveJobSearchPrefs() {
+  var prefs = {
+    salaryFloor: document.getElementById('js-salary-floor').value,
+    totalComp:   document.getElementById('js-total-comp').value,
+    exp:         document.getElementById('js-exp').value,
+    roles:       document.getElementById('js-roles').value,
+    location:    document.getElementById('js-location').value,
+    notes:       document.getElementById('js-notes').value,
+    otherIndustry: document.getElementById('js-other-industry') ? document.getElementById('js-other-industry').value : '',
+    workTypes:   JS_WORK_TYPES.map(function(wt) { return wt.selected; }),
+    industries:  JS_INDUSTRIES.map(function(ind) { return ind.selected; }),
+    sizes:       JS_SIZES.map(function(sz) { return sz.selected; }),
+  };
+  localStorage.setItem('jobSearchPrefs', JSON.stringify(prefs));
+  toast('Preferences saved.', 'success');
+}
+
+function loadJobSearchPrefs() {
+  try {
+    var saved = localStorage.getItem('jobSearchPrefs');
+    if (!saved) return;
+    var prefs = JSON.parse(saved);
+    if (prefs.salaryFloor) document.getElementById('js-salary-floor').value = prefs.salaryFloor;
+    if (prefs.totalComp)   document.getElementById('js-total-comp').value   = prefs.totalComp;
+    if (prefs.exp)         document.getElementById('js-exp').value           = prefs.exp;
+    if (prefs.roles)       document.getElementById('js-roles').value         = prefs.roles;
+    if (prefs.location)    document.getElementById('js-location').value      = prefs.location;
+    if (prefs.notes)       document.getElementById('js-notes').value         = prefs.notes;
+    if (prefs.otherIndustry && document.getElementById('js-other-industry')) {
+      document.getElementById('js-other-industry').value = prefs.otherIndustry;
+    }
+    if (Array.isArray(prefs.workTypes))  prefs.workTypes.forEach(function(sel, i)  { if (JS_WORK_TYPES[i])  JS_WORK_TYPES[i].selected  = sel; });
+    if (Array.isArray(prefs.industries)) prefs.industries.forEach(function(sel, i) { if (JS_INDUSTRIES[i]) JS_INDUSTRIES[i].selected = sel; });
+    if (Array.isArray(prefs.sizes))      prefs.sizes.forEach(function(sel, i)      { if (JS_SIZES[i])      JS_SIZES[i].selected      = sel; });
+  } catch(e) { console.warn('Could not load job search prefs:', e.message); }
+}
+
 function loadJobSearchPage() {
+  renderWorkTypeChips();
+  renderIndustryChips();
+  renderSizeChips();
+  loadJobSearchPrefs();
+  // Re-render chips after prefs load to reflect saved selections
   renderWorkTypeChips();
   renderIndustryChips();
   renderSizeChips();
@@ -10645,15 +10682,19 @@ function toggleWorkType(i) {
 }
 
 function renderIndustryChips() {
-  const wrap = document.getElementById('js-industries-wrap');
+  var wrap = document.getElementById('js-industries-wrap');
   if (!wrap) return;
   wrap.innerHTML = JS_INDUSTRIES.map(function(ind, i) {
-    const sel = ind.selected;
+    var sel = ind.selected;
     return '<button onclick="toggleIndustry(' + i + ')" style="' +
       'padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ' +
       (sel ? 'var(--burgundy);background:var(--burgundy);color:#fff' : 'var(--border);background:var(--bg);color:var(--text-secondary)') +
       '" data-idx="' + i + '">' + ind.label + '</button>';
   }).join('');
+  // Show Other text field when Other chip is selected
+  var otherChip = JS_INDUSTRIES.find(function(ind) { return ind.label === 'Other'; });
+  var otherWrap = document.getElementById('js-other-industry-wrap');
+  if (otherWrap) otherWrap.style.display = (otherChip && otherChip.selected) ? 'block' : 'none';
 }
 
 function renderSizeChips() {
@@ -10685,8 +10726,8 @@ function resetJobSearchCriteria() {
   document.getElementById('js-location').value = 'Chicago metro area';
   JS_WORK_TYPES.forEach(function(wt) { wt.selected = wt.label !== 'On-Site'; });
   renderWorkTypeChips();
-  document.getElementById('js-salary-floor').value = '150000';
-  document.getElementById('js-total-comp').value = '225000';
+  document.getElementById('js-salary-floor').value = '$150,000';
+  document.getElementById('js-total-comp').value = '$225,000+';
   document.getElementById('js-exp').value = '10';
   document.getElementById('js-notes').value = '';
   renderIndustryChips();
@@ -10712,12 +10753,15 @@ function exportJobSearchDocx() {
 async function runJobSearch() {
   const roles    = document.getElementById('js-roles').value.trim();
   const location = document.getElementById('js-location').value.trim();
-  const salaryFloor = parseInt(document.getElementById('js-salary-floor').value);
-  const totalComp   = parseInt(document.getElementById('js-total-comp').value);
+  const salaryFloor = document.getElementById('js-salary-floor').value || '$150,000';
+  const totalComp   = document.getElementById('js-total-comp').value || '$225,000+';
   const exp      = document.getElementById('js-exp').value;
   const notes    = document.getElementById('js-notes').value.trim();
 
-  const selectedIndustries = JS_INDUSTRIES.filter(function(i) { return i.selected; }).map(function(i) { return i.label; });
+  const _selInds = JS_INDUSTRIES.filter(function(i) { return i.selected && i.label !== 'Other'; }).map(function(i) { return i.label; });
+  const _otherEl = document.getElementById('js-other-industry');
+  if (_otherEl && _otherEl.value.trim()) _selInds.push(_otherEl.value.trim());
+  const selectedIndustries = _selInds;
   const selectedSizes      = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label + ' (' + s.value + ' employees)'; });
 
   if (selectedIndustries.length === 0) { toast('Select at least one industry.', 'error'); return; }
@@ -10736,7 +10780,7 @@ async function runJobSearch() {
     ' Location: ' + location + ' (' + workTypes + ').' +
     ' Industries: ' + selectedIndustries.slice(0,6).join(', ') + '.' +
     ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
-    ' Base salary min: ' + fmt(salaryFloor) + '.' +
+    ' Base salary min: ' + salaryFloor + '.' +
     (notes ? ' Notes: ' + notes + '.' : '') +
     '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
     '\n\nOnly real postings from last 60 days. No fabricated URLs.';
