@@ -10750,57 +10750,99 @@ function exportJobSearchDocx() {
   exportGenericDocx(jsOutput, 'JayWadhwa_JobSearch_Results_' + dateStr);
 }
 
-async function runJobSearch() {
-  const roles    = document.getElementById('js-roles').value.trim();
-  const location = document.getElementById('js-location').value.trim();
-  const salaryFloor = document.getElementById('js-salary-floor').value || '$150,000';
-  const totalComp   = document.getElementById('js-total-comp').value || '$225,000+';
-  const exp      = document.getElementById('js-exp').value;
-  const notes    = document.getElementById('js-notes').value.trim();
+function closeJsPromptModal() {
+  var m=document.getElementById('js-prompt-modal');
+  var b=document.getElementById('js-prompt-backdrop');
+  if(m)m.remove(); if(b)b.remove();
+}
 
-  const _selInds = JS_INDUSTRIES.filter(function(i) { return i.selected && i.label !== 'Other'; }).map(function(i) { return i.label; });
-  const _otherEl = document.getElementById('js-other-industry');
+function buildJobSearchPrompt() {
+  var roles       = document.getElementById('js-roles').value.trim();
+  var location    = document.getElementById('js-location').value.trim();
+  var salaryFloor = document.getElementById('js-salary-floor').value || '$150,000';
+  var totalComp   = document.getElementById('js-total-comp').value || '$225,000+';
+  var exp         = document.getElementById('js-exp').value;
+  var notes       = document.getElementById('js-notes').value.trim();
+
+  var _selInds = JS_INDUSTRIES.filter(function(i) { return i.selected && i.label !== 'Other'; }).map(function(i) { return i.label; });
+  var _otherEl = document.getElementById('js-other-industry');
   if (_otherEl && _otherEl.value.trim()) _selInds.push(_otherEl.value.trim());
-  const selectedIndustries = _selInds;
-  const selectedSizes      = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label + ' (' + s.value + ' employees)'; });
+  var selectedSizes = JS_SIZES.filter(function(s) { return s.selected; }).map(function(s) { return s.label + ' (' + s.value + ' employees)'; });
+  var workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
 
-  if (selectedIndustries.length === 0) { toast('Select at least one industry.', 'error'); return; }
+  return 'Find 6-8 real current marketing leadership job postings matching:' +
+    ' Roles: ' + roles.split(',').slice(0,4).join(',') + '.' +
+    ' Location: ' + location + ' (' + workTypes + ').' +
+    ' Industries: ' + _selInds.slice(0,6).join(', ') + '.' +
+    ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
+    ' Base salary min: ' + salaryFloor + '.' +
+    ' Target total comp: ' + totalComp + '.' +
+    ' Min years experience required: ' + exp + '+.' +
+    (notes ? ' Notes: ' + notes + '.' : '') +
+    '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
+    '\n\nOnly real postings from last 60 days. No fabricated URLs.';
+}
 
-  const panel = document.getElementById('js-output-panel');
-  const contentEl = document.getElementById('js-output-content');
+function runJobSearch() {
+  var _selInds = JS_INDUSTRIES.filter(function(i) { return i.selected && i.label !== 'Other'; });
+  var _otherEl = document.getElementById('js-other-industry');
+  var hasOther = _otherEl && _otherEl.value.trim();
+  if (_selInds.length === 0 && !hasOther) { toast('Select at least one industry.', 'error'); return; }
+
+  var prompt = buildJobSearchPrompt();
+
+  // Show editable prompt modal before running
+  var existing = document.getElementById('js-prompt-modal');
+  if (existing) existing.remove();
+  var backdrop = document.createElement('div');
+  backdrop.id = 'js-prompt-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998';
+  var modal = document.createElement('div');
+  modal.id = 'js-prompt-modal';
+  modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lg);z-index:9999;width:600px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column';
+  modal.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0">' +
+      '<span style="font-family:var(--font-display);font-size:16px;font-weight:600">✦ Review Search Prompt</span>' +
+      '<button onclick="closeJsPromptModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>' +
+    '</div>' +
+    '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;flex-shrink:0">Edit the search prompt below before running. Changes here do not affect your saved preferences.</p>' +
+    '<textarea id="js-prompt-edit" style="flex:1;min-height:260px;font-size:13px;line-height:1.6;font-family:var(--font-body);padding:12px;border:1px solid var(--border);border-radius:var(--radius);resize:vertical;color:var(--text);background:var(--bg)">' + prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-shrink:0">' +
+      '<button class="btn btn-secondary" onclick="closeJsPromptModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="executeJobSearch()">✦ Run Search</button>' +
+    '</div>';
+  backdrop.onclick = function() { modal.remove(); backdrop.remove(); };
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+}
+
+async function executeJobSearch() {
+  var promptEl = document.getElementById('js-prompt-edit');
+  var prompt = promptEl ? promptEl.value.trim() : buildJobSearchPrompt();
+  // Close modal
+  var m = document.getElementById('js-prompt-modal');
+  var b = document.getElementById('js-prompt-backdrop');
+  if (m) m.remove(); if (b) b.remove();
+
+  var panel = document.getElementById('js-output-panel');
+  var contentEl = document.getElementById('js-output-content');
   panel.style.display = 'block';
   contentEl.textContent = 'Searching for matching roles... This may take 30-60 seconds.';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const fmt = function(n) { return '$' + n.toLocaleString(); };
-
-  const workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
-  const prompt = 'Find 6-8 real current marketing leadership job postings matching:' +
-    ' Roles: ' + roles.split(',').slice(0,4).join(',') + '.' +
-    ' Location: ' + location + ' (' + workTypes + ').' +
-    ' Industries: ' + selectedIndustries.slice(0,6).join(', ') + '.' +
-    ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
-    ' Base salary min: ' + salaryFloor + '.' +
-    (notes ? ' Notes: ' + notes + '.' : '') +
-    '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
-    '\n\nOnly real postings from last 60 days. No fabricated URLs.';
-
-  // Use a lean system prompt for job search — full resume causes token rate limit errors
-  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+  var jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
 
   try {
-    // Send use_web_search flag so Worker enables the web search tool
-    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
-    const r = await fetch(WORKER_URL + '/ai', {
+    var jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
+    var r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
       body: JSON.stringify(jsBody)
     });
-    const data = await r.json();
-    const result = (data.content && data.content[0]) ? data.content[0].text : null;
+    var data = await r.json();
+    var result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
-    // Render markdown bold (**text**) as actual bold HTML
     var rendered = result
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
