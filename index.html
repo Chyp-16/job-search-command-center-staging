@@ -1747,7 +1747,7 @@ a { color: var(--burgundy); text-decoration: none; }
                 <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
               </div>
             </div>
-            <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
+            <div style="padding:24px 28px;background:var(--bg)"><div id="ob-output-content" style="font-family:'Calibri',Georgia,serif;font-size:14px;line-height:1.9;color:var(--text);max-height:740px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;background:#fff"></div></div>
           </div>
         </div>
 
@@ -8332,7 +8332,15 @@ async function runOutreachBuilder() {
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     obOutput = result;
-    contentEl.textContent = result;
+    // Polished report rendering — close to Word .docx output
+    var rendered = result
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*([^*]+)\*\*/g,'<strong style="color:var(--burgundy)">$1</strong>')
+      .replace(/^#{1,3}\s*(.+)$/gm,'<div style="font-family:Calibri,sans-serif;font-size:15px;font-weight:700;color:#972b32;margin:20px 0 6px;border-bottom:1px solid #e5c5c6;padding-bottom:4px">$1</div>')
+      .replace(/^---+$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">')
+      .replace(/\n\n/g,'</p><p style="margin:0 0 10px">')
+      .replace(/\n/g,'<br>');
+    contentEl.innerHTML = '<p style="margin:0 0 10px">' + rendered + '</p>';
     const linkedId = document.getElementById('ob-link-app').value || null;
     await dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: linkedId, content: result });
     if (linkedId) {
