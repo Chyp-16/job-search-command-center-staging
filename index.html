@@ -1628,7 +1628,10 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group">
                 <label class="form-label">Company *</label>
-                <input class="form-input" type="text" id="clg-company" placeholder="Company name">
+                <select class="form-select" id="clg-company-sel" onchange="(function(){var s=document.getElementById('clg-company-sel');var i=document.getElementById('clg-company');if(s.value){var a=allApps.find(function(x){return x.id===s.value;});if(a){i.value=a.company;if(document.getElementById('clg-role'))document.getElementById('clg-role').value=a.job_title||document.getElementById('clg-role').value;}}})()">
+                  <option value="">— Select application or type below —</option>
+                </select>
+                <input class="form-input" type="text" id="clg-company" placeholder="Or type company name" style="margin-top:6px">
               </div>
               <div class="form-group">
                 <label class="form-label">Role Title *</label>
@@ -1636,9 +1639,15 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group">
                 <label class="form-label">Hiring Manager / Contact Name</label>
-                <input class="form-input" type="text" id="clg-contact" placeholder="First name">
+                <select class="form-select" id="clg-contact-sel" onchange="(function(){var s=document.getElementById('clg-contact-sel');var i=document.getElementById('clg-contact');if(s.value){var c=allContacts.find(function(x){return x.id===s.value;});if(c)i.value=c.name||'';} else i.value='';})()">
+                  <option value="">— Select from contacts or type below —</option>
+                </select>
+                <input class="form-input" type="text" id="clg-contact" placeholder="Or type name" style="margin-top:6px">
               </div>
-              <div class="form-group"></div>
+              <div class="form-group">
+                <label class="form-label">Company URL <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(used to research context)</span></label>
+                <input class="form-input" type="url" id="clg-url" placeholder="https://company.com">
+              </div>
               <div class="form-group full">
                 <label class="form-label">Job Description or Context (optional — paste or upload)</label>
                 <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role... (optional if uploading a file)"></textarea>
@@ -2226,7 +2235,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Email</label>
-          <input class="form-input" type="email" id="cf-email" placeholder="name@company.com">
+          <input class="form-input" type="text" id="cf-email" placeholder="email@co.com, other@co.com" title="Separate multiple emails with commas">
         </div>
         <div class="form-group">
           <label class="form-label">Link to Application</label>
@@ -3289,7 +3298,7 @@ function filterApps() {
   const jt = document.getElementById('filter-jobtype').value;
 
   filteredApps = allApps.filter(a => {
-    const text = `${a.company} ${a.job_title} ${a.notes || ''}`.toLowerCase();
+    const text = `${a.company} ${a.job_title} ${a.notes || ''} ${a.industry || ''}`.toLowerCase();
     if (q && !text.includes(q)) return false;
     if (st && a.status !== st) return false;
     if (sr && a.source !== sr) return false;
@@ -7756,7 +7765,8 @@ function buildResumeDocx(text, filename, markedUp) {
     if (opts.sp)     s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
     if (opts.ind)    s += '<w:ind w:left="'+opts.ind+'"/>';
     if (opts.bhang)  s += '<w:ind w:left="'+opts.bhang[0]+'" w:hanging="'+opts.bhang[1]+'"/>';
-    if (opts.center) s += '<w:jc w:val="center"/>';
+    if (opts.center)  s += '<w:jc w:val="center"/>';
+    if (opts.vAlign)  s += '<w:textAlignment w:val="center"/>';
     return s + '</w:pPr>';
   }
 
@@ -7814,6 +7824,18 @@ function buildResumeDocx(text, filename, markedUp) {
     return P(ppr({sp:['0',spAfter||'50'], ind:'432'}), runs(t,CL,'20',BK,false));
   }
 
+  // Title block — job title line: Calibri Bold 14pt (sz=28), dark color
+  function titlePara(t) {
+    return P(ppr({sp:['120','0']}),
+      '<w:r>'+rpr(CA,'28',DA,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+  }
+
+  // Tagline: Calibri Regular 10pt italic, expanded 1pt character spacing (sz=20, spacing=20 twips)
+  function taglinePara(t) {
+    return P(ppr({sp:['0','80']}),
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+  }
+
   // Empty spacer paragraph
   function spacer(sz) {
     return P(ppr({sp:['0','0']}), '<w:r>'+rpr(CA,sz||'8',BK,false,false,false)+'<w:t></w:t></w:r>');
@@ -7821,8 +7843,8 @@ function buildResumeDocx(text, filename, markedUp) {
 
   // ── FIXED HEADER — always Jay's contact info ───────────────────────────
   var hdrXml =
-    // Name: Century Gothic, NOT bold, burgundy, 22pt (sz=44)
-    P(ppr({tabs:true, sp:['0','0']}),
+    // Name: Century Gothic, NOT bold, burgundy, 22pt (sz=44) — vertically centered
+    P(ppr({tabs:true, sp:['0','0'], vAlign:true}),
       '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:t>Jay Wadhwa</w:t></w:r>' +
       '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:tab/></w:r>' +
       '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">847-910-9377 | </w:t></w:r>' +
@@ -7894,6 +7916,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
   var bodyXml = '';
   var inExp = false;
+  var inTitleBlock = true;  // true until first section header — renders title + tagline
   var inEdu = false;
   var inAff = false;
   var inAddl = false; // Additional Brand/Leadership — auto-bullet ESPN/MSNBC lines
@@ -7933,8 +7956,16 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
+    // Title block: lines before first section header (job title + tagline)
+    if (inTitleBlock && !isSectionHdr(cl) && cl.length > 5) {
+      var looksLikeTitle = /[A-Z,&]/.test(cl) && cl.length > 20 && !/^[a-z]/.test(cl);
+      bodyXml += looksLikeTitle ? titlePara(cl) : taglinePara(cl);
+      return;
+    }
+
     // Section headers
     if (isSectionHdr(cl)) {
+      inTitleBlock = false;
       var isExpertise    = /EXPERTISE/.test(cl.toUpperCase());
       var isEducation    = /EDUCATION/.test(cl.toUpperCase());
       var isAffiliations = /AFFILI/.test(cl.toUpperCase());
@@ -8144,16 +8175,35 @@ function buildResumeDocx(text, filename, markedUp) {
 let clgOutput = '';
 
 function loadCLGPage() {
+  // Link-to-app dropdown
   const sel = document.getElementById('clg-link-app');
-  if (!sel) return;
-  sel.innerHTML = "<option value=''>— Don't link —</option>";
-  allApps.slice(0, 100).forEach(function(a) {
-    if (!a.company) return;
-    const opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
-    sel.appendChild(opt);
-  });
+  if (sel) {
+    sel.innerHTML = "<option value=''>— Don't link —</option>";
+    allApps.slice(0, 100).forEach(function(a) {
+      if (!a.company) return;
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
+      sel.appendChild(opt);
+    });
+  }
+  // Company selector from applications
+  var compSel = document.getElementById('clg-company-sel');
+  if (compSel) {
+    compSel.innerHTML = '<option value="">— Select application or type below —</option>' +
+      allApps.slice(0,100).filter(function(a){return a.company;}).map(function(a){
+        return '<option value="'+a.id+'">'+(a.company)+(a.job_title?' — '+a.job_title:'')+'</option>';
+      }).join('');
+  }
+  // Contact selector
+  var contSel = document.getElementById('clg-contact-sel');
+  if (contSel) {
+    var sorted = allContacts.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    contSel.innerHTML = '<option value="">— Select from contacts or type below —</option>' +
+      sorted.slice(0,200).map(function(c){
+        return '<option value="'+c.id+'">'+(c.name||'')+(c.company?' — '+c.company:'')+'</option>';
+      }).join('');
+  }
 }
 
 async function runCLGenerator() {
@@ -8180,7 +8230,9 @@ async function runCLGenerator() {
     rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
   };
 
-  const prompt = typePrompts[type] || typePrompts.cover_letter;
+  const clgUrl = (document.getElementById('clg-url') ? document.getElementById('clg-url').value : '').trim();
+  const urlContext = clgUrl ? '\n\nCompany website for research: ' + clgUrl : '';
+  const prompt = (typePrompts[type] || typePrompts.cover_letter) + urlContext;
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
@@ -8193,7 +8245,8 @@ async function runCLGenerator() {
 }
 
 function clearCLG() {
-  ['clg-company','clg-role','clg-contact','clg-jd'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-company','clg-role','clg-contact','clg-jd','clg-url'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-company-sel','clg-contact-sel'].forEach(function(id){ const e=document.getElementById(id);if(e)e.selectedIndex=0; });
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
@@ -8942,33 +8995,87 @@ function cleanForFilename(s) {
 async function exportCoverLetterDocx(text, company, role, contactName) {
   const role_clean    = cleanForFilename(role)    || 'Role';
   const company_clean = cleanForFilename(company) || 'Company';
-  const downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_Cover Letter';
+  const downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_CoverLetter';
+
+  // Build cover letter using same OOXML approach as resume — same header
+  var BG = '972b32'; var BK = '0D0D0D'; var GH = 'Century Gothic'; var CL = 'Calibri';
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  function rpr(font,sz,color,bold,ital,ul){
+    var s='<w:rPr><w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>';
+    if(bold) s+='<w:b/><w:bCs/>';
+    if(ital) s+='<w:i/><w:iCs/>';
+    if(color) s+='<w:color w:val="'+color+'"/>';
+    s+='<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr>';
+    return s;
+  }
+  function P(pp,rr){ return '<w:p>'+pp+rr+'</w:p>'; }
+  function ppr(opts){
+    var s='<w:pPr>';
+    if(opts.tabs) s+='<w:tabs><w:tab w:val="center" w:pos="4320"/><w:tab w:val="right" w:pos="8640"/></w:tabs>';
+    if(opts.hbdr) s+='<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="2E74B5"/></w:pBdr>';
+    if(opts.sp)   s+='<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
+    if(opts.center) s+='<w:jc w:val="center"/>';
+    s+='</w:pPr>'; return s;
+  }
+
+  // Same header as resume
+  var hdrXml =
+    P(ppr({tabs:true,sp:['0','0']}),
+      '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:t>Jay Wadhwa</w:t></w:r>'+
+      '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:tab/></w:r>'+
+      '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">847-910-9377 | </w:t></w:r>'+
+      '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>jvwadhwa@gmail.com</w:t></w:r>')+
+    P(ppr({tabs:true,sp:['0','80']}),
+      '<w:r>'+rpr(CL,'18',BK,false,false,false)+'<w:tab/></w:r>'+
+      '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>'+
+      '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>linkedin.com/in/jwadhwa</w:t></w:r>')+
+    P(ppr({hbdr:true,sp:['0','80']}),'');
+
+  // Date and salutation
+  var today_str = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  var dateXml = P(ppr({sp:['0','80']}),
+    '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>'+esc(today_str)+'</w:t></w:r>');
+  var salutation = '';
+  if (contactName) {
+    salutation = P(ppr({sp:['80','0']}),
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>'+esc('Dear '+contactName+',')+'</w:t></w:r>');
+  }
+
+  // Body paragraphs
+  var bodyXml = '';
+  (text||'').split('\n').forEach(function(line){
+    var t = line.trim();
+    var para = '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr>'+
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>'+
+      '<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r></w:p>';
+    bodyXml += para;
+  });
+
+  var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">'+
+    '<w:body>'+hdrXml+dateXml+salutation+bodyXml+
+    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>'+
+    '</w:body></w:document>';
+
   try {
-    toast('Preparing cover letter...', '');
-    const response = await fetch(BASE_URL + '/base-coverletter.docx');
-    if (!response.ok) throw new Error('Could not load cover letter template from GitHub.');
-    const arrayBuffer = await response.arrayBuffer();
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    let docXml = await zip.file('word/document.xml').async('string');
-    const today_str = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    const esc = function(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    docXml = docXml.replace(/\[TODAY&#x2019;S DATE\]/g, esc(today_str));
-    docXml = docXml.replace(/\[TODAY'S DATE\]/g, esc(today_str));
-    docXml = docXml.replace(/\[NAME, JOB TITLE\]/g, esc(contactName || ''));
-    docXml = docXml.replace(/\[COMPANY NAME\]/g, esc(company || ''));
-    docXml = docXml.replace(/\[JOB TITLE\]/g, esc(role || ''));
-    const bodyXml = textToWordXml(text);
-    docXml = docXml.replace(/<w:p[^>]*>(?:[^<]|<(?!\/w:p>))*\[BODY COPY\](?:[^<]|<(?!\/w:p>))*<\/w:p>/s, bodyXml);
-    if (docXml.includes('[BODY COPY]')) {
-      docXml = docXml.replace('[BODY COPY]', esc(text || ''));
-    }
+    var zip = new JSZip();
+    var relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
+      '</Relationships>';
+    var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+      '</Types>';
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', relsXml);
     zip.file('word/document.xml', docXml);
-    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = downloadName + '.docx';
-    a.click();
+    var blob = await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = downloadName + '.docx'; a.click();
     URL.revokeObjectURL(url);
     toast('Downloaded ' + downloadName + '.docx', 'success');
   } catch(e) { toast('Export error: ' + e.message, 'error'); }
