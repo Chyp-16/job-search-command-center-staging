@@ -6511,31 +6511,6 @@ function _exportToDocxGeneric() {
       <p style="font-size:9pt;color:#666;margin-bottom:16px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Jay Wadhwa Job Search Command Center</p>
       ${html}
     
-
-
-<!-- Merge Contacts Modal -->
-<div id="merge-contacts-modal" style="display:none;position:fixed;inset:0;z-index:10000">
-  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45)" onclick="closeMergeModal()"></div>
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;width:640px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <span style="font-family:var(--font-display);font-size:18px;font-weight:600">⇋ Merge Duplicate Contacts</span>
-      <button onclick="closeMergeModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>
-    </div>
-    <div style="display:flex;gap:12px;margin-bottom:16px">
-      <div style="flex:1"><label class="form-label">Contact A</label>
-        <select class="form-select" id="merge-contact-a" onchange="renderMergePreview()"><option value="">— Select —</option></select>
-      </div>
-      <div style="flex:1"><label class="form-label">Contact B</label>
-        <select class="form-select" id="merge-contact-b" onchange="renderMergePreview()"><option value="">— Select —</option></select>
-      </div>
-    </div>
-    <div id="merge-preview" style="margin-bottom:16px"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" onclick="closeMergeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="executeMerge()">⇋ Merge Contacts</button>
-    </div>
-  </div>
-</div>
 </body>
     </html>`;
 
@@ -11285,5 +11260,29 @@ setTimeout(async () => {
   }
 }, 2000);
 </script>
+
+<!-- Merge Contacts Modal -->
+<div id="merge-contacts-modal" style="display:none;position:fixed;inset:0;z-index:10000">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45)" onclick="closeMergeModal()"></div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;width:640px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-family:var(--font-display);font-size:18px;font-weight:600">⇋ Merge Duplicate Contacts</span>
+      <button onclick="closeMergeModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-secondary)">✕</button>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:16px">
+      <div style="flex:1"><label class="form-label">Contact A</label>
+        <select class="form-select" id="merge-contact-a" onchange="renderMergePreview()"><option value="">— Select —</option></select>
+      </div>
+      <div style="flex:1"><label class="form-label">Contact B</label>
+        <select class="form-select" id="merge-contact-b" onchange="renderMergePreview()"><option value="">— Select —</option></select>
+      </div>
+    </div>
+    <div id="merge-preview" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="executeMerge()">⇋ Merge Contacts</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
