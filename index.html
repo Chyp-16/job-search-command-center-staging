@@ -11201,8 +11201,8 @@ async function executeMerge() {
 
     _mergeContactA = null; _mergeContactB = null; _mergeResolutions = {};
     closeMergeModal();
-    renderContactsTable();
     toast('Contacts merged.', 'success');
+    loadContacts();
   } catch(e) {
     console.error('Merge error:', e);
     toast('Merge failed: ' + e.message, 'error');
