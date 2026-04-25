@@ -1013,6 +1013,7 @@ a { color: var(--burgundy); text-decoration: none; }
               <th onclick="sortApps('job_title')" id="sh-job_title">Title ↕</th>
               <th onclick="sortApps('status')" id="sh-status">Status ↕</th>
               <th onclick="sortApps('source')" id="sh-source">Source ↕</th>
+              <th onclick="sortApps('industry')" id="sh-industry">Industry ↕</th>
               <th onclick="sortApps('salary')" id="sh-salary">Salary ↕</th>
               <th onclick="sortApps('outreach_count')" id="sh-outreach_count">Outreach ↕</th>
               <th></th>
@@ -3377,6 +3378,7 @@ function renderAppsTable() {
         <td style="color:var(--text-secondary);font-size:12px">${a.job_title || '—'}</td>
         <td>${badge(a.status)}</td>
         <td style="font-size:12px;color:var(--text-secondary)">${a.source || '—'}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${a.industry || '—'}</td>
         <td style="font-size:12px">${a.salary || '—'}</td>
         <td style="font-size:12px;color:var(--text-secondary)">${outreachDone > 0 ? outreachDone + ' sent' : '—'}</td>
         <td>
