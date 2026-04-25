@@ -8211,11 +8211,19 @@ function _renderCLGDropdowns() {
 }
 
 async function loadCLGPage() {
-  // If contacts not yet loaded, fetch them first
+  // If contacts not yet loaded, paginate all contacts (Supabase cap = 1000/request)
   if (!allContacts.length) {
     try {
-      var data = await dbGet('contacts', 'select=id,name,company,email&order=name.asc&limit=5000');
-      allContacts = Array.isArray(data) ? data : [];
+      var PAGE = 1000, clgOffset = 0, clgAll = [];
+      while (true) {
+        var data = await dbGet('contacts', 'select=id,name,company,email&order=name.asc&limit=' + PAGE + '&offset=' + clgOffset);
+        var page = Array.isArray(data) ? data : [];
+        clgAll = clgAll.concat(page);
+        if (page.length < PAGE) break;
+        clgOffset += PAGE;
+        if (clgOffset > 9000) break;
+      }
+      allContacts = clgAll;
     } catch(e) { console.warn('CLG: could not load contacts', e.message); }
   }
   _renderCLGDropdowns();
