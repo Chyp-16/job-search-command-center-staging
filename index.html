@@ -1658,6 +1658,15 @@ a { color: var(--burgundy); text-decoration: none; }
                   <span id="clg-jd-file-name" style="font-size:12px;color:var(--burgundy)"></span>
                 </div>
               </div>
+              <div class="form-group full">
+                <label class="form-label">Customized Resume <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(paste text or upload — used as drafting source)</span></label>
+                <textarea class="form-textarea" id="clg-resume" rows="6" placeholder="Paste your tailored resume text here..."></textarea>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+                  <input type="file" id="clg-resume-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLGResumeUpload(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('clg-resume-file').click()">📎 Upload Resume</button>
+                  <span id="clg-resume-file-name" style="font-size:12px;color:var(--burgundy)"></span>
+                </div>
+              </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runCLGenerator()">✦ Generate Document</button>
@@ -8248,6 +8257,38 @@ function onCLGContactChange() {
   hidden.value = opt.dataset.name || opt.text.split('—')[0].trim();
 }
 
+async function handleCLGResumeUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('clg-resume-file-name').textContent = file.name;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'txt') {
+    var reader = new FileReader();
+    reader.onload = function(e) { document.getElementById('clg-resume').value = e.target.result; };
+    reader.readAsText(file);
+  } else if (ext === 'docx') {
+    try {
+      var ab = await file.arrayBuffer();
+      var result = await mammoth.extractRawText({ arrayBuffer: ab });
+      document.getElementById('clg-resume').value = result.value;
+    } catch(e) { toast('Could not read .docx: ' + e.message, 'error'); }
+  } else if (ext === 'pdf') {
+    try {
+      var ab = await file.arrayBuffer();
+      var pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+      var text = '';
+      for (var i = 1; i <= pdf.numPages; i++) {
+        var page = await pdf.getPage(i);
+        var tc = await page.getTextContent();
+        text += tc.items.map(function(s){ return s.str; }).join(' ') + '\n';
+      }
+      document.getElementById('clg-resume').value = text.trim();
+    } catch(e) { toast('Could not read PDF: ' + e.message, 'error'); }
+  } else {
+    toast('Supported formats: .txt, .docx, .pdf', 'error');
+  }
+}
+
 async function runCLGenerator() {
   const type = document.getElementById('clg-type').value;
   const company = (document.getElementById('clg-company').value || '').trim();
@@ -8263,7 +8304,25 @@ async function runCLGenerator() {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const typePrompts = {
-    cover_letter: `Write a cover letter for Jay Wadhwa applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
+    cover_letter: 'You are drafting a cover letter for Jay Wadhwa applying to the ' + role + ' role at ' + company + '.' + (contact ? ' Address it to ' + contact + '.' : '') +
+      '\n\nSOURCES PROVIDED:\n' +
+      (clgResume ? 'RESUME:\n' + clgResume + '\n\n' : '') +
+      (jd ? 'JOB DESCRIPTION:\n' + jd + '\n\n' : '') +
+      (clgUrl ? 'COMPANY WEBSITE: ' + clgUrl + '\n\n' : '') +
+      'DRAFTING WORKFLOW:\n' +
+      '1. Analyze sources - pull the most relevant experience, specific achievements with numbers, and skills that fit this role.\n' +
+      '2. Analyze the JD - identify the top 3-5 requirements, culture clues, and stated challenges or goals.\n' +
+      '3. Draft using these rules:\n' +
+      '   - Under 300 words\n' +
+      '   - Open with something specific about ' + company + ', not generic praise\n' +
+      '   - Connect 2-3 relevant experiences directly to the role\n' +
+      '   - Include one measurable example\n' +
+      '   - Show understanding of the company goals or challenges\n' +
+      '   - Conversational tone - peer-to-peer, not formal or desperate\n' +
+      '   - End with a specific next step, not a generic closing\n' +
+      '4. Make it human - contractions where natural, varied sentence length, no buzzwords or cliches.\n\n' +
+      'DO NOT: repeat the whole resume, use corporate speak, make unsupported claims, use generic openings, or sound like a template.\n\n' +
+      'FORMAT: Professional business letter.' + (contact ? ' Address: Dear ' + contact + ',' : '') + ' Clear scannable paragraphs. Strong opening and closing.',
     inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
     linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
     email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
@@ -8273,7 +8332,9 @@ async function runCLGenerator() {
   };
 
   const clgUrl = (document.getElementById('clg-url') ? document.getElementById('clg-url').value : '').trim();
-  const urlContext = clgUrl ? '\n\nCompany website for research: ' + clgUrl : '';
+  const clgResume = (document.getElementById('clg-resume') ? document.getElementById('clg-resume').value : '').trim();
+  // clgResume and clgUrl are referenced inside the cover_letter template literal above
+  const urlContext = (type !== 'cover_letter' && clgUrl) ? '\n\nCompany website for research: ' + clgUrl : '';
   const prompt = (typePrompts[type] || typePrompts.cover_letter) + urlContext;
 
   try {
@@ -8287,7 +8348,8 @@ async function runCLGenerator() {
 }
 
 function clearCLG() {
-  ['clg-company','clg-role','clg-contact','clg-jd','clg-url'].forEach(function(id){ var e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-company','clg-role','clg-contact','clg-jd','clg-url','clg-resume'].forEach(function(id){ var e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-resume-file-name','clg-jd-file-name'].forEach(function(id){ var e=document.getElementById(id);if(e)e.textContent=''; });
   ['clg-company-sel','clg-contact-sel','clg-link-app'].forEach(function(id){ var e=document.getElementById(id);if(e)e.selectedIndex=0; });
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
