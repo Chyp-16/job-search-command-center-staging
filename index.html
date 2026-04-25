@@ -8176,7 +8176,7 @@ function buildResumeDocx(text, filename, markedUp) {
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
 let clgOutput = '';
 
-function loadCLGPage() {
+function _renderCLGDropdowns() {
   // Link-to-app dropdown
   var sel = document.getElementById('clg-link-app');
   if (sel) {
@@ -8189,7 +8189,7 @@ function loadCLGPage() {
       sel.appendChild(opt);
     });
   }
-  // Company selector — all apps, no slice cap
+  // Company selector — all apps, sorted
   var compSel = document.getElementById('clg-company-sel');
   if (compSel) {
     compSel.innerHTML = '<option value="">— Select application —</option>' +
@@ -8199,7 +8199,7 @@ function loadCLGPage() {
           return '<option value="'+a.id+'" data-company="'+a.company.replace(/"/g,'&quot;')+'" data-role="'+(a.job_title||'').replace(/"/g,'&quot;')+'">'+(a.company)+(a.job_title?' — '+a.job_title:'')+'</option>';
         }).join('');
   }
-  // Contact selector — all contacts, no slice cap
+  // Contact selector — all contacts, sorted
   var contSel = document.getElementById('clg-contact-sel');
   if (contSel) {
     var sorted = allContacts.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
@@ -8208,6 +8208,17 @@ function loadCLGPage() {
         return '<option value="'+c.id+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'">'+(c.name||'')+(c.company?' — '+c.company:'')+'</option>';
       }).join('');
   }
+}
+
+async function loadCLGPage() {
+  // If contacts not yet loaded, fetch them first
+  if (!allContacts.length) {
+    try {
+      var data = await dbGet('contacts', 'select=id,name,company,email&order=name.asc&limit=5000');
+      allContacts = Array.isArray(data) ? data : [];
+    } catch(e) { console.warn('CLG: could not load contacts', e.message); }
+  }
+  _renderCLGDropdowns();
 }
 
 function onCLGCompanyChange() {
