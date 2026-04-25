@@ -1629,10 +1629,10 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group">
                 <label class="form-label">Company *</label>
-                <select class="form-select" id="clg-company-sel" onchange="(function(){var s=document.getElementById('clg-company-sel');var i=document.getElementById('clg-company');if(s.value){var a=allApps.find(function(x){return x.id===s.value;});if(a){i.value=a.company;if(document.getElementById('clg-role'))document.getElementById('clg-role').value=a.job_title||document.getElementById('clg-role').value;}}})()">
-                  <option value="">— Select application or type below —</option>
+                <select class="form-select" id="clg-company-sel" onchange="onCLGCompanyChange()">
+                  <option value="">— Select application —</option>
                 </select>
-                <input class="form-input" type="text" id="clg-company" placeholder="Or type company name" style="margin-top:6px">
+                <input type="hidden" id="clg-company">
               </div>
               <div class="form-group">
                 <label class="form-label">Role Title *</label>
@@ -1640,10 +1640,10 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group">
                 <label class="form-label">Hiring Manager / Contact Name</label>
-                <select class="form-select" id="clg-contact-sel" onchange="(function(){var s=document.getElementById('clg-contact-sel');var i=document.getElementById('clg-contact');if(s.value){var c=allContacts.find(function(x){return x.id===s.value;});if(c)i.value=c.name||'';} else i.value='';})()">
-                  <option value="">— Select from contacts or type below —</option>
+                <select class="form-select" id="clg-contact-sel" onchange="onCLGContactChange()">
+                  <option value="">— Select from contacts —</option>
                 </select>
-                <input class="form-input" type="text" id="clg-contact" placeholder="Or type name" style="margin-top:6px">
+                <input type="hidden" id="clg-contact">
               </div>
               <div class="form-group">
                 <label class="form-label">Company URL <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(used to research context)</span></label>
@@ -8178,34 +8178,55 @@ let clgOutput = '';
 
 function loadCLGPage() {
   // Link-to-app dropdown
-  const sel = document.getElementById('clg-link-app');
+  var sel = document.getElementById('clg-link-app');
   if (sel) {
     sel.innerHTML = "<option value=''>— Don't link —</option>";
-    allApps.slice(0, 100).forEach(function(a) {
+    allApps.forEach(function(a) {
       if (!a.company) return;
-      const opt = document.createElement('option');
+      var opt = document.createElement('option');
       opt.value = a.id;
       opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
       sel.appendChild(opt);
     });
   }
-  // Company selector from applications
+  // Company selector — all apps, no slice cap
   var compSel = document.getElementById('clg-company-sel');
   if (compSel) {
-    compSel.innerHTML = '<option value="">— Select application or type below —</option>' +
-      allApps.slice(0,100).filter(function(a){return a.company;}).map(function(a){
-        return '<option value="'+a.id+'">'+(a.company)+(a.job_title?' — '+a.job_title:'')+'</option>';
-      }).join('');
+    compSel.innerHTML = '<option value="">— Select application —</option>' +
+      allApps.filter(function(a){ return a.company; })
+        .sort(function(a,b){ return (a.company||'').localeCompare(b.company||''); })
+        .map(function(a){
+          return '<option value="'+a.id+'" data-company="'+a.company.replace(/"/g,'&quot;')+'" data-role="'+(a.job_title||'').replace(/"/g,'&quot;')+'">'+(a.company)+(a.job_title?' — '+a.job_title:'')+'</option>';
+        }).join('');
   }
-  // Contact selector
+  // Contact selector — all contacts, no slice cap
   var contSel = document.getElementById('clg-contact-sel');
   if (contSel) {
-    var sorted = allContacts.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-    contSel.innerHTML = '<option value="">— Select from contacts or type below —</option>' +
-      sorted.slice(0,200).map(function(c){
-        return '<option value="'+c.id+'">'+(c.name||'')+(c.company?' — '+c.company:'')+'</option>';
+    var sorted = allContacts.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+    contSel.innerHTML = '<option value="">— Select from contacts —</option>' +
+      sorted.map(function(c){
+        return '<option value="'+c.id+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'">'+(c.name||'')+(c.company?' — '+c.company:'')+'</option>';
       }).join('');
   }
+}
+
+function onCLGCompanyChange() {
+  var sel = document.getElementById('clg-company-sel');
+  var hidden = document.getElementById('clg-company');
+  var roleEl = document.getElementById('clg-role');
+  if (!sel || !sel.value) { if (hidden) hidden.value = ''; return; }
+  var opt = sel.options[sel.selectedIndex];
+  if (hidden) hidden.value = opt.dataset.company || opt.text.split('—')[0].trim();
+  if (roleEl && opt.dataset.role) roleEl.value = opt.dataset.role;
+}
+
+function onCLGContactChange() {
+  var sel = document.getElementById('clg-contact-sel');
+  var hidden = document.getElementById('clg-contact');
+  if (!sel || !hidden) return;
+  if (!sel.value) { hidden.value = ''; return; }
+  var opt = sel.options[sel.selectedIndex];
+  hidden.value = opt.dataset.name || opt.text.split('—')[0].trim();
 }
 
 async function runCLGenerator() {
@@ -8247,8 +8268,8 @@ async function runCLGenerator() {
 }
 
 function clearCLG() {
-  ['clg-company','clg-role','clg-contact','clg-jd','clg-url'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
-  ['clg-company-sel','clg-contact-sel'].forEach(function(id){ const e=document.getElementById(id);if(e)e.selectedIndex=0; });
+  ['clg-company','clg-role','clg-contact','clg-jd','clg-url'].forEach(function(id){ var e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-company-sel','clg-contact-sel','clg-link-app'].forEach(function(id){ var e=document.getElementById(id);if(e)e.selectedIndex=0; });
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
