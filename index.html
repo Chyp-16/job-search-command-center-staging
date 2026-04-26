@@ -8331,32 +8331,45 @@ async function runCLGenerator() {
   const clgResume = (document.getElementById('clg-resume') ? document.getElementById('clg-resume').value : '').trim();
 
   const typePrompts = {
-    cover_letter: 'You are drafting a cover letter for Jay Wadhwa applying to the ' + role + ' role at ' + company + '.' + (contact ? ' The hiring manager is ' + contact + (clgContactTitle ? ', ' + clgContactTitle : '') + '.' : '') +
-      '\n\nSOURCES PROVIDED:\n' +
-      (clgResume ? 'RESUME:\n' + clgResume + '\n\n' : '') +
-      (jd ? 'JOB DESCRIPTION:\n' + jd + '\n\n' : '') +
-      (clgUrl ? 'COMPANY WEBSITE: ' + clgUrl + '\n\n' : '') +
-      'DRAFTING WORKFLOW:\n' +
-      '1. Analyze sources - pull the most relevant experience, specific achievements with numbers, and skills that fit this role.\n' +
-      '2. Analyze the JD - identify the top 3-5 requirements, culture clues, and stated challenges or goals.\n' +
-      '3. Draft using these rules:\n' +
-      '   - Under 300 words\n' +
-      '   - Open with something specific about ' + company + ', not generic praise\n' +
-      '   - Connect 2-3 relevant experiences directly to the role\n' +
-      '   - Include one measurable example\n' +
-      '   - Show understanding of the company goals or challenges\n' +
-      '   - Conversational tone - peer-to-peer, not formal or desperate\n' +
-      '   - End with a specific next step, not a generic closing\n' +
-      '4. Make it human - contractions where natural, varied sentence length, no buzzwords or cliches.\n\n' +
-      'DO NOT: repeat the whole resume, use corporate speak, make unsupported claims, use generic openings, or sound like a template.\n\n' +
-      'FORMAT: Business letter body only. DO NOT include a header, date, recipient block, or Meeting Link — all added automatically. Start with: Hi [First Name], then body, then: Cheers, / Jay Wadhwa. Use - for bullets only when they shorten the letter. Use ** only inside bullets for bold.' +
-      '\n\nVOICE: Executive peer-to-peer. Confident and direct. Human, not corporate. Sound like a seasoned CMO writing to an equal, not an applicant writing to a gatekeeper.' +
-      '\n\nACTIVE VOICE ONLY. Never use passive constructions. BAD: "My experience aligns with your goals." GOOD: "I built that system at NBC." BAD: "Results were achieved through..." GOOD: "We grew revenue 130%."' +
-      '\n\nSENTENCE RULES: 15 words or fewer per sentence. Mix short and medium. Contractions required. No semicolons. No em dashes. No fragments.' +
-      '\n\nCONTENT: Open with something specific about this company — not generic praise. Lead with one strong result and a number. Connect 2-3 experiences to their actual needs. Show you researched them. End with a direct next step.' +
-      '\n\nBULLETS: Use them when listing 3+ parallel items that are shorter as bullets than as prose. Do not use bullets for single ideas or flowing narrative.' +
-      '\n\nSTRICTLY BANNED — do not write any of these: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, resonates, energized, passionate, thrilled, excited, would love, inspired, eager, compelling, meaningful, aligns perfectly, aligns with, resonates with, perfectly positioned, I am excited, I am passionate, I\'d love to, I welcome, I would welcome, it is with great, I was thrilled, I am eager.' +
-      '\n\nLENGTH: 300 words max. 8th-grade reading level. Plain short words only. Cut anything that does not add specific value.',
+    cover_letter: (function(){
+      var p = '';
+      p += 'Write a cover letter body for Jay Wadhwa. Role: ' + role + '. Company: ' + company + '.';
+      if (contact) p += ' Hiring manager: ' + contact + (clgContactTitle ? ', ' + clgContactTitle : '') + '.';
+      p += '\n\n';
+      if (clgResume) p += 'RESUME:\n' + clgResume + '\n\n';
+      if (jd)        p += 'JOB DESCRIPTION:\n' + jd + '\n\n';
+      if (clgUrl)    p += 'COMPANY URL: ' + clgUrl + '\n\n';
+      p += '--- STRICT OUTPUT RULES ---\n\n';
+      p += 'START with: Hi ' + (contact ? contact.split(' ')[0] : '[First Name]') + ',\n';
+      p += 'END with: Cheers, / Jay Wadhwa\n';
+      p += 'DO NOT include: header, date, address, Meeting Link. Those are added automatically.\n';
+      p += 'MAX 250 words.\n\n';
+      p += '--- ACTIVE VOICE ---\n';
+      p += 'Every sentence: subject + verb + object. No exceptions.\n';
+      p += 'WRONG: "My background aligns with your needs."\n';
+      p += 'RIGHT: "I built this exact capability at NBC Sports."\n';
+      p += 'WRONG: "Your approach resonates with my experience."\n';
+      p += 'RIGHT: "I scaled three SaaS brands using this same model."\n\n';
+      p += '--- BULLETS ---\n';
+      p += 'When you have 3 or more parallel proof points, you MUST write them as bullets.\n';
+      p += 'Start each bullet with a hyphen and a space: - \n';
+      p += 'Example:\n';
+      p += '- Grew revenue 96% at Secret Network in nine months\n';
+      p += '- Built a 25-person creative agency at NBC Sports\n';
+      p += '- Drove 4x revenue growth at ESPN Classic\n\n';
+      p += '--- BANNED WORDS AND PHRASES ---\n';
+      p += 'Never write any of these: aligns with, aligns perfectly, resonates, resonates with, perfectly positioned, ';
+      p += 'I am excited, thrilled, eager, passionate, inspired, I would welcome, I welcome, would love, ';
+      p += 'leverage, seamless, proactive, pivotal, delve, compelling, meaningful, cutting-edge, energized.\n\n';
+      p += '--- STRUCTURE ---\n';
+      p += '1. One sentence about something specific you know about ' + company + '. Not generic praise. Show research.\n';
+      p += '2. One opening result with a number. Make it relevant to this role.\n';
+      p += '3. Bullets if you have 3+ parallel achievements. Prose if fewer.\n';
+      p += '4. One sentence showing you understand their specific challenge.\n';
+      p += '5. Direct close: propose a specific next step.\n\n';
+      p += 'Sentences: 15 words or fewer. Contractions required. No semicolons. No em dashes.';
+      return p;
+    })(),
     inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
     linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
     email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
