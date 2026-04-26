@@ -7778,7 +7778,7 @@ function buildResumeDocx(text, filename, markedUp) {
   function ppr(opts) {
     opts = opts||{};
     var s = '<w:pPr>';
-    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs>';
+    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="10466"/></w:tabs>';
     if (opts.bbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="'+BL+'"/></w:pBdr>';
     if (opts.hbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/></w:pBdr>';
     if (opts.num)    s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
@@ -7853,7 +7853,7 @@ function buildResumeDocx(text, filename, markedUp) {
   // Tagline: Calibri Regular 10pt italic, expanded 1pt character spacing (sz=20, spacing=20 twips)
   function taglinePara(t) {
     return P(ppr({sp:['0','80']}),
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
   }
 
   // Empty spacer paragraph
@@ -7871,7 +7871,7 @@ function buildResumeDocx(text, filename, markedUp) {
       '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>jvwadhwa@gmail.com</w:t></w:r>'
     ) +
     // Location + LinkedIn
-    P(ppr({tabs:true, sp:['0','80']}),
+    P(ppr({tabs:true, sp:['0','0']}),
       '<w:r>'+rpr(CL,'18',BK,false,false,false)+'<w:tab/></w:r>' +
       '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>' +
       '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>linkedin.com/in/jwadhwa</w:t></w:r>'
