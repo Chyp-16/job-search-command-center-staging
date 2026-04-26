@@ -8349,12 +8349,14 @@ async function runCLGenerator() {
       '   - End with a specific next step, not a generic closing\n' +
       '4. Make it human - contractions where natural, varied sentence length, no buzzwords or cliches.\n\n' +
       'DO NOT: repeat the whole resume, use corporate speak, make unsupported claims, use generic openings, or sound like a template.\n\n' +
-      'FORMAT: Business letter body only. DO NOT include a header, date, or recipient block — those are added automatically. Do not include a Meeting Link line — that is added automatically. Start directly with the salutation: Hi [First Name], then body paragraphs, then closing: Cheers, / Jay Wadhwa. Use ** around bold text only in bullet points. Use - at line start for bullets only when they make the letter more concise.' +
-      '\n\nWRITING RULES: Voice: executive marketing leader, peer-to-peer, confident, direct, human. No corporate speak. ' +
-      'Sentences: 15 words or fewer, active voice, no semicolons, contractions natural, no em dashes, no fragments. ' +
-      'Content: lead with results and numbers, do not start multiple sentences with I, no hedging, show company research, end with a clear next step. ' +
-      'STRICTLY BANNED — do not use these words or phrases under any circumstances: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, resonates, energized, passionate, thrilled, excited, would love, inspired, eager, compelling, meaningful, I\'d love to, I welcome, I would welcome, aligns perfectly, aligns with, resonates with, perfectly positioned, I am excited, I am passionate, it is with great, I was thrilled. ' +
-      'Length: 350 words max. Reading level: 8th grade. Plain short words only.',
+      'FORMAT: Business letter body only. DO NOT include a header, date, recipient block, or Meeting Link — all added automatically. Start with: Hi [First Name], then body, then: Cheers, / Jay Wadhwa. Use - for bullets only when they shorten the letter. Use ** only inside bullets for bold.' +
+      '\n\nVOICE: Executive peer-to-peer. Confident and direct. Human, not corporate. Sound like a seasoned CMO writing to an equal, not an applicant writing to a gatekeeper.' +
+      '\n\nACTIVE VOICE ONLY. Never use passive constructions. BAD: "My experience aligns with your goals." GOOD: "I built that system at NBC." BAD: "Results were achieved through..." GOOD: "We grew revenue 130%."' +
+      '\n\nSENTENCE RULES: 15 words or fewer per sentence. Mix short and medium. Contractions required. No semicolons. No em dashes. No fragments.' +
+      '\n\nCONTENT: Open with something specific about this company — not generic praise. Lead with one strong result and a number. Connect 2-3 experiences to their actual needs. Show you researched them. End with a direct next step.' +
+      '\n\nBULLETS: Use them when listing 3+ parallel items that are shorter as bullets than as prose. Do not use bullets for single ideas or flowing narrative.' +
+      '\n\nSTRICTLY BANNED — do not write any of these: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, resonates, energized, passionate, thrilled, excited, would love, inspired, eager, compelling, meaningful, aligns perfectly, aligns with, resonates with, perfectly positioned, I am excited, I am passionate, I\'d love to, I welcome, I would welcome, it is with great, I was thrilled, I am eager.' +
+      '\n\nLENGTH: 300 words max. 8th-grade reading level. Plain short words only. Cut anything that does not add specific value.',
     inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
     linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
     email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
@@ -9185,14 +9187,14 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
       '<w:r>'+rpr(GH,'44',BG,false,false)+'<w:t xml:space="preserve">Jay Wadhwa</w:t></w:r>'+
       '<w:r>'+rpr(CL,'18',BG,false,false)+'<w:tab/><w:t xml:space="preserve">847-910-9377 | </w:t></w:r>'+
       hyperlink('rId2','jvwadhwa@gmail.com',rprHyperlink('18',BG)))+
-    P(pprHdr(false,['0','60']),
+    P(pprHdr(false,['0','0']),
       '<w:r>'+rpr(CL,'18',BK,false,false)+'<w:tab/><w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>'+
       hyperlink('rId3','linkedin.com/in/jwadhwa',rprHyperlink('18',BG)))+
     P(pprHdr(true,['0','120']),'');
 
   // Date
   var today_str = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  var bodyXml = P(ppr({sp:['0','80']}),
+  var bodyXml = P(ppr({sp:['0','0']}),
     '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(today_str)+'</w:t></w:r>');
 
   // Recipient block: Name, Title on same line / Company below
@@ -9202,7 +9204,7 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
       '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(nameTitle)+'</w:t></w:r>');
   }
   if (company) {
-    bodyXml += P(ppr({sp:['0','80']}),
+    bodyXml += P(ppr({sp:['0','0']}),
       '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(company)+'</w:t></w:r>');
   }
 
