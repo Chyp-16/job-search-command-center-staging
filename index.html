@@ -9213,7 +9213,7 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
   // Recipient block: Name, Title on same line / Company below
   if (contactName || contactTitle) {
     var nameTitle = [contactName, contactTitle].filter(Boolean).join(', ');
-    bodyXml += P(ppr({sp:['120','0']}),
+    bodyXml += P(ppr({sp:['0','0']}),
       '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(nameTitle)+'</w:t></w:r>');
   }
   if (company) {
@@ -9286,7 +9286,8 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
     '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>'+
     '<w:sz w:val="22"/><w:szCs w:val="22"/>'+
     '</w:rPr></w:rPrDefault></w:docDefaults>' +
-    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'+
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>'+
+    '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:style>'+
     '</w:styles>';
 
   var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
