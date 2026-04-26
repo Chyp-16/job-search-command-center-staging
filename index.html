@@ -1660,7 +1660,12 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group full">
                 <label class="form-label">Customized Resume <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(paste text or upload — used as drafting source)</span></label>
-                <textarea class="form-textarea" id="clg-resume" rows="6" placeholder="Paste your tailored resume text here..."></textarea>
+                <div style="border:2px dashed var(--border-strong);border-radius:var(--radius);padding:4px;transition:all 0.2s"
+                     ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)';this.style.background='var(--burgundy-muted)'"
+                     ondragleave="this.style.borderColor='var(--border-strong)';this.style.background=''"
+                     ondrop="handleCLGResumeDrop(event)">
+                  <textarea class="form-textarea" id="clg-resume" rows="6" placeholder="Paste your tailored resume text here, or drag &amp; drop a file (.pdf, .docx, .txt)..." style="border:none;padding:4px;background:transparent;width:100%;resize:vertical"></textarea>
+                </div>
                 <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
                   <input type="file" id="clg-resume-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleCLGResumeUpload(event)">
                   <button class="btn btn-secondary btn-sm" onclick="document.getElementById('clg-resume-file').click()">📎 Upload Resume</button>
@@ -8257,9 +8262,23 @@ function onCLGContactChange() {
   hidden.value = opt.dataset.name || opt.text.split('—')[0].trim();
 }
 
+async function handleCLGResumeDrop(event) {
+  event.preventDefault();
+  event.currentTarget.style.borderColor = 'var(--border-strong)';
+  event.currentTarget.style.background = '';
+  var file = event.dataTransfer.files[0];
+  if (!file) return;
+  // Reuse upload handler by simulating file input event
+  await handleCLGResumeFile(file);
+}
+
 async function handleCLGResumeUpload(event) {
   var file = event.target.files[0];
   if (!file) return;
+  await handleCLGResumeFile(file);
+}
+
+async function handleCLGResumeFile(file) {
   document.getElementById('clg-resume-file-name').textContent = file.name;
   var ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'txt') {
@@ -8303,6 +8322,9 @@ async function runCLGenerator() {
   contentEl.textContent = 'Generating...';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  const clgUrl    = (document.getElementById('clg-url')    ? document.getElementById('clg-url').value    : '').trim();
+  const clgResume = (document.getElementById('clg-resume') ? document.getElementById('clg-resume').value : '').trim();
+
   const typePrompts = {
     cover_letter: 'You are drafting a cover letter for Jay Wadhwa applying to the ' + role + ' role at ' + company + '.' + (contact ? ' Address it to ' + contact + '.' : '') +
       '\n\nSOURCES PROVIDED:\n' +
@@ -8331,9 +8353,6 @@ async function runCLGenerator() {
     rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
   };
 
-  const clgUrl = (document.getElementById('clg-url') ? document.getElementById('clg-url').value : '').trim();
-  const clgResume = (document.getElementById('clg-resume') ? document.getElementById('clg-resume').value : '').trim();
-  // clgResume and clgUrl are referenced inside the cover_letter template literal above
   const urlContext = (type !== 'cover_letter' && clgUrl) ? '\n\nCompany website for research: ' + clgUrl : '';
   const prompt = (typePrompts[type] || typePrompts.cover_letter) + urlContext;
 
