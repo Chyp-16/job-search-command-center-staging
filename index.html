@@ -9188,22 +9188,28 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
 
   // Header: Jay Wadhwa left | phone + email right (right tab)
   // Page: 12240 wide, 1440 margins each side → text width 9360 twips = right tab pos
-  function pprHdr(hbdr, sp) {
+  function pprHdr(hbdr, isNameRow) {
     var s = '<w:pPr>';
     s += '<w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>';
     if (hbdr) s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="2E74B5"/></w:pBdr>';
-    s += '<w:spacing w:before="0" w:after="0" w:line="280" w:lineRule="exact"/>';
+    // Name row: auto line spacing so 44pt text is not clipped
+    // Contact row: exact 240 twips (12pt) to keep tight with name row
+    if (isNameRow) {
+      s += '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>';
+    } else {
+      s += '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/>';
+    }
     s += '</w:pPr>'; return s;
   }
   var hdrXml =
-    P(pprHdr(false,['0','0']),
+    P(pprHdr(false,true),
       '<w:r>'+rpr(GH,'44',BG,false,false)+'<w:t xml:space="preserve">Jay Wadhwa</w:t></w:r>'+
       '<w:r>'+rpr(CL,'18',BG,false,false)+'<w:tab/><w:t xml:space="preserve">847-910-9377 | </w:t></w:r>'+
       hyperlink('rId2','jvwadhwa@gmail.com',rprHyperlink('18',BG)))+
-    P(pprHdr(false,['0','0']),
+    P(pprHdr(false,false),
       '<w:r>'+rpr(CL,'18',BK,false,false)+'<w:tab/><w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>'+
       hyperlink('rId3','linkedin.com/in/jwadhwa',rprHyperlink('18',BG)))+
-    P(pprHdr(true,['0','120']),'');
+    P(pprHdr(true,false),'');
 
   // Date
   var today_str = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
