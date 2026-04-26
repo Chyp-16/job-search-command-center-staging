@@ -8353,7 +8353,7 @@ async function runCLGenerator() {
       '\n\nWRITING RULES: Voice: executive marketing leader, peer-to-peer, confident, direct, human. No corporate speak. ' +
       'Sentences: 15 words or fewer, active voice, no semicolons, contractions natural, no em dashes, no fragments. ' +
       'Content: lead with results and numbers, do not start multiple sentences with I, no hedging, show company research, end with a clear next step. ' +
-      'Banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, resonates, energized, passionate, thrilled, excited, would love, inspired, eager, compelling, meaningful, I\'d love to, I welcome. ' +
+      'STRICTLY BANNED — do not use these words or phrases under any circumstances: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, resonates, energized, passionate, thrilled, excited, would love, inspired, eager, compelling, meaningful, I\'d love to, I welcome, I would welcome, aligns perfectly, aligns with, resonates with, perfectly positioned, I am excited, I am passionate, it is with great, I was thrilled. ' +
       'Length: 350 words max. Reading level: 8th grade. Plain short words only.',
     inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
     linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
@@ -9251,14 +9251,19 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
         parseInline(bullet)+'</w:p>';
       return;
     }
-    bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="160"/></w:pPr>'+parseInline(t)+'</w:p>';
+    var isClosure = /^(Cheers|Jay Wadhwa|Best|Regards|Sincerely|Thanks)/i.test(t);
+    var afterSp = isClosure ? '0' : '160';
+    bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="'+afterSp+'"/></w:pPr>'+parseInline(t)+'</w:p>';
   });
 
-  // Always append Meeting Link below signature
+  // Always append Meeting Link — bold, burgundy hyperlink, no label prefix
+  var meetingRPr = '<w:rPr><w:rFonts w:ascii="'+CL+'" w:hAnsi="'+CL+'" w:cs="'+CL+'"/>'+
+    '<w:b/><w:bCs/><w:color w:val="'+BG+'"/><w:u w:val="single"/>'+
+    '<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>';
   bodyXml +=
-    '<w:p><w:pPr><w:spacing w:before="80" w:after="0"/></w:pPr>'+
-    '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t xml:space="preserve">Meeting Link: </w:t></w:r>'+
-    hyperlink('rId4','https://calendly.com/jwadhwa',rprHyperlink('22','1155BB'))+'</w:p>';
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>'+
+    '<w:hyperlink r:id="rId4" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+    '<w:r>'+meetingRPr+'<w:t>Meeting Link</w:t></w:r></w:hyperlink></w:p>';
 
   var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<w:styles '+WNS+' '+RNS+'>' +
@@ -9270,11 +9275,8 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
     '</w:styles>';
 
   var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"'+
-    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'+
-    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'+
-    ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'+
-    ' mc:Ignorable="w14 wp14">'+
+    '<w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'+
+    ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
     '<w:body>'+hdrXml+bodyXml+
     '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'+
     '<w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>'+
