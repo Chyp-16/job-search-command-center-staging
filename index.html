@@ -7847,13 +7847,13 @@ function buildResumeDocx(text, filename, markedUp) {
   // Title block — job title line: Calibri Bold 14pt (sz=28), dark color
   function titlePara(t) {
     return P(ppr({sp:['120','0']}),
-      '<w:r>'+rpr(CA,'28',DA,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+      '<w:r>'+rpr(CL,'28',DA,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
   }
 
   // Tagline: Calibri Regular 10pt italic, expanded 1pt character spacing (sz=20, spacing=20 twips)
   function taglinePara(t) {
     return P(ppr({sp:['0','80']}),
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
   }
 
   // Empty spacer paragraph
