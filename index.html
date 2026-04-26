@@ -9187,12 +9187,12 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
     '</Relationships>';
 
   // Header: Jay Wadhwa left | phone + email right (right tab)
+  // Page: 12240 wide, 1440 margins each side → text width 9360 twips = right tab pos
   function pprHdr(hbdr, sp) {
     var s = '<w:pPr>';
     s += '<w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>';
     if (hbdr) s += '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="2E74B5"/></w:pBdr>';
-    s += '<w:spacing w:before="'+(sp[0]||0)+'" w:after="'+(sp[1]||0)+'"/>';
-    s += '<w:textAlignment w:val="center"/>';
+    s += '<w:spacing w:before="0" w:after="0" w:line="280" w:lineRule="exact"/>';
     s += '</w:pPr>'; return s;
   }
   var hdrXml =
@@ -9295,7 +9295,7 @@ async function exportCoverLetterDocx(text, company, role, contactName, contactTi
     ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'+
     '<w:body>'+hdrXml+bodyXml+
     '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'+
-    '<w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>'+
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>'+
     '</w:sectPr></w:body></w:document>';
 
   var _relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
