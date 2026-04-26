@@ -1646,6 +1646,10 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input type="hidden" id="clg-contact">
               </div>
               <div class="form-group">
+                <label class="form-label">Contact Title <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(e.g. Chief Operating Officer)</span></label>
+                <input class="form-input" type="text" id="clg-contact-title" placeholder="e.g. VP of Talent Acquisition">
+              </div>
+              <div class="form-group">
                 <label class="form-label">Company URL <span style="font-size:11px;font-weight:400;color:var(--text-secondary)">(used to research context)</span></label>
                 <input class="form-input" type="url" id="clg-url" placeholder="https://company.com">
               </div>
@@ -8322,11 +8326,12 @@ async function runCLGenerator() {
   contentEl.textContent = 'Generating...';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const clgUrl    = (document.getElementById('clg-url')    ? document.getElementById('clg-url').value    : '').trim();
+  const clgUrl          = (document.getElementById('clg-url')          ? document.getElementById('clg-url').value          : '').trim();
+  const clgContactTitle = (document.getElementById('clg-contact-title') ? document.getElementById('clg-contact-title').value : '').trim();
   const clgResume = (document.getElementById('clg-resume') ? document.getElementById('clg-resume').value : '').trim();
 
   const typePrompts = {
-    cover_letter: 'You are drafting a cover letter for Jay Wadhwa applying to the ' + role + ' role at ' + company + '.' + (contact ? ' Address it to ' + contact + '.' : '') +
+    cover_letter: 'You are drafting a cover letter for Jay Wadhwa applying to the ' + role + ' role at ' + company + '.' + (contact ? ' The hiring manager is ' + contact + (clgContactTitle ? ', ' + clgContactTitle : '') + '.' : '') +
       '\n\nSOURCES PROVIDED:\n' +
       (clgResume ? 'RESUME:\n' + clgResume + '\n\n' : '') +
       (jd ? 'JOB DESCRIPTION:\n' + jd + '\n\n' : '') +
@@ -8344,7 +8349,7 @@ async function runCLGenerator() {
       '   - End with a specific next step, not a generic closing\n' +
       '4. Make it human - contractions where natural, varied sentence length, no buzzwords or cliches.\n\n' +
       'DO NOT: repeat the whole resume, use corporate speak, make unsupported claims, use generic openings, or sound like a template.\n\n' +
-      'FORMAT: Professional business letter.' + (contact ? ' Address: Dear ' + contact + ',' : '') + ' Clear scannable paragraphs. Strong opening and closing.',
+      'FORMAT: Business letter body only. DO NOT include a header, date, or recipient block — those are added automatically. Start directly with the salutation: Hi [First Name], then body paragraphs, then closing: Cheers, / Jay Wadhwa. Use ** around bold text. Use - at line start for bullet points.',
     inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
     linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
     email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
@@ -8367,13 +8372,13 @@ async function runCLGenerator() {
 }
 
 function clearCLG() {
-  ['clg-company','clg-role','clg-contact','clg-jd','clg-url','clg-resume'].forEach(function(id){ var e=document.getElementById(id);if(e)e.value=''; });
+  ['clg-company','clg-role','clg-contact','clg-contact-title','clg-jd','clg-url','clg-resume'].forEach(function(id){ var e=document.getElementById(id);if(e)e.value=''; });
   ['clg-resume-file-name','clg-jd-file-name'].forEach(function(id){ var e=document.getElementById(id);if(e)e.textContent=''; });
   ['clg-company-sel','clg-contact-sel','clg-link-app'].forEach(function(id){ var e=document.getElementById(id);if(e)e.selectedIndex=0; });
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
-function exportCLGDocx() { var co=(document.getElementById('clg-company').value||'').trim(); var ro=(document.getElementById('clg-role').value||'').trim(); var ct=(document.getElementById('clg-contact').value||'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct); }
+function exportCLGDocx() { var co=(document.getElementById('clg-company').value||'').trim(); var ro=(document.getElementById('clg-role').value||'').trim(); var ct=(document.getElementById('clg-contact').value||'').trim(); var ctitle=(document.getElementById('clg-contact-title')?document.getElementById('clg-contact-title').value:'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct, ctitle); }
 
 async function saveCLGOutput() {
   if (!clgOutput) return;
@@ -9115,15 +9120,18 @@ function cleanForFilename(s) {
 }
 
 // Naming convention: JayWadhwa_[Role]_[Company]_Resume
-async function exportCoverLetterDocx(text, company, role, contactName) {
-  const role_clean    = cleanForFilename(role)    || 'Role';
-  const company_clean = cleanForFilename(company) || 'Company';
-  const downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_CoverLetter';
+async function exportCoverLetterDocx(text, company, role, contactName, contactTitle) {
+  var role_clean    = (cleanForFilename(role)    || 'Role').replace(/\s+/g,'_');
+  var company_clean = (cleanForFilename(company) || 'Company').replace(/\s+/g,'_');
+  var downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_CoverLetter';
 
-  // Build cover letter using same OOXML approach as resume — same header
   var BG = '972b32'; var BK = '0D0D0D'; var GH = 'Century Gothic'; var CL = 'Calibri';
-  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-  function rpr(font,sz,color,bold,ital,ul){
+  var WNS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var RNS = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function rpr(font,sz,color,bold,ital){
     var s='<w:rPr><w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>';
     if(bold) s+='<w:b/><w:bCs/>';
     if(ital) s+='<w:i/><w:iCs/>';
@@ -9131,70 +9139,153 @@ async function exportCoverLetterDocx(text, company, role, contactName) {
     s+='<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr>';
     return s;
   }
+  function rprHyperlink(sz,color){
+    return '<w:rPr><w:rFonts w:ascii="'+CL+'" w:hAnsi="'+CL+'" w:cs="'+CL+'"/>' +
+      '<w:color w:val="'+color+'"/><w:u w:val="single"/>' +
+      '<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr>';
+  }
   function P(pp,rr){ return '<w:p>'+pp+rr+'</w:p>'; }
   function ppr(opts){
     var s='<w:pPr>';
     if(opts.tabs) s+='<w:tabs><w:tab w:val="center" w:pos="4320"/><w:tab w:val="right" w:pos="8640"/></w:tabs>';
     if(opts.hbdr) s+='<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="2E74B5"/></w:pBdr>';
     if(opts.sp)   s+='<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"/>';
-    if(opts.center) s+='<w:jc w:val="center"/>';
     s+='</w:pPr>'; return s;
   }
-
-  // Same header as resume
-  var hdrXml =
-    P(ppr({tabs:true,sp:['0','0']}),
-      '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:t>Jay Wadhwa</w:t></w:r>'+
-      '<w:r>'+rpr(GH,'44',BG,false,false,false)+'<w:tab/></w:r>'+
-      '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">847-910-9377 | </w:t></w:r>'+
-      '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>jvwadhwa@gmail.com</w:t></w:r>')+
-    P(ppr({tabs:true,sp:['0','80']}),
-      '<w:r>'+rpr(CL,'18',BK,false,false,false)+'<w:tab/></w:r>'+
-      '<w:r>'+rpr(CL,'18',BG,false,false,false)+'<w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>'+
-      '<w:r>'+rpr(CL,'18',BG,true,false,false)+'<w:t>linkedin.com/in/jwadhwa</w:t></w:r>')+
-    P(ppr({hbdr:true,sp:['0','80']}),'');
-
-  // Date and salutation
-  var today_str = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-  var dateXml = P(ppr({sp:['0','80']}),
-    '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>'+esc(today_str)+'</w:t></w:r>');
-  var salutation = '';
-  if (contactName) {
-    salutation = P(ppr({sp:['80','0']}),
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>'+esc('Dear '+contactName+',')+'</w:t></w:r>');
+  function hyperlink(relId, displayText, rPrXml){
+    return '<w:hyperlink r:id="'+relId+'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<w:r>'+rPrXml+'<w:t>'+esc(displayText)+'</w:t></w:r></w:hyperlink>';
   }
 
-  // Body paragraphs
-  var bodyXml = '';
-  (text||'').split('\n').forEach(function(line){
+  // Relationships — rId1=document, rId2=email, rId3=linkedin, rId4=meeting
+  var wRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="mailto:jvwadhwa@gmail.com" TargetMode="External"/>'+
+    '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://www.linkedin.com/in/jwadhwa" TargetMode="External"/>'+
+    '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://calendly.com/jwadhwa" TargetMode="External"/>'+
+    '</Relationships>';
+
+  // Header — name (left) | phone | email (hyperlink) / location | linkedin (hyperlink)
+  var hdrXml =
+    P(ppr({tabs:true,sp:['0','0']}),
+      '<w:r>'+rpr(GH,'44',BG,false,false)+'<w:t>Jay Wadhwa</w:t></w:r>'+
+      '<w:r>'+rpr(CL,'18',BG,false,false)+'<w:tab/><w:t xml:space="preserve">847-910-9377 | </w:t></w:r>'+
+      hyperlink('rId2','jvwadhwa@gmail.com',rprHyperlink('18',BG)))+
+    P(ppr({tabs:true,sp:['0','80']}),
+      '<w:r>'+rpr(CL,'18',BK,false,false)+'<w:tab/><w:t xml:space="preserve">Greater Chicago Area | </w:t></w:r>'+
+      hyperlink('rId3','linkedin.com/in/jwadhwa',rprHyperlink('18',BG)))+
+    P(ppr({hbdr:true,sp:['0','120']}),'');
+
+  // Date
+  var today_str = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  var bodyXml = P(ppr({sp:['0','80']}),
+    '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(today_str)+'</w:t></w:r>');
+
+  // Recipient block: Name / Title / Company (only if provided)
+  if (contactName) {
+    bodyXml += P(ppr({sp:['120','0']}),
+      '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(contactName)+'</w:t></w:r>');
+  }
+  if (contactTitle) {
+    bodyXml += P(ppr({sp:['0','0']}),
+      '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(contactTitle)+'</w:t></w:r>');
+  }
+  if (company) {
+    bodyXml += P(ppr({sp:['0','80']}),
+      '<w:r>'+rpr(CL,'22',BK,false,false)+'<w:t>'+esc(company)+'</w:t></w:r>');
+  }
+
+  // Re: [Role] in bold
+  if (role) {
+    bodyXml += P(ppr({sp:['0','160']}),
+      '<w:r>'+rpr(CL,'22',BK,true,false)+'<w:t xml:space="preserve">Re: '+esc(role)+'</w:t></w:r>');
+  }
+
+  // Body — parse AI-generated text line by line
+  // Support: **bold**, - bullet, plain paragraphs, Meeting Link, Cheers
+  var lines = (text||'').split('\n');
+  var BODY_RPR = rpr(CL,'22',BK,false,false);
+  var BODY_SZ = '22';
+
+  function parseInline(line) {
+    // Convert **text** to bold runs, plain text stays plain
+    var out = '';
+    var parts = line.split(/\*\*([^*]+)\*\*/g);
+    parts.forEach(function(p, i) {
+      if (i % 2 === 1) {
+        out += '<w:r>'+rpr(CL,BODY_SZ,BK,true,false)+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
+      } else if (p) {
+        // Check for meeting link placeholder
+        var meetParts = p.split('Meeting Link');
+        if (meetParts.length > 1) {
+          if (meetParts[0]) out += '<w:r>'+BODY_RPR+'<w:t xml:space="preserve">'+esc(meetParts[0])+'</w:t></w:r>';
+          out += hyperlink('rId4','Meeting Link',rprHyperlink(BODY_SZ,BG));
+          if (meetParts[1]) out += '<w:r>'+BODY_RPR+'<w:t xml:space="preserve">'+esc(meetParts[1])+'</w:t></w:r>';
+        } else {
+          out += '<w:r>'+BODY_RPR+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
+        }
+      }
+    });
+    return out;
+  }
+
+  lines.forEach(function(line) {
     var t = line.trim();
-    var para = '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr>'+
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>'+
-      '<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r></w:p>';
-    bodyXml += para;
+    if (!t) {
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="80"/></w:pPr></w:p>';
+      return;
+    }
+    // Bullet point
+    if (t.charAt(0) === '-' && t.length > 1) {
+      var bullet = t.slice(1).trim();
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="80"/><w:ind w:left="360" w:hanging="180"/></w:pPr>'+
+        '<w:r>'+BODY_RPR+'<w:t xml:space="preserve">• </w:t></w:r>'+
+        parseInline(bullet)+'</w:p>';
+      return;
+    }
+    bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr>'+parseInline(t)+'</w:p>';
   });
 
+  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<w:styles '+WNS+' '+RNS+'>' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>'+
+    '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>'+
+    '<w:sz w:val="22"/><w:szCs w:val="22"/>'+
+    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'+
+    '</w:styles>';
+
   var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">'+
-    '<w:body>'+hdrXml+dateXml+salutation+bodyXml+
-    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>'+
-    '</w:body></w:document>';
+    '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"'+
+    ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'+
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'+
+    ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'+
+    ' mc:Ignorable="w14 wp14">'+
+    '<w:body>'+hdrXml+bodyXml+
+    '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'+
+    '<w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>'+
+    '</w:sectPr></w:body></w:document>';
+
+  var _relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
+    '</Relationships>';
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'+
+    '</Types>';
 
   try {
     var zip = new JSZip();
-    var relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'+
-      '</Relationships>';
-    var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
-      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
-      '<Default Extension="xml" ContentType="application/xml"/>'+
-      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'+
-      '</Types>';
     zip.file('[Content_Types].xml', contentTypes);
-    zip.file('_rels/.rels', relsXml);
+    zip.file('_rels/.rels', _relsXml);
     zip.file('word/document.xml', docXml);
+    zip.file('word/_rels/document.xml.rels', wRelsXml);
+    zip.file('word/styles.xml', stylesXml);
     var blob = await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
