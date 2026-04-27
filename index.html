@@ -11653,6 +11653,12 @@ async function executeMerge() {
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
+// Pre-load Contacts and Applications on every page load so all features
+// have data without requiring manual tab navigation first
+(function() {
+  loadContacts();
+  loadApps();
+})();
 // Restore last visited page on refresh
 (function() {
   var lastPage = null;
