@@ -7819,7 +7819,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
   // Normal body para — Calibri Light, **bold** and [YLW] supported
   function bPara(t, spBefore, spAfter) {
-    return P(ppr({sp:[spBefore||'0',spAfter||'60']}), runs(t,CL,'22',BK,false));
+    return P(ppr({sp:[spBefore||'0',spAfter||'60']}), runs(t,CA,'22',BK,false));
   }
 
   // Result sub-header: bold, black, Calibri 10pt
@@ -7847,7 +7847,7 @@ function buildResumeDocx(text, filename, markedUp) {
   // Title block — job title line: Calibri Bold 14pt (sz=28), dark color
   function titlePara(t) {
     return P(ppr({sp:['120','0']}),
-      '<w:r>'+rpr(CL,'28',DA,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+      '<w:r>'+rpr(CA,'28',DA,true,false,false)+'<w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
   }
 
   // Tagline: Calibri Regular 10pt italic, expanded 1pt character spacing (sz=20, spacing=20 twips)
