@@ -7764,7 +7764,7 @@ function buildResumeDocx(text, filename, markedUp) {
       var nx = cands[0]||null;
       if (nx) {
         if (nx.idx>0) out += '<w:r>'+rpr(font,sz,color,false,italic,false)+'<w:t xml:space="preserve">'+esc(rem.slice(0,nx.idx))+'</w:t></w:r>';
-        out += '<w:r>'+rpr(font, sz, color, nx.bold, italic&&!nx.bold, nx.ylw)+'<w:t xml:space="preserve">'+esc(nx.inner)+'</w:t></w:r>';
+        out += '<w:r>'+rpr(font, sz, nx.bold ? '902B32' : color, nx.bold, italic&&!nx.bold, nx.ylw)+'<w:t xml:space="preserve">'+esc(nx.inner)+'</w:t></w:r>';
         rem = rem.slice(nx.idx+nx.len);
       } else {
         out += '<w:r>'+rpr(font,sz,color,false,italic,false)+'<w:t xml:space="preserve">'+esc(rem)+'</w:t></w:r>';
