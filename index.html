@@ -8100,7 +8100,16 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Inside Additional Brand/Leadership — auto-bullet ESPN Classic and MSNBC lines
     if (inAddl) {
-      bodyXml += bul(rl.replace(/^\s*[-*\u2022]\s*/,''));
+      // Company name before dash = bold red; rest = Calibri Light black
+      var addlText = rl.replace(/^\s*[-*\u2022]\s*/,'').replace(/\*\*/g,'');
+      var dashMatch = addlText.match(/^([^\u2013\u2014\-]+)([\u2013\u2014\-].*)$/);
+      if (dashMatch) {
+        bodyXml += P(ppr({num:true, sp:['0','40']}),
+          '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(dashMatch[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(' '+dashMatch[2].trim())+'</w:t></w:r>');
+      } else {
+        bodyXml += bul(rl.replace(/^\s*[-*\u2022]\s*/,''));
+      }
       lastWasCoLine = false;
       return;
     }
