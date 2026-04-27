@@ -8138,10 +8138,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Inside result block — auto-bullet achievement lines
     if (inResults) {
-      // Achievement lines: ALL bold and red (#902B32) per spec
-      var achText = rl.replace(/^\s*[-\u2022]\s*/,'').replace(/\*\*/g,'');
-      bodyXml += P(ppr({num:true, sp:['0','40']}),
-        '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(achText)+'</w:t></w:r>');
+      bodyXml += bul(rl.replace(/^\s*[-\u2022\*]\s*/,''));
       lastWasCoLine = false;
       return;
     }
