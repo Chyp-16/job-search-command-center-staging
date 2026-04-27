@@ -1263,9 +1263,9 @@ a { color: var(--burgundy); text-decoration: none; }
           <thead><tr>
             <th onclick="sortCompanies('name')">Company ↕</th>
             <th onclick="sortCompanies('industry')">Industry ↕</th>
-            <th>Applications</th>
-            <th>Contacts</th>
+            <th>Application Date</th>
             <th>Status</th>
+            <th>Contacts</th>
           </tr></thead>
           <tbody id="companies-tbody"></tbody>
         </table>
@@ -8308,21 +8308,18 @@ var companiesSortField = 'name';
 var companiesSortAsc = true;
 
 function buildCompaniesFromApps() {
-  // Derive company list from allApps — deduplicate by company name
   var map = {};
   allApps.forEach(function(a) {
     if (!a.company) return;
     var key = a.company.trim().toLowerCase();
     if (!map[key]) {
-      map[key] = {
-        name: a.company.trim(),
-        industry: a.industry || '',
-        apps: [],
-        statuses: []
-      };
+      map[key] = { name: a.company.trim(), industry: a.industry || '', apps: [] };
     }
     map[key].apps.push(a);
-    if (a.status) map[key].statuses.push(a.status);
+    // Keep most recent app (latest date_applied)
+    if (!map[key].latestApp || (a.date_applied && a.date_applied > (map[key].latestApp.date_applied || ''))) {
+      map[key].latestApp = a;
+    }
   });
   return Object.values(map).sort(function(a,b){ return a.name.localeCompare(b.name); });
 }
@@ -8362,19 +8359,26 @@ function renderCompaniesTable() {
     return;
   }
   tbody.innerHTML = filteredCompanies.map(function(co) {
-    var appCount = co.apps.length;
-    var contactCount = allContacts.filter(function(c) {
+    // Application Date — from most recent linked application
+    var appDate = '';
+    if (co.latestApp && co.latestApp.date_applied) {
+      appDate = new Date(co.latestApp.date_applied).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+    }
+    // Status — from most recent linked application
+    var status = (co.latestApp && co.latestApp.status) ? co.latestApp.status : '';
+    // Industry — from company record
+    var industry = co.industry || '';
+    // Contacts — names of matched contacts
+    var matchedContacts = allContacts.filter(function(c) {
       return c.company && c.company.toLowerCase() === co.name.toLowerCase();
-    }).length;
-    var statuses = [...new Set(co.statuses)].join(', ') || '—';
-    var appLinks = '<span style="color:var(--text-secondary);font-size:12px">' + appCount + ' application' + (appCount!==1?'s':'') + '</span>';
-    var contactLinks = '<span style="color:var(--text-secondary);font-size:12px">' + contactCount + ' contact' + (contactCount!==1?'s':'') + '</span>';
+    });
+    var contactNames = matchedContacts.map(function(c){ return c.name || ''; }).filter(Boolean).join(', ');
     return '<tr>' +
       '<td><strong>' + co.name + '</strong></td>' +
-      '<td>' + (co.industry || '—') + '</td>' +
-      '<td>' + appLinks + '</td>' +
-      '<td>' + contactLinks + '</td>' +
-      '<td>' + statuses + '</td>' +
+      '<td>' + industry + '</td>' +
+      '<td>' + appDate + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td style="font-size:12px">' + contactNames + '</td>' +
       '</tr>';
   }).join('');
 }
