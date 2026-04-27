@@ -821,6 +821,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="contacts">
         <span class="nav-icon">👥</span><span>Contacts</span>
       </div>
+      <div class="nav-item" data-page="companies">
+        <span class="nav-icon">🏢</span><span>Companies</span>
+      </div>
       <div class="nav-item" data-page="email" onclick="openEmailCompose(event)">
         <span class="nav-icon">✉️</span><span>Email</span>
       </div>
@@ -1243,6 +1246,31 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
     </div>
 
+
+    <!-- ── COMPANIES ─────────────────────────────────────────────────── -->
+    <div class="page" id="page-companies">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Companies</h2>
+          <span id="companies-count" class="badge" style="margin-left:10px"></span>
+        </div>
+        <div class="page-header-right">
+          <input class="search-input" type="text" placeholder="Search companies, industry..." id="company-search" oninput="filterCompanies()">
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="companies-table">
+          <thead><tr>
+            <th onclick="sortCompanies('name')">Company ↕</th>
+            <th onclick="sortCompanies('industry')">Industry ↕</th>
+            <th>Applications</th>
+            <th>Contacts</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody id="companies-tbody"></tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- ── JOB SEARCH ──────────────────────────────────────────────── -->
     <div class="page" id="page-jobsearch">
@@ -3087,6 +3115,7 @@ function navigateTo(page) {
   if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
   if (page === 'aiwriting') { loadRTPage(); loadCLGPage(); loadOBPage(); loadInterviewPrepPage(); }
+  if (page === 'companies') { loadCompaniesPage(); }
   if (page === 'documents') { switchDocsTab('resumes'); loadDocsPage(); }
 }
 
@@ -8272,6 +8301,84 @@ function buildResumeDocx(text, filename, markedUp) {
 }
 
 
+// ── COMPANIES PAGE JS ─────────────────────────────────────────────────────
+var allCompanies = [];
+var filteredCompanies = [];
+var companiesSortField = 'name';
+var companiesSortAsc = true;
+
+function buildCompaniesFromApps() {
+  // Derive company list from allApps — deduplicate by company name
+  var map = {};
+  allApps.forEach(function(a) {
+    if (!a.company) return;
+    var key = a.company.trim().toLowerCase();
+    if (!map[key]) {
+      map[key] = {
+        name: a.company.trim(),
+        industry: a.industry || '',
+        apps: [],
+        statuses: []
+      };
+    }
+    map[key].apps.push(a);
+    if (a.status) map[key].statuses.push(a.status);
+  });
+  return Object.values(map).sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+
+function loadCompaniesPage() {
+  allCompanies = buildCompaniesFromApps();
+  filteredCompanies = allCompanies.slice();
+  renderCompaniesTable();
+}
+
+function filterCompanies() {
+  var q = (document.getElementById('company-search').value || '').toLowerCase();
+  filteredCompanies = allCompanies.filter(function(c) {
+    return !q || (c.name + ' ' + c.industry).toLowerCase().includes(q);
+  });
+  renderCompaniesTable();
+}
+
+function sortCompanies(field) {
+  if (companiesSortField === field) companiesSortAsc = !companiesSortAsc;
+  else { companiesSortField = field; companiesSortAsc = true; }
+  filteredCompanies.sort(function(a,b) {
+    var av = (a[field]||'').toLowerCase();
+    var bv = (b[field]||'').toLowerCase();
+    return companiesSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  renderCompaniesTable();
+}
+
+function renderCompaniesTable() {
+  var tbody = document.getElementById('companies-tbody');
+  var countEl = document.getElementById('companies-count');
+  if (!tbody) return;
+  if (countEl) countEl.textContent = filteredCompanies.length + ' companies';
+  if (!filteredCompanies.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-secondary)">No companies found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filteredCompanies.map(function(co) {
+    var appCount = co.apps.length;
+    var contactCount = allContacts.filter(function(c) {
+      return c.company && c.company.toLowerCase() === co.name.toLowerCase();
+    }).length;
+    var statuses = [...new Set(co.statuses)].join(', ') || '—';
+    var appLinks = '<span style="color:var(--text-secondary);font-size:12px">' + appCount + ' application' + (appCount!==1?'s':'') + '</span>';
+    var contactLinks = '<span style="color:var(--text-secondary);font-size:12px">' + contactCount + ' contact' + (contactCount!==1?'s':'') + '</span>';
+    return '<tr>' +
+      '<td><strong>' + co.name + '</strong></td>' +
+      '<td>' + (co.industry || '—') + '</td>' +
+      '<td>' + appLinks + '</td>' +
+      '<td>' + contactLinks + '</td>' +
+      '<td>' + statuses + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
 let clgOutput = '';
 
@@ -11657,7 +11764,7 @@ populateDropdowns();
 // have data without requiring manual tab navigation first
 (function() {
   loadContacts();
-  loadApps();
+  loadApps().then(function() { loadCompaniesPage(); });
 })();
 // Restore last visited page on refresh
 (function() {
