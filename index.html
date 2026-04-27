@@ -8067,11 +8067,30 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Inside Select Client Wins — all lines bold red #902B32
+    // Inside Select Client Wins — bold red only for the specified opening phrases
     if (inWins) {
       var winsText = rl.replace(/^\s*[-\u2022]\s*/,'').replace(/\*\*/g,'');
-      bodyXml += P(ppr({num:true, sp:['0','40']}),
-        '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
+      // Bold red phrases — only these exact opening portions, rest stays black
+      var boldPhrases = [
+        '6 Emmy Awards and 9 Promax/BDA honors',
+        'Drove 4x revenue growth',
+        '+588% digital audience growth'
+      ];
+      var matched = false;
+      for (var bp = 0; bp < boldPhrases.length; bp++) {
+        if (winsText.indexOf(boldPhrases[bp]) === 0) {
+          var boldPart = boldPhrases[bp];
+          var restPart = winsText.slice(boldPart.length);
+          bodyXml += P(ppr({num:true, sp:['0','40']}),
+            '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(boldPart)+'</w:t></w:r>' +
+            (restPart ? '<w:r>'+rpr(CA,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(restPart)+'</w:t></w:r>' : ''));
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        bodyXml += bul(rl.replace(/^\s*[-\u2022]\s*/,''));
+      }
       lastWasCoLine = false;
       return;
     }
