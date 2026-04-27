@@ -7970,6 +7970,8 @@ function buildResumeDocx(text, filename, markedUp) {
     if (headerPhrases.some(function(hp){ return rawLine.includes(hp); })) return false;
     if (/^[-=_]{2,}$/.test(cl)) return false; // strip ---, ===, ___
     if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
+    // Strip AI preamble/planning sentences that are not resume content
+    if (/^(Looking at|I'?ll |I will |I'?m going to|Here'?s the|Here is the|I'?ve tailored|I'?ve highlighted|Below is|I have tailored|I'?ve updated|Let me |Note:|Please note)/i.test(cl)) return false;
     return true;
   });
 
