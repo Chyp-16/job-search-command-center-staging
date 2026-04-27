@@ -8375,10 +8375,10 @@ function renderCompaniesTable() {
     var contactNames = matchedContacts.map(function(c){ return c.name || ''; }).filter(Boolean).join(', ');
     return '<tr>' +
       '<td><strong>' + co.name + '</strong></td>' +
-      '<td>' + industry + '</td>' +
-      '<td>' + appDate + '</td>' +
-      '<td>' + status + '</td>' +
-      '<td>' + contactNames + '</td>' +
+      '<td>' + (industry || '—') + '</td>' +
+      '<td>' + (appDate || '—') + '</td>' +
+      '<td>' + (status  || '—') + '</td>' +
+      '<td style="max-width:220px;white-space:normal;word-break:break-word">' + (contactNames || '—') + '</td>' +
       '</tr>';
   }).join('');
 }
