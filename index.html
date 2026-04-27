@@ -1255,7 +1255,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <span id="companies-count" class="badge" style="margin-left:10px"></span>
         </div>
         <div class="page-header-right">
-          <input class="search-input" type="text" placeholder="Search companies, industry..." id="company-search" oninput="filterCompanies()">
+          <input class="search-input" type="text" placeholder="Search companies..." id="company-search" oninput="filterCompanies()">
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -8378,7 +8378,7 @@ function renderCompaniesTable() {
       '<td>' + industry + '</td>' +
       '<td>' + appDate + '</td>' +
       '<td>' + status + '</td>' +
-      '<td style="font-size:12px">' + contactNames + '</td>' +
+      '<td>' + contactNames + '</td>' +
       '</tr>';
   }).join('');
 }
