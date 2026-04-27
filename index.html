@@ -8116,7 +8116,10 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Inside result block — auto-bullet achievement lines
     if (inResults) {
-      bodyXml += bul(rl.replace(/^\s*[-\u2022]\s*/,''));
+      // Achievement lines: ALL bold and red (#902B32) per spec
+      var achText = rl.replace(/^\s*[-\u2022]\s*/,'').replace(/\*\*/g,'');
+      bodyXml += P(ppr({num:true, sp:['0','40']}),
+        '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(achText)+'</w:t></w:r>');
       lastWasCoLine = false;
       return;
     }
@@ -8127,8 +8130,9 @@ function buildResumeDocx(text, filename, markedUp) {
 
   // ── ASSEMBLE DOCUMENT XML ──────────────────────────────────────────────
   var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var NSR = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document '+NS+'><w:body>' +
+    '<w:document '+NS+' '+NSR+'><w:body>' +
     hdrXml + bodyXml +
     '<w:sectPr>' +
       '<w:pgSz w:w="11906" w:h="16838"/>' +
