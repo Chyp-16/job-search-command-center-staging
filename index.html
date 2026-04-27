@@ -8039,8 +8039,16 @@ function buildResumeDocx(text, filename, markedUp) {
     // Inside Education section
     if (inEdu) {
       if (isEduDegree(cl)) {
-        bodyXml += P(ppr({sp:['60','30']}),
-          '<w:r>'+rpr(CA,'20',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
+        // Split on first | — degree/major before pipe, school info after pipe = bold black
+        var eduPipe = cl.match(/^([^|]+)(\|.*)$/);
+        if (eduPipe) {
+          bodyXml += P(ppr({sp:['60','30']}),
+            '<w:r>'+rpr(CA,'20',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(eduPipe[1].trim())+'</w:t></w:r>'+
+            '<w:r>'+rpr(CA,'20',BK,true,false,false)+'<w:t xml:space="preserve">'+esc(' | '+eduPipe[2].replace(/^\|\s*/,'').trim())+'</w:t></w:r>');
+        } else {
+          bodyXml += P(ppr({sp:['60','30']}),
+            '<w:r>'+rpr(CA,'20',BG,true,false,false)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
+        }
       } else if (isEduSchool(cl)) {
         bodyXml += P(ppr({sp:['0','60']}),
           '<w:r>'+rpr(CL,'20',BK,false,false,false)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
