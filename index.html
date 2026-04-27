@@ -7853,7 +7853,7 @@ function buildResumeDocx(text, filename, markedUp) {
   // Tagline: Calibri Regular 10pt italic, expanded 1pt character spacing (sz=20, spacing=20 twips)
   function taglinePara(t) {
     return P(ppr({sp:['0','80']}),
-      '<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
+      '<w:r><w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="' + DA + '"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(t.replace(/\*\*/g,''))+'</w:t></w:r>');
   }
 
   // Empty spacer paragraph
@@ -7995,9 +7995,11 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Title block: lines before first section header (job title + tagline)
     if (inTitleBlock && !isSectionHdr(cl) && cl.length > 5) {
-      var looksLikeTitle = /[A-Z,&]/.test(cl) && cl.length > 20 && !/^[a-z]/.test(cl);
-      bodyXml += looksLikeTitle ? titlePara(cl) : taglinePara(cl);
-      return;
+      if (!inTitleBlock._n) inTitleBlock._n = 0;
+      inTitleBlock._n++;
+      if (inTitleBlock._n === 1) { bodyXml += titlePara(cl); return; }
+      if (inTitleBlock._n === 2) { bodyXml += taglinePara(cl); return; }
+      inTitleBlock = false; // third line: exit title block, fall through to normal render
     }
 
     // Section headers
