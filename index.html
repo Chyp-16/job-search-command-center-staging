@@ -8067,11 +8067,11 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Inside Select Client Wins — auto-bullet all non-bullet lines
+    // Inside Select Client Wins — all lines bold red #902B32
     if (inWins) {
-      // rl already has ** markers for bold — pass directly to bul() which calls runs()
-      // Strip only leading bullet marker chars, not ** bold markers
-      bodyXml += bul(rl.replace(/^\s*[-\u2022]\s*/,''));
+      var winsText = rl.replace(/^\s*[-\u2022]\s*/,'').replace(/\*\*/g,'');
+      bodyXml += P(ppr({num:true, sp:['0','40']}),
+        '<w:r>'+rpr(CA,'20','902B32',true,false,false)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
       lastWasCoLine = false;
       return;
     }
