@@ -7954,6 +7954,7 @@ function buildResumeDocx(text, filename, markedUp) {
   var bodyXml = '';
   var inExp = false;
   var inTitleBlock = true;  // true until first section header — renders title + tagline
+  var titleBlockLine = 0;  // counter: 1=titlePara, 2=taglinePara, 3+=exit
   var inEdu = false;
   var inAff = false;
   var inAddl = false; // Additional Brand/Leadership — auto-bullet ESPN/MSNBC lines
@@ -7995,11 +7996,10 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Title block: lines before first section header (job title + tagline)
     if (inTitleBlock && !isSectionHdr(cl) && cl.length > 5) {
-      if (!inTitleBlock._n) inTitleBlock._n = 0;
-      inTitleBlock._n++;
-      if (inTitleBlock._n === 1) { bodyXml += titlePara(cl); return; }
-      if (inTitleBlock._n === 2) { bodyXml += taglinePara(cl); return; }
-      inTitleBlock = false; // third line: exit title block, fall through to normal render
+      titleBlockLine++;
+      if (titleBlockLine === 1) { bodyXml += titlePara(cl); return; }
+      if (titleBlockLine === 2) { bodyXml += taglinePara(cl); return; }
+      inTitleBlock = false; // third line onwards: exit title block, fall through to normal render
     }
 
     // Section headers
