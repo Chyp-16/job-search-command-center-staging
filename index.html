@@ -1168,59 +1168,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <tbody id="companies-tbody"></tbody>
         </table>
       </div>
-      <div id="aw-panel-companyintel" style="display:none">
-        <div style="padding:24px">
-          <h2 style="margin-bottom:4px">Company Intel</h2>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Research any target company. Get networking strategy, talking points, and outreach context.</p>
-          <div class="form-grid" style="max-width:720px">
-            <div class="form-group">
-              <label class="form-label">Target Company *</label>
-              <input class="form-input" type="text" id="ci-company" placeholder="e.g. Salesforce">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Role *</label>
-              <input class="form-input" type="text" id="ci-role" placeholder="e.g. VP of Marketing">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Industry</label>
-              <input class="form-input" type="text" id="ci-industry" placeholder="e.g. SaaS, FinTech, Media">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Company Type</label>
-              <select class="form-select" id="ci-type">
-                <option value="">— Select —</option>
-                <option>SaaS</option><option>Web3</option><option>FinTech</option>
-                <option>Media</option><option>Non-Profit</option><option>Healthcare</option>
-                <option>AI / Tech</option><option>Startup</option><option>Enterprise</option><option>Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Company Size</label>
-              <select class="form-select" id="ci-size">
-                <option value="">— Select —</option>
-                <option>1–10</option><option>11–50</option><option>51–200</option>
-                <option>201–500</option><option>500–1000</option><option>1000+</option>
-              </select>
-            </div>
-            <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
-              <button class="btn btn-secondary" style="flex:1" onclick="runCompanyIntel('logged')">Use Logged Contacts</button>
-              <button class="btn btn-primary" style="flex:1" onclick="runCompanyIntel('web')">Search Web Too</button>
-            </div>
-          </div>
-          <div id="ci-output-panel" style="display:none;margin-top:24px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <span style="font-weight:600;font-size:15px">✦ Company Intel</span>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('ci-output').textContent).then(function(){toast('Copied','success')})">Copy</button>
-                <button id="ci-stop-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="stopCompanyIntel()">⏹ Stop</button>
-              </div>
-            </div>
-            <div id="ci-output" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-height:600px;overflow-y:auto"></div>
-          </div>
-        </div>
-      </div>
 
-    </div>
 
     <!-- ── JOB SEARCH ──────────────────────────────────────────────── -->
     <div class="page" id="page-jobsearch">
@@ -1892,6 +1840,58 @@ a { color: var(--burgundy); text-decoration: none; }
           </div>
           <div style="padding:20px;">
             <div id="ip-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="aw-panel-companyintel" style="display:none">
+        <div style="padding:24px">
+          <h2 style="margin-bottom:4px">Company Intel</h2>
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Research any target company. Get networking strategy, talking points, and outreach context.</p>
+          <div class="form-grid" style="max-width:720px">
+            <div class="form-group">
+              <label class="form-label">Target Company *</label>
+              <input class="form-input" type="text" id="ci-company" placeholder="e.g. Salesforce">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Role *</label>
+              <input class="form-input" type="text" id="ci-role" placeholder="e.g. VP of Marketing">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Industry</label>
+              <input class="form-input" type="text" id="ci-industry" placeholder="e.g. SaaS, FinTech, Media">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Company Type</label>
+              <select class="form-select" id="ci-type">
+                <option value="">— Select —</option>
+                <option>SaaS</option><option>Web3</option><option>FinTech</option>
+                <option>Media</option><option>Non-Profit</option><option>Healthcare</option>
+                <option>AI / Tech</option><option>Startup</option><option>Enterprise</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Company Size</label>
+              <select class="form-select" id="ci-size">
+                <option value="">— Select —</option>
+                <option>1–10</option><option>11–50</option><option>51–200</option>
+                <option>201–500</option><option>500–1000</option><option>1000+</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
+              <button class="btn btn-secondary" style="flex:1" onclick="runCompanyIntel('logged')">Use Logged Contacts</button>
+              <button class="btn btn-primary" style="flex:1" onclick="runCompanyIntel('web')">Search Web Too</button>
+            </div>
+          </div>
+          <div id="ci-output-panel" style="display:none;margin-top:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <span style="font-weight:600;font-size:15px">✦ Company Intel</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('ci-output').textContent).then(function(){toast('Copied','success')})">Copy</button>
+                <button id="ci-stop-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="stopCompanyIntel()">⏹ Stop</button>
+              </div>
+            </div>
+            <div id="ci-output" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-height:600px;overflow-y:auto"></div>
           </div>
         </div>
       </div>
