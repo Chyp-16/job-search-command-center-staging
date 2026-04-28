@@ -954,7 +954,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
       </div>
       <!-- Filter tabs -->
-      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
+      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none">
         <button id="tf-all"      onclick="filterTasks('all')"      style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">All</button>
         <button id="tf-overdue"  onclick="filterTasks('overdue')"  style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Overdue</button>
         <button id="tf-today"    onclick="filterTasks('today')"    style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">Due Today</button>
@@ -1297,9 +1297,9 @@ a { color: var(--burgundy); text-decoration: none; }
 
       <!-- Tab switcher -->
       <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
-        <button id="lib-tab-style"     onclick="switchLibTab('style')"     style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">✍️ Writing Style</button>
-        <button id="lib-tab-prompts"   onclick="switchLibTab('prompts')"   style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">💬 Prompts</button>
-        <button id="lib-tab-templates" onclick="switchLibTab('templates')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📧 Email Templates</button>
+        <button id="lib-tab-style"     onclick="switchLibTab('style')"     style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">✍️ Writing Style</button>
+        <button id="lib-tab-prompts"   onclick="switchLibTab('prompts')"   style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">💬 Prompts</button>
+        <button id="lib-tab-templates" onclick="switchLibTab('templates')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📧 Email Templates</button>
       </div>
 
       <!-- Tab: Writing Style -->
@@ -1442,11 +1442,11 @@ a { color: var(--burgundy); text-decoration: none; }
 
       <!-- Tab switcher -->
       <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
-        <button id="aw-tab-resumetailor" onclick="switchAIWritingTab('resumetailor')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">📝 Resume Tailor</button>
-        <button id="aw-tab-coverlettergenerator" onclick="switchAIWritingTab('coverlettergenerator')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">✉️ Cover Letter AI</button>
-        <button id="aw-tab-outreachbuilder" onclick="switchAIWritingTab('outreachbuilder')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📨 Outreach Builder</button>
-        <button id="aw-tab-interviewprep" onclick="switchAIWritingTab('interviewprep')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🎯 Interview Prep</button>
-        <button id="aw-tab-companyintel" onclick="switchAIWritingTab('companyintel')" style="padding:10px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🏢 Company Intel</button>
+        <button id="aw-tab-resumetailor" onclick="switchAIWritingTab('resumetailor')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">📝 Resume Tailor</button>
+        <button id="aw-tab-coverlettergenerator" onclick="switchAIWritingTab('coverlettergenerator')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">✉️ Cover Letter AI</button>
+        <button id="aw-tab-outreachbuilder" onclick="switchAIWritingTab('outreachbuilder')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📨 Outreach Builder</button>
+        <button id="aw-tab-interviewprep" onclick="switchAIWritingTab('interviewprep')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🎯 Interview Prep</button>
+        <button id="aw-tab-companyintel" onclick="switchAIWritingTab('companyintel')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🏢 Company Intel</button>
       </div>
 
       <!-- Tab: Resume Tailor -->
