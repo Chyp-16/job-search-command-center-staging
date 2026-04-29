@@ -1296,7 +1296,7 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
 
       <!-- Tab switcher -->
-      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0;overflow-x:auto;scrollbar-width:none">
+      <div style="display:flex;gap:0;padding:0 32px;border-bottom:2px solid var(--border);margin-bottom:0">
         <button id="lib-tab-style"     onclick="switchLibTab('style')"     style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--burgundy);border-bottom:2px solid var(--burgundy);margin-bottom:-2px;font-family:var(--font-body)">✍️ Writing Style</button>
         <button id="lib-tab-prompts"   onclick="switchLibTab('prompts')"   style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">💬 Prompts</button>
         <button id="lib-tab-templates" onclick="switchLibTab('templates')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📧 Email Templates</button>
@@ -1446,7 +1446,6 @@ a { color: var(--burgundy); text-decoration: none; }
         <button id="aw-tab-coverlettergenerator" onclick="switchAIWritingTab('coverlettergenerator')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">✉️ Cover Letter AI</button>
         <button id="aw-tab-outreachbuilder" onclick="switchAIWritingTab('outreachbuilder')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">📨 Outreach Builder</button>
         <button id="aw-tab-interviewprep" onclick="switchAIWritingTab('interviewprep')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🎯 Interview Prep</button>
-        <button id="aw-tab-companyintel" onclick="switchAIWritingTab('companyintel')" style="padding:10px 14px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--font-body)">🏢 Company Intel</button>
       </div>
 
       <!-- Tab: Resume Tailor -->
@@ -1843,62 +1842,9 @@ a { color: var(--burgundy); text-decoration: none; }
           </div>
         </div>
       </div>
-
-      <div id="aw-panel-companyintel" style="display:none">
-        <div style="padding:24px">
-          <h2 style="margin-bottom:4px">Company Intel</h2>
-          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">Research any target company. Get networking strategy, talking points, and outreach context.</p>
-          <div class="form-grid" style="max-width:720px">
-            <div class="form-group">
-              <label class="form-label">Target Company *</label>
-              <input class="form-input" type="text" id="ci-company" placeholder="e.g. Salesforce">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Role *</label>
-              <input class="form-input" type="text" id="ci-role" placeholder="e.g. VP of Marketing">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Industry</label>
-              <input class="form-input" type="text" id="ci-industry" placeholder="e.g. SaaS, FinTech, Media">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Company Type</label>
-              <select class="form-select" id="ci-type">
-                <option value="">— Select —</option>
-                <option>SaaS</option><option>Web3</option><option>FinTech</option>
-                <option>Media</option><option>Non-Profit</option><option>Healthcare</option>
-                <option>AI / Tech</option><option>Startup</option><option>Enterprise</option><option>Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Company Size</label>
-              <select class="form-select" id="ci-size">
-                <option value="">— Select —</option>
-                <option>1–10</option><option>11–50</option><option>51–200</option>
-                <option>201–500</option><option>500–1000</option><option>1000+</option>
-              </select>
-            </div>
-            <div class="form-group" style="display:flex;align-items:flex-end;gap:8px">
-              <button class="btn btn-secondary" style="flex:1" onclick="runCompanyIntel('logged')">Use Logged Contacts</button>
-              <button class="btn btn-primary" style="flex:1" onclick="runCompanyIntel('web')">Search Web Too</button>
-            </div>
-          </div>
-          <div id="ci-output-panel" style="display:none;margin-top:24px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <span style="font-weight:600;font-size:15px">✦ Company Intel</span>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('ci-output').textContent).then(function(){toast('Copied','success')})">Copy</button>
-                <button id="ci-stop-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="stopCompanyIntel()">⏹ Stop</button>
-              </div>
-            </div>
-            <div id="ci-output" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-height:600px;overflow-y:auto"></div>
-          </div>
-        </div>
-      </div>
     </div>
 
     </div>
-
 
     <!-- ── UPLOADED DOCUMENTS PAGE ───────────────────────────────── -->
 
@@ -3065,7 +3011,7 @@ function navigateTo(page) {
 
   if (page === 'ai') { if (!allResources.length) loadResources().then(populateAIResourcePicker); else populateAIResourcePicker(); }
   if (page === 'jobsearch') loadJobSearchPage();
-  if (page === 'aiwriting') { loadRTPage(); loadCLGPage(); loadOBPage(); loadInterviewPrepPage(); loadCIPage(); }
+  if (page === 'aiwriting') { loadRTPage(); loadCLGPage(); loadOBPage(); loadInterviewPrepPage(); }
   if (page === 'companies') { loadCompaniesPage(); }
   if (page === 'documents') { switchDocsTab('resumes'); loadDocsPage(); }
 }
@@ -7540,7 +7486,7 @@ var _aiWritingTab = 'resumetailor';
 
 function switchAIWritingTab(tab) {
   _aiWritingTab = tab;
-  var tabs = ['resumetailor', 'coverlettergenerator', 'outreachbuilder', 'interviewprep', 'companyintel'];
+  var tabs = ['resumetailor', 'coverlettergenerator', 'outreachbuilder', 'interviewprep'];
   tabs.forEach(function(t) {
     var btn   = document.getElementById('aw-tab-' + t);
     var panel = document.getElementById('aw-panel-' + t);
@@ -7556,7 +7502,6 @@ function switchAIWritingTab(tab) {
   if (tab === 'coverlettergenerator') loadCLGPage();
   if (tab === 'outreachbuilder')     loadOBPage();
   if (tab === 'interviewprep')       loadInterviewPrepPage();
-  if (tab === 'companyintel')         loadCIPage();
 }
 
 function loadRTPage() {
@@ -8252,86 +8197,6 @@ function buildResumeDocx(text, filename, markedUp) {
     .catch(function(e) { toast('Export failed: '+e.message,'error'); });
 }
 
-
-// ── COMPANY INTEL PAGE JS ──────────────────────────────────────────────────
-var _ciAbort = null;
-
-function loadCIPage() {
-  // Pre-fill company dropdown if allApps already loaded
-  // Nothing to pre-populate — fields are free text
-}
-
-function stopCompanyIntel() {
-  if (_ciAbort) _ciAbort.abort();
-  document.getElementById('ci-stop-btn').style.display = 'none';
-  toast('Stopped.', '');
-}
-
-async function runCompanyIntel(mode) {
-  var company  = (document.getElementById('ci-company').value || '').trim();
-  var role     = (document.getElementById('ci-role').value || '').trim();
-  var industry = (document.getElementById('ci-industry').value || '').trim();
-  var type     = (document.getElementById('ci-type').value || '').trim();
-  var size     = (document.getElementById('ci-size').value || '').trim();
-
-  if (!company || !role) { toast('Company and Role are required.', 'error'); return; }
-
-  var panel = document.getElementById('ci-output-panel');
-  var out   = document.getElementById('ci-output');
-  var stop  = document.getElementById('ci-stop-btn');
-  panel.style.display = 'block';
-  out.textContent = 'Researching ' + company + '...';
-  stop.style.display = 'inline-flex';
-
-  // Build prompt
-  var loggedContacts = '';
-  if (mode === 'logged') {
-    var matched = allContacts.filter(function(c) {
-      return c.company && c.company.toLowerCase() === company.toLowerCase();
-    });
-    if (matched.length) {
-      loggedContacts = '\n\nLogged contacts at this company:\n' +
-        matched.map(function(c){ return '- ' + (c.name||'') + (c.title?' ('+c.title+')':''); }).join('\n');
-    }
-  }
-
-  var prompt = 'Research ' + company + ' for Jay Wadhwa, who is targeting the ' + role + ' role.' +
-    (industry ? ' Industry: ' + industry + '.' : '') +
-    (type ? ' Company type: ' + type + '.' : '') +
-    (size ? ' Size: ' + size + '.' : '') +
-    loggedContacts +
-    '\n\nProvide:\n' +
-    '1. Company overview (2-3 sentences — what they do, their market position, recent news)\n' +
-    '2. Why this role matters to them right now\n' +
-    '3. Top 3 talking points Jay should use in outreach\n' +
-    '4. Suggested InMail subject line\n' +
-    '5. One-sentence email opener specific to this company\n' +
-    (mode === 'web' ? '6. Any recent news, funding, or leadership changes worth referencing\n' : '') +
-    '\nBe specific. No generic advice. Write for a senior CMO-level candidate.';
-
-  _ciAbort = new AbortController();
-  try {
-    var resp = await fetch(WORKER_URL + '/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: _ciAbort.signal,
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        system: JAY_SYSTEM_PROMPT + (mode === 'web' ? '\n\nUse web search to find current information about the company.' : ''),
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    var data = await resp.json();
-    var text = (data.content || []).map(function(b){ return b.text || ''; }).join('');
-    out.textContent = text || 'No response received.';
-  } catch(e) {
-    if (e.name !== 'AbortError') out.textContent = 'Error: ' + e.message;
-  } finally {
-    stop.style.display = 'none';
-    _ciAbort = null;
-  }
-}
 
 // ── COMPANIES PAGE JS ─────────────────────────────────────────────────────
 var allCompanies = [];
