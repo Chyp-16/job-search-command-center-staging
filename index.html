@@ -1627,7 +1627,8 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card-header">✦ Tailored Resume Analysis
             <div style="display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(false)">⬇ Final Resume</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(true)">⬇ Marked Up</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -6872,7 +6873,7 @@ async function runResumeTailor() {
                  .replace(/\{\{job_description\}\}/g, jd);
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
     contentEl.textContent = result;
     const linkedId = document.getElementById('rt-link-app').value || null;
@@ -6940,6 +6941,29 @@ function buildResumeDocx(text, filename, markedUp) {
   function run(rprXml, txt) {
     if (!txt) return '';
     return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(txt)+'</w:t></w:r>';
+  }
+
+  // Parse text with [YLW]...[/YLW] markers → yellow highlight runs (markedUp only)
+  function runsWithHighlight(rprBase, txt, bold) {
+    if (!txt) return '';
+    if (!markedUp || txt.indexOf('[YLW]') === -1) {
+      var rp = rprBase.replace('</w:rPr>', (bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
+      return '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(txt.replace(/\[YLW\]|\[\/YLW\]/g,''))+'</w:t></w:r>';
+    }
+    var out = '';
+    var parts = txt.split(/\[YLW\](.*?)\[\/YLW\]/g);
+    parts.forEach(function(part, i) {
+      if (!part) return;
+      if (i % 2 === 1) {
+        // Highlighted segment: add yellow highlight
+        var hlRpr = rprBase.replace('</w:rPr>', '<w:highlight w:val="yellow"/>'+(bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
+        out += '<w:r>'+hlRpr+'<w:t xml:space="preserve">'+esc(part)+'</w:t></w:r>';
+      } else {
+        var rp = rprBase.replace('</w:rPr>', (bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
+        out += '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(part)+'</w:t></w:r>';
+      }
+    });
+    return out;
   }
 
   // ── Header: Century Gothic 22pt burgundy name + tab + Calibri Light 9pt contact ──
@@ -7293,13 +7317,14 @@ function buildResumeDocx(text, filename, markedUp) {
     .catch(function(e) { toast('Export failed: '+e.message,'error'); });
 }
 
-function exportRTDocx() {
+function exportRTDocx(markedUp) {
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
   var co = cleanForFilename(app ? app.company : '') || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
-  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
-  buildResumeDocx(rtOutput, fname, false);
+  var suffix = markedUp ? '_MarkedUp' : '_Resume';
+  var fname = 'JayWadhwa_' + ro + '_' + co + suffix;
+  buildResumeDocx(rtOutput, fname, !!markedUp);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
