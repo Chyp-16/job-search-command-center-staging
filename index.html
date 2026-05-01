@@ -5124,7 +5124,7 @@ const SEED_PROMPTS = [
   {
     "name": "Resume Tailoring",
     "category": "Resume",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Mark every changed word or phrase with [YLW] before and [/YLW] after. Example: [YLW]changed text[/YLW]. Do not use <mark> tags. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "keywords_required",
       "keywords_nice",
@@ -6909,6 +6909,29 @@ function buildResumeDocx(text, filename, markedUp) {
   var DA = '0D0D0D';   // near-black: title block
 
   function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // Strip change markers from text for plain rendering (Final export uses this)
+  function stripMarkers(s) {
+    return (s||'').replace(/<mark>/gi,'').replace(/<\/mark>/gi,'').replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,'');
+  }
+  // For Markup export: convert markers to highlighted OOXML inline
+  function markupRuns(rprXml, txt) {
+    if (!txt) return '';
+    var normalized = txt.replace(/<mark>/gi,'[YLW]').replace(/<\/mark>/gi,'[/YLW]');
+    if (!markedUp || normalized.indexOf('[YLW]') === -1) {
+      return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(stripMarkers(txt))+'</w:t></w:r>';
+    }
+    var out = '';
+    normalized.split(/\[YLW\](.*?)\[\/YLW\]/g).forEach(function(p,i){
+      if(!p) return;
+      if(i%2===1){
+        var hlRpr = rprXml.replace('</w:rPr>','<w:highlight w:val="yellow"/></w:rPr>');
+        out+='<w:r>'+hlRpr+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
+      } else {
+        out+='<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
+      }
+    });
+    return out;
+  }
 
   // Run properties
   function rpr(font, sz, color, bold, ital) {
@@ -6940,22 +6963,27 @@ function buildResumeDocx(text, filename, markedUp) {
 
   function run(rprXml, txt) {
     if (!txt) return '';
-    return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(txt)+'</w:t></w:r>';
+    return markupRuns(rprXml, txt);
   }
 
-  // Parse text with [YLW]...[/YLW] markers → yellow highlight runs (markedUp only)
+  // Parse [YLW]...[/YLW] or <mark>...</mark> → yellow highlights (markedUp) or strip (Final)
   function runsWithHighlight(rprBase, txt, bold) {
     if (!txt) return '';
-    if (!markedUp || txt.indexOf('[YLW]') === -1) {
+    // Normalize <mark>...</mark> to [YLW]...[/YLW]
+    var normalized = txt.replace(/<mark>/gi,'[YLW]').replace(/<\/mark>/gi,'[/YLW]');
+    var hasMarkers = normalized.indexOf('[YLW]') !== -1;
+    if (!markedUp || !hasMarkers) {
+      // Final export: strip all markers
+      var clean = normalized.replace(/\[YLW\]|\[\/YLW\]/g,'');
       var rp = rprBase.replace('</w:rPr>', (bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
-      return '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(txt.replace(/\[YLW\]|\[\/YLW\]/g,''))+'</w:t></w:r>';
+      return '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(clean)+'</w:t></w:r>';
     }
+    // Markup export: render highlights
     var out = '';
-    var parts = txt.split(/\[YLW\](.*?)\[\/YLW\]/g);
+    var parts = normalized.split(/\[YLW\](.*?)\[\/YLW\]/g);
     parts.forEach(function(part, i) {
       if (!part) return;
       if (i % 2 === 1) {
-        // Highlighted segment: add yellow highlight
         var hlRpr = rprBase.replace('</w:rPr>', '<w:highlight w:val="yellow"/>'+(bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
         out += '<w:r>'+hlRpr+'<w:t xml:space="preserve">'+esc(part)+'</w:t></w:r>';
       } else {
@@ -6995,6 +7023,8 @@ function buildResumeDocx(text, filename, markedUp) {
     if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
     if (headerPhrases.some(function(p){ return cl === p || cl.startsWith(p+'\t') || cl.endsWith(p); })) return false;
     if (/^Looking at|^I\'ll |^I will |^Here\'s the|^Here is the|^I\'ve tailored|^Below is|^Let me |^Note:/i.test(cl)) return false;
+    // Strip <mark> from classification — handled during rendering
+
     return true;
   });
 
