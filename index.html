@@ -7697,11 +7697,73 @@ function renderDocsTable() {
         (hasPath
           ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
           : '<span style="font-size:11px;color:var(--text-light)">No file</span>') +
+        (d.doc_type === 'Resume' ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="setDocAsBaseResume(this.dataset.docid, this.dataset.path)" title="Set as Base Resume for Resume Tailor">★ Set Base</button> ' : '') +
         ' <button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
+}
+
+async function setDocAsBaseResume(id, storagePath) {
+  // Download the file, extract text, save as base resume
+  try {
+    toast('Loading resume text...', '');
+    // Try to get text from notes field first, then download file
+    const doc = allDocs.find(function(d){ return d.id === id; });
+    if (doc && doc.notes) {
+      baseResumeText = doc.notes;
+      document.getElementById('base-resume-text').value = baseResumeText;
+      // Show base doc modal with text pre-filled so user can confirm/save
+      openBaseDocModal();
+      toast('Resume loaded. Review and click Save.', 'success');
+      return;
+    }
+    if (!storagePath) {
+      // No file — open base doc modal for manual paste
+      openBaseDocModal();
+      return;
+    }
+    // Download and extract text from file
+    const r = await fetch(WORKER_URL + '/storage/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
+    });
+    const data = await r.json();
+    if (!data.url) throw new Error('Could not get file URL');
+    const fileResp = await fetch(data.url);
+    const blob = await fileResp.blob();
+    const ext = (storagePath || '').split('.').pop().toLowerCase();
+    var text = '';
+    if (ext === 'txt') {
+      text = await blob.text();
+    } else if (ext === 'docx') {
+      const ab = await blob.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: ab });
+      text = result.value || '';
+    } else if (ext === 'pdf') {
+      const ab = await blob.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+      for (var i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        text += tc.items.map(function(s){ return s.str; }).join(' ') + '\n';
+      }
+    }
+    if (text.trim()) {
+      baseResumeText = text.trim();
+      document.getElementById('base-resume-text').value = baseResumeText;
+      openBaseDocModal();
+      toast('Resume loaded. Review and click Save.', 'success');
+    } else {
+      openBaseDocModal();
+      toast('Could not extract text. Paste manually.', 'error');
+    }
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+    openBaseDocModal();
+  }
 }
 
 async function downloadDoc(id, storagePath) {
