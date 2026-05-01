@@ -8680,7 +8680,7 @@ async function runInlineCompanyIntel(company, role, industry, btnEl) {
     '5. Any recent news or leadership changes worth referencing\n' +
     '\nBe specific. Peer-to-peer CMO voice. No generic advice. Under 250 words.';
 
-  var jsSystemPrompt = "You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level). Peer-to-peer, results-first voice.";
+  var jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
 
   try {
     var r = await fetch(WORKER_URL + '/ai', {
@@ -8729,75 +8729,39 @@ async function runJobSearch() {
   const fmt = function(n) { return '$' + n.toLocaleString(); };
 
   const workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
-  const prompt = 'Find 4-5 real current marketing leadership job postings matching:' +
+  const prompt = 'Find 6-8 real current marketing leadership job postings matching:' +
     ' Roles: ' + roles.split(',').slice(0,4).join(',') + '.' +
     ' Location: ' + location + ' (' + workTypes + ').' +
     ' Industries: ' + selectedIndustries.slice(0,6).join(', ') + '.' +
     ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
     ' Base salary min: ' + fmt(salaryFloor) + '.' +
     (notes ? ' Notes: ' + notes + '.' : '') +
-    '\n\nReturn ONLY a valid JSON array — no preamble, no markdown, no explanation. ' +
-    'Each item must have exactly these keys: title, company, url, salary, hiring_manager, hm_linkedin, recruiter_email, fit_reason, red_flags, industry. ' +
-    'Use empty string "" for any field you cannot confirm. Include partial results — do not refuse because some fields are missing. ' +
-    'Real postings preferred but include strong matches even if URL is not confirmed. Never return prose — only the JSON array.';
+    '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
+    '\n\nOnly real postings from last 60 days. No fabricated URLs.';
 
   // Use a lean system prompt for job search — full resume causes token rate limit errors
   const jsSystemPrompt = "Job search assistant for Jay Wadhwa, VP/CMO-level marketing executive. Chicago area. Search web for real current job postings. Return only valid JSON array, no prose.";
 
   try {
     // Send use_web_search flag so Worker enables the web search tool
-    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true, max_tokens: 1024 };
+    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
     const r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
       body: JSON.stringify(jsBody)
     });
     const data = await r.json();
-    const rawText = (data.content && data.content[0]) ? data.content[0].text : null;
-    if (!rawText) throw new Error(data.error?.message || 'No response');
-    jsOutput = rawText;
-
-    // Parse JSON results and render as cards with inline Company Intel buttons
-    var jobs = [];
-    try {
-      var clean = rawText.replace(/```json|```/g, '').trim();
-      jobs = JSON.parse(clean);
-    } catch(e) {
-      // Fallback: render as plain text if JSON parsing fails
-      contentEl.style.whiteSpace = 'pre-wrap';
-      contentEl.innerHTML = rawText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      toast('Search complete.', 'success');
-      return;
-    }
-
+    const result = (data.content && data.content[0]) ? data.content[0].text : null;
+    if (!result) throw new Error(data.error?.message || 'No response');
+    jsOutput = result;
+    // Render markdown bold (**text**) as actual bold HTML
+    var rendered = result
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    contentEl.innerHTML = rendered;
     contentEl.style.whiteSpace = 'normal';
-    contentEl.innerHTML = jobs.map(function(job, idx) {
-      var panelId = 'ci-inline-' + (job.company||'co'+idx).replace(/[^a-zA-Z0-9]/g,'_');
-      var safeCompany = (job.company||'').replace(/'/g,"\\'");
-      var safeRole = (job.title||'').replace(/'/g,"\\'");
-      var safeIndustry = (job.industry||'').replace(/'/g,"\\'");
-      return '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;background:var(--bg-card)">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">' +
-          '<div>' +
-            '<div style="font-weight:700;font-size:14px;color:var(--burgundy)">' + (job.title||'Unknown Role') + '</div>' +
-            '<div style="font-size:13px;color:var(--text);margin-top:2px">' + (job.company||'') + (job.industry ? ' &middot; ' + job.industry : '') + '</div>' +
-          '</div>' +
-          '<div style="display:flex;gap:8px;align-items:center">' +
-            (job.url ? '<a href="' + job.url + '" target="_blank" class="btn btn-secondary btn-sm">View Posting ↗</a>' : '') +
-            '<button class="btn btn-primary btn-sm" onclick="runInlineCompanyIntel(\'' + safeCompany + '\',\'' + safeRole + '\',\'' + safeIndustry + '\',this)">▶ Company Intel</button>' +
-          '</div>' +
-        '</div>' +
-        '<div style="margin-top:10px;font-size:13px;display:flex;flex-wrap:wrap;gap:16px;color:var(--text-secondary)">' +
-          (job.salary ? '<span>💰 ' + job.salary + '</span>' : '') +
-          (job.hiring_manager ? '<span>👤 ' + job.hiring_manager + (job.hm_linkedin ? ' <a href="' + job.hm_linkedin + '" target="_blank" style="color:var(--burgundy)">LinkedIn</a>' : '') + '</span>' : '') +
-          (job.recruiter_email ? '<span>📧 ' + job.recruiter_email + '</span>' : '') +
-        '</div>' +
-        (job.fit_reason ? '<div style="margin-top:8px;font-size:13px;color:var(--text)">' + job.fit_reason + '</div>' : '') +
-        (job.red_flags ? '<div style="margin-top:6px;font-size:12px;color:#c0392b">⚠ ' + job.red_flags + '</div>' : '') +
-        '<div id="' + panelId + '" style="display:none;margin-top:10px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)"></div>' +
-      '</div>';
-    }).join('');
-    toast('Search complete. ' + jobs.length + ' roles found.', 'success');
+    toast('Search complete.', 'success');
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
     toast('Search failed: ' + e.message, 'error');
