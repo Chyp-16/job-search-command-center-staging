@@ -8736,9 +8736,10 @@ async function runJobSearch() {
     ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
     ' Base salary min: ' + fmt(salaryFloor) + '.' +
     (notes ? ' Notes: ' + notes + '.' : '') +
-    '\n\nReturn ONLY a JSON array. No preamble. No markdown. Each item must have exactly these keys: ' +
-    'title, company, url, salary, hiring_manager, hm_linkedin, recruiter_email, fit_reason, red_flags, industry.' +
-    '\n\nOnly real postings from last 60 days. No fabricated URLs. Empty string for unknown fields.';
+    '\n\nReturn ONLY a valid JSON array — no preamble, no markdown, no explanation. ' +
+    'Each item must have exactly these keys: title, company, url, salary, hiring_manager, hm_linkedin, recruiter_email, fit_reason, red_flags, industry. ' +
+    'Use empty string "" for any field you cannot confirm. Include partial results — do not refuse because some fields are missing. ' +
+    'Real postings preferred but include strong matches even if URL is not confirmed. Never return prose — only the JSON array.';
 
   // Use a lean system prompt for job search — full resume causes token rate limit errors
   const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
