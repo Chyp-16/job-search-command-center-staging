@@ -6895,16 +6895,411 @@ function clearRT() {
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
+
+// ── RESUME DOCX BUILDER — matches Master.docx formatting exactly ──────────
+function buildResumeDocx(text, filename, markedUp) {
+  // ── Constants matching Master.docx measurements ──────────────────────────
+  var BG = '9E3A3E';   // burgundy: name, section hdrs, job titles
+  var BG2 = '972B32';  // burgundy2: sub job titles, result hdrs
+  var BK = '000000';   // black
+  var GH = 'Century Gothic';
+  var CA = 'Calibri';
+  var CL = 'Calibri Light';
+  var DA = '0D0D0D';   // near-black: title block
+
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Run properties
+  function rpr(font, sz, color, bold, ital) {
+    var s = '<w:rPr>';
+    s += '<w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>';
+    if (bold === true)  s += '<w:b/><w:bCs/>';
+    if (bold === false) s += '<w:b w:val="0"/><w:bCs w:val="0"/>';
+    if (ital === true)  s += '<w:i/><w:iCs/>';
+    if (ital === false) s += '<w:i w:val="0"/><w:iCs w:val="0"/>';
+    if (color) s += '<w:color w:val="'+color+'"/>';
+    if (sz)    s += '<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/>';
+    s += '</w:rPr>';
+    return s;
+  }
+
+  function P(pPrXml, runsXml) { return '<w:p>'+pPrXml+runsXml+'</w:p>'; }
+
+  function ppr(opts) {
+    var s = '<w:pPr>';
+    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="'+(opts.tabPos||'9360')+'"/></w:tabs>';
+    if (opts.hbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr>';
+    if (opts.num)    s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    if (opts.sp)     s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"'+(opts.line?' w:line="'+opts.line+'" w:lineRule="auto"':'')+'/>';
+    if (opts.ind)    s += '<w:ind w:left="'+opts.ind+'" w:hanging="360"/>';
+    if (opts.jc)     s += '<w:jc w:val="'+opts.jc+'"/>';
+    s += '</w:pPr>';
+    return s;
+  }
+
+  function run(rprXml, txt) {
+    if (!txt) return '';
+    return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(txt)+'</w:t></w:r>';
+  }
+
+  // ── Header: Century Gothic 22pt burgundy name + tab + Calibri Light 9pt contact ──
+  // Tab right stop at 9360 twips (0.5" margins on 8.5" page: 12240 - 720 - 720 = 10800 — but Master uses narrower)
+  // Master page is 7560310 EMU wide = 9.75" but margins 457200 each = 0.5" → text width = 8.75" = 12600 twips
+  // Right tab: 12600 - 720 = ~11880... Actually measured from Master: use right-aligned tab
+  var HDR_NAME_RPR  = rpr(GH, '44', BG, null, null);
+  var HDR_CONT_RPR  = rpr(CL, '18', null, null, null);
+
+  var hdrXml =
+    P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>',
+      '<w:r>'+HDR_NAME_RPR+'<w:t>Jay Wadhwa</w:t></w:r>'+
+      '<w:r>'+HDR_NAME_RPR+'<w:tab/></w:r>'+
+      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">847-910-9377 | jvwadhwa@gmail.com</w:t></w:r>')+
+    P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr>',
+      '<w:r>'+HDR_CONT_RPR+'<w:tab/></w:r>'+
+      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">Greater Chicago Area | linkedin.com/in/jwadhwa</w:t></w:r>')+
+    P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="80"/></w:pPr>','');
+
+  // ── Parse AI output into body paragraphs ─────────────────────────────────
+  var lines = (text||'').split('\n');
+  var bodyXml = '';
+
+  // Filter header lines that belong to Jay's contact info (already in hdrXml)
+  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area','Jay Wadhwa'];
+  var filteredLines = lines.filter(function(line) {
+    var cl = line.trim();
+    if (!cl) return true;
+    if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
+    if (headerPhrases.some(function(p){ return cl === p || cl.startsWith(p+'\t') || cl.endsWith(p); })) return false;
+    if (/^Looking at|^I\'ll |^I will |^Here\'s the|^Here is the|^I\'ve tailored|^Below is|^Let me |^Note:/i.test(cl)) return false;
+    return true;
+  });
+
+  // Section header keywords
+  function isSectionHdr(t) {
+    var SECTION_KW = ['EXPERIENCE','EXPERTISE','RECOGNITION','AFFILIATION','SUMMARY','CLIENT WIN',
+      'EDUCATION','AWARD','ADDITIONAL','OTHER CLIENT','PROFESSIONAL'];
+    return SECTION_KW.some(function(k){ return t.toUpperCase().indexOf(k) !== -1; }) &&
+      t === t.toUpperCase() && t.length < 100 && !/^[-*•]/.test(t);
+  }
+
+  function isJobTitle(t) {
+    // ALL-CAPS lines that are job titles (contain |)
+    return /\|/.test(t) && (t.toUpperCase() === t || /[A-Z]{3,}/.test(t)) && t.length < 120;
+  }
+
+  function isCoLine(t) {
+    // Company + location + date lines (contain | and date range)
+    return /\|.*\d{4}/.test(t) && t.length < 100;
+  }
+
+  function isResultHdr(t) {
+    return /Results|Leadership|Wins|Transformations|Achievements|Performance|Awards?/i.test(t) &&
+      !/^[-•*]/.test(t) && t.length < 80 && !isSectionHdr(t) && !isJobTitle(t);
+  }
+
+  function isBullet(t) {
+    return /^[-•*▸]/.test(t) || /^\d+\./.test(t);
+  }
+
+  // Bold red phrases in Select Client Wins
+  var BOLD_PHRASES = [
+    '6 Emmy Awards and 9 Promax/BDA honors',
+    'Drove 4x revenue growth',
+    '+96% revenue growth',
+    '+588% digital audience growth'
+  ];
+
+  var inExp = false, inEdu = false, inAff = false, inAddl = false;
+  var inWins = false, inResults = false, inRec = false;
+  var titleBlockLine = 0;
+  var inTitleBlock = true;
+
+  filteredLines.forEach(function(line) {
+    var rl = line;
+    var cl = line.trim();
+    if (!cl) {
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="40"/></w:pPr></w:p>';
+      return;
+    }
+
+    // Title block: first 2 non-empty non-header lines
+    if (inTitleBlock && !isSectionHdr(cl) && cl.length > 5) {
+      titleBlockLine++;
+      if (titleBlockLine === 1) {
+        // Job title: Calibri, inherited size, DA color — split on ** for bold phrases
+        bodyXml += P(ppr({sp:['60','20']}),
+          '<w:r>'+rpr(CA,null,DA,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
+      }
+      if (titleBlockLine === 2) {
+        // Tagline: Calibri Light 11pt italic
+        bodyXml += P(ppr({sp:['0','60']}),
+          '<w:r>'+rpr(CL,'22',DA,false,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
+      }
+      // 3rd line exits title block
+      inTitleBlock = false;
+    }
+
+    // Section headers
+    if (isSectionHdr(cl)) {
+      inTitleBlock = false;
+      var isExp     = /EXPERIENCE/.test(cl.toUpperCase());
+      var isEdu     = /EDUCATION/.test(cl.toUpperCase());
+      var isAff     = /AFFILI/.test(cl.toUpperCase());
+      var isAddlB   = /ADDITIONAL|OTHER CLIENT/.test(cl.toUpperCase());
+      var isWinsS   = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
+      var isRecS    = /RECOGNITION|AWARD/.test(cl.toUpperCase());
+      inExp     = isExp;
+      inEdu     = isEdu;
+      inAff     = isAff;
+      inAddl    = isAddlB;
+      inWins    = isWinsS;
+      inRec     = isRecS;
+      inResults = false;
+
+      // Render section header: Calibri inherited, black, ALL CAPS, small spacing
+      bodyXml += P(ppr({sp:['120','40']}),
+        '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t>'+esc(cl)+'</w:t></w:r>');
+      // Horizontal rule below
+      bodyXml += P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="40"/></w:pPr>','');
+      return;
+    }
+
+    // Job title headers (e.g. VICE PRESIDENT OF MARKETING AND CREATIVE SERVICES)
+    // These are ALL CAPS, contain no | date, colored burgundy
+    if (!isSectionHdr(cl) && cl === cl.toUpperCase() && cl.length > 15 && cl.length < 100 && !/\|.*\d{4}/.test(cl) && /[A-Z]{4}/.test(cl) && !inWins && !inRec) {
+      inResults = false;
+      // Check if it's a sub-section job title (bold burgundy) vs top-level (non-bold burgundy)
+      var isBoldTitle = inExp || (bodyXml.indexOf('<w:t>PROFESSIONAL EXPERIENCE</w:t>') !== -1);
+      bodyXml += P(ppr({sp:['80','0']}),
+        '<w:r>'+rpr(CA,null,BG,isBoldTitle?true:null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Company + location + date lines (Calibri bold company name | Calibri Light date)
+    if (isCoLine(cl) && inExp) {
+      var parts = cl.split('|');
+      var coName = (parts[0]||'').trim();
+      var dateRest = parts.slice(1).join('|').trim();
+      bodyXml += P(ppr({sp:['0','0']}),
+        '<w:r>'+rpr(CA,null,null,true,false)+'<w:t xml:space="preserve">'+esc(coName)+'</w:t></w:r>'+
+        (dateRest ? '<w:r>'+rpr(CL,null,null,null,false)+'<w:t xml:space="preserve"> | '+esc(dateRest)+'</w:t></w:r>' : ''));
+      return;
+    }
+
+    // Italic description lines (lines directly after company line, before result headers)
+    if (inExp && !isBullet(cl) && !isResultHdr(cl) && !isCoLine(cl) && !/^[A-Z]{4}/.test(cl)) {
+      bodyXml += P(ppr({sp:['0','80']}),
+        '<w:r>'+rpr(CL,null,BK,null,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Result sub-headers (Brand & Growth Results, etc.)
+    if (isResultHdr(cl) && (inExp || inAddl)) {
+      inResults = true;
+      bodyXml += P(ppr({sp:['80','40']}),
+        '<w:r>'+rpr(CA,null,BG2,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Select Client Wins bullets — bold red phrase + black rest
+    if (inWins) {
+      var winsText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+      var matched = false;
+      for (var bp = 0; bp < BOLD_PHRASES.length; bp++) {
+        if (winsText.indexOf(BOLD_PHRASES[bp]) === 0) {
+          var boldP = BOLD_PHRASES[bp];
+          var restP = winsText.slice(boldP.length);
+          bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+            '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(boldP)+'</w:t></w:r>'+
+            (restP ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(restP)+'</w:t></w:r>' : ''));
+          matched = true; break;
+        }
+      }
+      if (!matched) {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Recognition/Awards bullets
+    if (inRec) {
+      var recText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+      var recMatch = recText.match(/^(\d+[^,]+?(?:Awards?|Honors?|Emmy|Promax|BDA)[^,]*)(.*)$/i);
+      if (recMatch) {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(recMatch[1].trim())+'</w:t></w:r>'+
+          (recMatch[2].trim() ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(recMatch[2].trim())+'</w:t></w:r>' : ''));
+      } else {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(recText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Additional Brand section lines (ESPN Classic, MSNBC)
+    if (inAddl) {
+      var addlText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+      var dashMatch = addlText.match(/^([^\u2013\u2014\-]+)([\u2013\u2014\-].*)$/);
+      if (dashMatch) {
+        bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',null,null,null)+'<w:t xml:space="preserve">'+esc(dashMatch[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,'22',BK,null,null)+'<w:t xml:space="preserve"> '+esc(dashMatch[2].trim())+'</w:t></w:r>');
+      } else {
+        bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',null,null,null)+'<w:t xml:space="preserve">'+esc(addlText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Result bullets (Calibri Light bold metric + Calibri Light regular rest)
+    if ((isBullet(cl) || inResults) && inExp) {
+      var bulText = cl.replace(/^[-•*\d.]+\s*/,'').replace(/\*\*/g,'');
+      // Split on first lower-case word boundary after metric (space + lowercase)
+      var splitMatch = bulText.match(/^([A-Z0-9$+%.,\s]+?)\s+([a-z].*)$/);
+      if (splitMatch) {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
+          '<w:r>'+rpr(CL,null,null,true,null)+'<w:t xml:space="preserve">'+esc(splitMatch[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+esc(splitMatch[2])+'</w:t></w:r>');
+      } else {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
+          '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve">'+esc(bulText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Education lines
+    if (inEdu) {
+      var eduPipe = cl.match(/^([^|]+)(\|.*)$/);
+      if (eduPipe) {
+        bodyXml += P(ppr({sp:['60','0']}),
+          '<w:r>'+rpr(CA,null,null,true,null)+'<w:t xml:space="preserve">'+esc(eduPipe[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(eduPipe[2])+'</w:t></w:r>');
+      } else {
+        bodyXml += P(ppr({sp:['60','0']}),
+          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Affiliations lines
+    if (inAff) {
+      var affParts = cl.split('|');
+      var affBold = affParts[0].trim();
+      var affRest = affParts.slice(1).join('|').trim();
+      bodyXml += P(ppr({sp:['0','60']}),
+        '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(affBold)+'</w:t></w:r>'+
+        (affRest ? '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve"> | '+esc(affRest)+'</w:t></w:r>' : ''));
+      return;
+    }
+
+    // Core Expertise sub-headers + content
+    if (inExp === false && !inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
+      // Could be expertise sub-header (bold burgundy) or content (inherited)
+      if (/^[A-Z]/.test(cl) && cl.length < 60 && !/\|/.test(cl) && !isBullet(cl)) {
+        // Check if it looks like an expertise category
+        var isExpCat = /Strategy|Creative|Growth|Leadership|Technical|Partnership|Content|Operations/i.test(cl);
+        if (isExpCat) {
+          bodyXml += P(ppr({sp:['40','40']}),
+            '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+          return;
+        }
+      }
+    }
+
+    // Default: Calibri inherited body paragraph
+    bodyXml += P(ppr({sp:['0','60']}),
+      '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+  });
+
+  // ── Assemble OOXML document ───────────────────────────────────────────────
+  var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var NSR = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+
+  var numberingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:abstractNum w:abstractNumId="0">' +
+    '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/>' +
+    '<w:lvlText w:val=""/>' +
+    '<w:lvlJc w:val="left"/>' +
+    '<w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr>' +
+    '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr>' +
+    '</w:lvl></w:abstractNum>' +
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
+    '</w:numbering>';
+
+  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles '+NS+'>' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+    '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>' +
+    '<w:sz w:val="22"/><w:szCs w:val="22"/>' +
+    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">' +
+    '<w:name w:val="Normal"/>' +
+    '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>' +
+    '</w:style>' +
+    '</w:styles>';
+
+  var documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document '+NS+' '+NSR+'>' +
+    '<w:body>' +
+    hdrXml + bodyXml +
+    '<w:sectPr>' +
+    '<w:pgSz w:w="12240" w:h="15840"/>' +
+    '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>' +
+    '</w:sectPr>' +
+    '</w:body></w:document>';
+
+  var _relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+
+  var wRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
+    '</Relationships>';
+
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
+    '</Types>';
+
+  var safe = (filename||'JayWadhwa_Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
+
+  var zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypes);
+  zip.file('_rels/.rels', _relsXml);
+  zip.file('word/document.xml', documentXml);
+  zip.file('word/_rels/document.xml.rels', wRelsXml);
+  zip.file('word/styles.xml', stylesXml);
+  zip.file('word/numbering.xml', numberingXml);
+
+  zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = safe + '.docx'; a.click();
+      URL.revokeObjectURL(url);
+      toast('Resume exported. Open in Word to review.', 'success');
+    })
+    .catch(function(e) { toast('Export failed: '+e.message,'error'); });
+}
+
 function exportRTDocx() {
-  var coRaw = (document.getElementById('rt-link-app').selectedOptions[0] && document.getElementById('rt-link-app').selectedOptions[0].text || '').split('\u2014')[0];
-  var roRaw = (document.getElementById('rt-jd').value || '').slice(0, 60); // use first part of JD as role hint if no separate field
-  // Better: pull company and role from the linked app
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
-  var co = cleanForFilename(app ? app.company : coRaw) || 'Company';
+  var co = cleanForFilename(app ? app.company : '') || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
   var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
-  exportGenericDocx(rtOutput, fname);
+  buildResumeDocx(rtOutput, fname, false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
