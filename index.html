@@ -7038,8 +7038,12 @@ function buildResumeDocx(text, filename, markedUp) {
   function isSectionHdr(t) {
     var SECTION_KW = ['EXPERIENCE','EXPERTISE','RECOGNITION','AFFILIATION','SUMMARY','CLIENT WIN',
       'EDUCATION','AWARD','ADDITIONAL','OTHER CLIENT','PROFESSIONAL'];
-    return SECTION_KW.some(function(k){ return t.toUpperCase().indexOf(k) !== -1; }) &&
-      t === t.toUpperCase() && t.length < 100 && !/^[-*•]/.test(t);
+    var cu = t.toUpperCase();
+    // Allow mixed-case section headers like "Select Client Wins"
+    var kwMatch = SECTION_KW.some(function(k){ return cu.indexOf(k) !== -1; });
+    var isAllCaps = t === cu;
+    var isMixedSectionHdr = kwMatch && !isAllCaps && t.length < 60 && !/^[-*•]/.test(t) && !/\|/.test(t) && !/\d{4}/.test(t);
+    return kwMatch && (isAllCaps || isMixedSectionHdr) && t.length < 100 && !/^[-*•]/.test(t);
   }
 
   function isJobTitle(t) {
@@ -7093,7 +7097,7 @@ function buildResumeDocx(text, filename, markedUp) {
       }
       if (titleBlockLine === 2) {
         // Tagline: Calibri Light 11pt italic
-        bodyXml += P(ppr({sp:['0','60']}),
+        bodyXml += P(ppr({sp:['0','0']}),
           '<w:r>'+rpr(CL,'22',DA,false,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
@@ -7216,16 +7220,20 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Result bullets (Calibri Light bold metric + Calibri Light regular rest)
     if ((isBullet(cl) || inResults) && inExp) {
-      var bulText = cl.replace(/^[-•*\d.]+\s*/,'').replace(/\*\*/g,'');
-      // Split on first lower-case word boundary after metric (space + lowercase)
-      var splitMatch = bulText.match(/^([A-Z0-9$+%.,\s]+?)\s+([a-z].*)$/);
-      if (splitMatch) {
-        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
-          '<w:r>'+rpr(CL,null,null,true,null)+'<w:t xml:space="preserve">'+esc(splitMatch[1].trim())+'</w:t></w:r>'+
-          '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+esc(splitMatch[2])+'</w:t></w:r>');
+      // Strip bullet prefix and ** markers — split into bold metric + plain continuation
+      var bulText = cl.replace(/^[-•*\d.]+\s*/,'');
+      // If AI used **bold** markup, split on that
+      var boldMatch = bulText.match(/^\*\*(.+?)\*\*\s*(.*)/);
+      var pprBul = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>';
+      if (boldMatch) {
+        var bm1 = esc(boldMatch[1]); var bm2 = esc(boldMatch[2]);
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
+          (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
       } else {
-        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
-          '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve">'+esc(bulText)+'</w:t></w:r>');
+        // No ** markup — render full line as bold Calibri Light (matching Master)
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
       }
       return;
     }
