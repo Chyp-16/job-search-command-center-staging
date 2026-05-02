@@ -6958,6 +6958,7 @@ function buildResumeDocx(text, filename, markedUp) {
   var CA = 'Calibri';
   var CL = 'Calibri Light';
   var DA = '0D0D0D';   // near-black: title block
+  var RE = '902B32';   // red: education, ESPN/MSNBC, core expertise sub-headers, wins bold phrases
 
   function esc(s) {
     return (s||'')
@@ -7094,13 +7095,13 @@ function buildResumeDocx(text, filename, markedUp) {
       if (titleBlockLine === 1) {
         // Job title: Calibri, inherited size, DA color — split on ** for bold phrases
         bodyXml += P(ppr({sp:['60','20']}),
-          '<w:r>'+rpr(CA,null,DA,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'28',BK,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
       if (titleBlockLine === 2) {
         // Tagline: Calibri Light 11pt italic
         bodyXml += P(ppr({sp:['0','0']}),
-          '<w:r>'+rpr(CL,'22',DA,false,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+          '<w:r><w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="'+DA+'"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
       // 3rd line exits title block
@@ -7113,7 +7114,7 @@ function buildResumeDocx(text, filename, markedUp) {
       var isExp     = /EXPERIENCE/.test(cl.toUpperCase());
       var isEdu     = /EDUCATION/.test(cl.toUpperCase());
       var isAff     = /AFFILI/.test(cl.toUpperCase());
-      var isAddlB   = /ADDITIONAL|OTHER CLIENT/.test(cl.toUpperCase());
+      var isAddlB   = /ADDITIONAL/.test(cl.toUpperCase()); // OTHER CLIENT RESULTS handled separately
       var isWinsS   = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
       var isRecS    = /RECOGNITION|AWARD/.test(cl.toUpperCase());
       inExp     = isExp;
@@ -7127,7 +7128,7 @@ function buildResumeDocx(text, filename, markedUp) {
       if (isWinsS) {
         // Select Client Wins — no divider, left-aligned, inherited size, no bold
         bodyXml += P(ppr({sp:['120','20']}),
-          '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t>'+esc(cl)+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'24',BK,true,null)+'<w:t>'+esc(cl)+'</w:t></w:r>');
       } else {
         // Named section headers — centered, Calibri 14pt bold, divider line tight below
         bodyXml += P('<w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="0"/></w:pPr>',
@@ -7183,7 +7184,7 @@ function buildResumeDocx(text, filename, markedUp) {
           var boldP = BOLD_PHRASES[bp];
           var restP = winsText.slice(boldP.length);
           bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
-            '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(boldP)+'</w:t></w:r>'+
+            '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(boldP)+'</w:t></w:r>'+
             (restP ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(restP)+'</w:t></w:r>' : ''));
           matched = true; break;
         }
@@ -7210,13 +7211,20 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
+    // OTHER CLIENT RESULTS — job header: bold 11pt Calibri red #902B32 left-justified
+    if (/OTHER CLIENT RESULTS/i.test(cl)) {
+      bodyXml += P(ppr({sp:['80','0']}),
+        '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,'').replace(/^[-•*]\s*/,''))+'</w:t></w:r>');
+      return;
+    }
+
     // Additional Brand section lines (ESPN Classic, MSNBC)
     if (inAddl) {
       var addlText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
       var dashMatch = addlText.match(/^([^\u2013\u2014\-]+)([\u2013\u2014\-].*)$/);
       if (dashMatch) {
         bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
-          '<w:r>'+rpr(CA,'22',null,null,null)+'<w:t xml:space="preserve">'+esc(dashMatch[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(dashMatch[1].trim())+'</w:t></w:r>'+
           '<w:r>'+rpr(CA,'22',BK,null,null)+'<w:t xml:space="preserve"> '+esc(dashMatch[2].trim())+'</w:t></w:r>');
       } else {
         bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
@@ -7250,11 +7258,11 @@ function buildResumeDocx(text, filename, markedUp) {
       var eduPipe = cl.match(/^([^|]+)(\|.*)$/);
       if (eduPipe) {
         bodyXml += P(ppr({sp:['60','0']}),
-          '<w:r>'+rpr(CA,null,null,true,null)+'<w:t xml:space="preserve">'+esc(eduPipe[1].trim())+'</w:t></w:r>'+
-          '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(eduPipe[2])+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(eduPipe[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,'22',BK,true,null)+'<w:t xml:space="preserve"> '+esc(eduPipe[2])+'</w:t></w:r>');
       } else {
         bodyXml += P(ppr({sp:['60','0']}),
-          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'22',BK,null,null)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
       }
       return;
     }
@@ -7275,10 +7283,10 @@ function buildResumeDocx(text, filename, markedUp) {
       // Could be expertise sub-header (bold burgundy) or content (inherited)
       if (/^[A-Z]/.test(cl) && cl.length < 60 && !/\|/.test(cl) && !isBullet(cl)) {
         // Check if it looks like an expertise category
-        var isExpCat = /Strategy|Creative|Growth|Leadership|Technical|Partnership|Content|Operations/i.test(cl);
+        var isExpCat = /Strategy|Creative|Growth|Leadership|Technical|Partnership|Content|Operations|Digital|Performance|Brand|Marketing|Analytics|Management/i.test(cl);
         if (isExpCat) {
           bodyXml += P(ppr({sp:['40','40']}),
-            '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+            '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
           return;
         }
       }
@@ -7297,10 +7305,10 @@ function buildResumeDocx(text, filename, markedUp) {
     '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
     '<w:abstractNum w:abstractNumId="0">' +
     '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/>' +
-    '<w:lvlText w:val="\uf0b7"/>' +
+    '<w:lvlText w:val="\u2022"/>' +
     '<w:lvlJc w:val="left"/>' +
     '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>' +
-    '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings" w:hint="default"/></w:rPr>' +
+    '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:hint="default"/></w:rPr>' +
     '</w:lvl></w:abstractNum>' +
     '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
     '</w:numbering>';
