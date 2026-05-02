@@ -7096,7 +7096,7 @@ function buildResumeDocx(text, filename, markedUp) {
       if (titleBlockLine === 1) {
         // Job title: Calibri, inherited size, DA color — split on ** for bold phrases
         bodyXml += P(ppr({sp:['60','20']}),
-          '<w:r>'+rpr(CA,null,DA,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,'28',BK,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
       if (titleBlockLine === 2) {
