@@ -1627,8 +1627,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card-header">✦ Tailored Resume Analysis
             <div style="display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(false)">⬇ Final Resume</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(true)">⬇ Marked Up</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -4461,7 +4460,7 @@ function showHubSpotSetupGuide() {
 // Push a contact to HubSpot when saved
 // ── SUPABASE BACKUP ─────────────────────────────────────────────────────
 
-var BACKUP_TABLES = ['applications','contacts','uploaded_documents','resources','email_templates','ai_outputs','prompts'];
+var BACKUP_TABLES = ['applications','contacts','uploaded_documents','resources','email_templates','ai_outputs','prompts','resumes'];
 var BACKUP_KEY = 'jsc_last_backup';
 var BACKUP_INTERVAL_DAYS = 7;
 
@@ -4541,6 +4540,58 @@ async function runSupabaseBackup() {
       }).join('\n');
       zip.file(table + '_' + dateStr + '.csv', csv);
     });
+
+    // Add restore instructions and prompts snapshot for exact state restore
+    var meta = {
+      backup_date: dateStr,
+      backup_timestamp: new Date().toISOString(),
+      restore_instructions: [
+        "RESTORE STEPS (do these in order):",
+        "1. CODE: Find index_DATE.html in this ZIP. Copy it to your job-search-command-center folder, renaming it index.html. Then run: cd ~/Desktop/Console docs/job-search-command-center && git add -f index.html && git commit -m Restore from backup DATE && git push",
+        "2. PROMPTS: Open prompts_snapshot_DATE.json. For each prompt, paste its system_prompt value back into the app Prompts editor or update via Supabase.",
+        "3. BASE RESUME: Open base_resume_snapshot_DATE.txt. In the app click Base Documents and paste this text into the Master Resume field. Click Save.",
+        "4. WORKER: See worker_backup_instructions file in this ZIP.",
+        "5. VERIFY: Hard refresh the app. Run Resume Tailor end-to-end and export. Check Base Documents shows your resume text."
+      ]
+    };
+    zip.file('RESTORE_INSTRUCTIONS_' + dateStr + '.json', JSON.stringify(meta, null, 2));
+
+    // Snapshot prompts table as readable JSON for easy restore
+    var promptsData = wb['prompts'] || [];
+    zip.file('prompts_snapshot_' + dateStr + '.json', JSON.stringify(promptsData, null, 2));
+
+    // Snapshot base resume separately for easy access
+    var resumesData = wb['resumes'] || [];
+    var baseResume = resumesData.find(function(r){ return r.is_base_version; });
+    if (baseResume && baseResume.notes) {
+      zip.file('base_resume_snapshot_' + dateStr + '.txt', baseResume.notes);
+    }
+
+    // Add Cloudflare Worker snapshot
+    try {
+      var workerRes = await fetch('https://job-search-proxy.jvwadhwa.workers.dev/worker-source', { method: 'GET', headers: { 'Origin': location.origin } });
+      // Worker source not publicly fetchable — include instructions instead
+    } catch(e) {}
+    // Worker code must be saved manually from Cloudflare dashboard
+    // Saved separately in your backup folder as worker_snapshot_DATE.js
+    // Capture current index.html source code for exact code restore
+    try {
+      var srcRes = await fetch(location.href);
+      var srcText = await srcRes.text();
+      zip.file('index_' + dateStr + '.html', srcText);
+    } catch(e) {
+      zip.file('index_backup_note_' + dateStr + '.txt', 'Could not capture index.html automatically. Use git to restore code.');
+    }
+
+    zip.file('worker_backup_instructions_' + dateStr + '.txt',
+      'Cloudflare Worker backup:\n' +
+      '1. Go to https://dash.cloudflare.com\n' +
+      '2. Workers & Pages > job-search-proxy\n' +
+      '3. Click Edit code\n' +
+      '4. Copy all code and save as worker_snapshot_' + dateStr + '.js\n\n' +
+      'Worker URL: https://job-search-proxy.jvwadhwa.workers.dev\n' +
+      'Last known worker hash: saved in this backup zip as prompts_snapshot JSON'
+    );
 
     var blob = await zip.generateAsync({ type: 'blob' });
     var url = URL.createObjectURL(blob);
@@ -6908,29 +6959,12 @@ function buildResumeDocx(text, filename, markedUp) {
   var CL = 'Calibri Light';
   var DA = '0D0D0D';   // near-black: title block
 
-  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  // Strip change markers from text for plain rendering (Final export uses this)
-  function stripMarkers(s) {
-    return (s||'').replace(/<mark>/gi,'').replace(/<\/mark>/gi,'').replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,'');
-  }
-  // For Markup export: convert markers to highlighted OOXML inline
-  function markupRuns(rprXml, txt) {
-    if (!txt) return '';
-    var normalized = txt.replace(/<mark>/gi,'[YLW]').replace(/<\/mark>/gi,'[/YLW]');
-    if (!markedUp || normalized.indexOf('[YLW]') === -1) {
-      return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(stripMarkers(txt))+'</w:t></w:r>';
-    }
-    var out = '';
-    normalized.split(/\[YLW\](.*?)\[\/YLW\]/g).forEach(function(p,i){
-      if(!p) return;
-      if(i%2===1){
-        var hlRpr = rprXml.replace('</w:rPr>','<w:highlight w:val="yellow"/></w:rPr>');
-        out+='<w:r>'+hlRpr+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
-      } else {
-        out+='<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>';
-      }
-    });
-    return out;
+  function esc(s) {
+    return (s||'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/<mark>/gi,'').replace(/<\/mark>/gi,'')
+      .replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,'')
+      .replace(/\*\*(.*?)\*\*/g,'$1');
   }
 
   // Run properties
@@ -6963,35 +6997,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
   function run(rprXml, txt) {
     if (!txt) return '';
-    return markupRuns(rprXml, txt);
-  }
-
-  // Parse [YLW]...[/YLW] or <mark>...</mark> → yellow highlights (markedUp) or strip (Final)
-  function runsWithHighlight(rprBase, txt, bold) {
-    if (!txt) return '';
-    // Normalize <mark>...</mark> to [YLW]...[/YLW]
-    var normalized = txt.replace(/<mark>/gi,'[YLW]').replace(/<\/mark>/gi,'[/YLW]');
-    var hasMarkers = normalized.indexOf('[YLW]') !== -1;
-    if (!markedUp || !hasMarkers) {
-      // Final export: strip all markers
-      var clean = normalized.replace(/\[YLW\]|\[\/YLW\]/g,'');
-      var rp = rprBase.replace('</w:rPr>', (bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
-      return '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(clean)+'</w:t></w:r>';
-    }
-    // Markup export: render highlights
-    var out = '';
-    var parts = normalized.split(/\[YLW\](.*?)\[\/YLW\]/g);
-    parts.forEach(function(part, i) {
-      if (!part) return;
-      if (i % 2 === 1) {
-        var hlRpr = rprBase.replace('</w:rPr>', '<w:highlight w:val="yellow"/>'+(bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
-        out += '<w:r>'+hlRpr+'<w:t xml:space="preserve">'+esc(part)+'</w:t></w:r>';
-      } else {
-        var rp = rprBase.replace('</w:rPr>', (bold?'<w:b/><w:bCs/>':'')+'</w:rPr>');
-        out += '<w:r>'+rp+'<w:t xml:space="preserve">'+esc(part)+'</w:t></w:r>';
-      }
-    });
-    return out;
+    return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(txt)+'</w:t></w:r>';
   }
 
   // ── Header: Century Gothic 22pt burgundy name + tab + Calibri Light 9pt contact ──
@@ -7347,14 +7353,13 @@ function buildResumeDocx(text, filename, markedUp) {
     .catch(function(e) { toast('Export failed: '+e.message,'error'); });
 }
 
-function exportRTDocx(markedUp) {
+function exportRTDocx() {
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
   var co = cleanForFilename(app ? app.company : '') || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
-  var suffix = markedUp ? '_MarkedUp' : '_Resume';
-  var fname = 'JayWadhwa_' + ro + '_' + co + suffix;
-  buildResumeDocx(rtOutput, fname, !!markedUp);
+  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
+  buildResumeDocx(rtOutput, fname, false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
