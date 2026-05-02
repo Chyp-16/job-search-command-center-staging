@@ -7030,6 +7030,7 @@ function buildResumeDocx(text, filename, markedUp) {
     if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
     if (headerPhrases.some(function(p){ return cl === p || cl.startsWith(p+'\t') || cl.endsWith(p); })) return false;
     if (/^Looking at|^I\'ll |^I will |^Here\'s the|^Here is the|^I\'ve tailored|^Below is|^Let me |^Note:/i.test(cl)) return false;
+    if (/^STEP \d|^---+$|^Here are|^I\'ve completed|^I have completed|^Below you\'ll/i.test(cl)) return false;
     // Strip <mark> from classification — handled during rendering
 
     return true;
@@ -7095,7 +7096,7 @@ function buildResumeDocx(text, filename, markedUp) {
       if (titleBlockLine === 1) {
         // Job title: Calibri, inherited size, DA color — split on ** for bold phrases
         bodyXml += P(ppr({sp:['60','20']}),
-          '<w:r>'+rpr(CA,'28',BK,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+          '<w:r>'+rpr(CA,null,DA,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
       if (titleBlockLine === 2) {
@@ -7183,15 +7184,15 @@ function buildResumeDocx(text, filename, markedUp) {
         if (winsText.indexOf(BOLD_PHRASES[bp]) === 0) {
           var boldP = BOLD_PHRASES[bp];
           var restP = winsText.slice(boldP.length);
-          bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
             '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(boldP)+'</w:t></w:r>'+
             (restP ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(restP)+'</w:t></w:r>' : ''));
           matched = true; break;
         }
       }
       if (!matched) {
-        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
-          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
       }
       return;
     }
@@ -7243,12 +7244,12 @@ function buildResumeDocx(text, filename, markedUp) {
       if (boldMatch) {
         var bm1 = esc(boldMatch[1]); var bm2 = esc(boldMatch[2]);
         bodyXml += P(pprBul,
-          '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
           (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
       } else {
-        // No ** markup — render full line as bold Calibri Light (matching Master)
+        // No ** markup — render as Calibri Light non-bold black
         bodyXml += P(pprBul,
-          '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
       }
       return;
     }
