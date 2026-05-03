@@ -7183,7 +7183,7 @@ function buildResumeDocx(text, filename, markedUp) {
       var winsText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
       var matched = false;
       for (var bp = 0; bp < BOLD_PHRASES.length; bp++) {
-        if (winsText.indexOf(BOLD_PHRASES[bp]) === 0) {
+        if (winsText.toLowerCase().indexOf(BOLD_PHRASES[bp].toLowerCase()) === 0) {
           var boldP = BOLD_PHRASES[bp];
           var restP = winsText.slice(boldP.length);
           bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
