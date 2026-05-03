@@ -7183,7 +7183,7 @@ function buildResumeDocx(text, filename, markedUp) {
     // Section headers — centered 14pt bold with divider
     if (isSectionHdr(cl)) {
       inTitleBlock = false;
-      var isExp     = /EXPERIENCE/.test(cl.toUpperCase());
+      var isExp     = /PROFESSIONAL EXPERIENCE/.test(cl.toUpperCase());
       var isEdu     = /EDUCATION/.test(cl.toUpperCase());
       var isAff     = /AFFILI/.test(cl.toUpperCase());
       var isAddlB   = /ADDITIONAL/.test(cl.toUpperCase()); // OTHER CLIENT RESULTS handled separately
@@ -7352,7 +7352,7 @@ function buildResumeDocx(text, filename, markedUp) {
     }
 
     // Core Expertise category headers — standalone lines with & or / pattern, inside expertise section
-    if (inExp === false && !inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
+    if (!inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
       // Category headers: short, start with capital, contain & or /, no bullet, not a job title
       var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
         /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
