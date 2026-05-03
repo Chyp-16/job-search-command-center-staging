@@ -7295,9 +7295,24 @@ function buildResumeDocx(text, filename, markedUp) {
       }
     }
 
-    // Default: Calibri inherited body paragraph
-    bodyXml += P(ppr({sp:['0','60']}),
-      '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+    // Default: check BOLD_PHRASES first, then plain body paragraph
+    var rlStripped2 = cl.replace(/^[^a-zA-Z0-9+]+/,'').replace(/\*\*/g,'');
+    var bpMatched = false;
+    for (var bpi = 0; bpi < BOLD_PHRASES.length; bpi++) {
+      if (rlStripped2.toLowerCase().indexOf(BOLD_PHRASES[bpi].toLowerCase()) === 0) {
+        var bpBold = BOLD_PHRASES[bpi];
+        var bpRest = rlStripped2.slice(bpBold.length);
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="50" w:after="50"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(bpBold)+'</w:t></w:r>'+
+          (bpRest ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bpRest)+'</w:t></w:r>' : ''));
+        bpMatched = true;
+        break;
+      }
+    }
+    if (!bpMatched) {
+      bodyXml += P(ppr({sp:['0','60']}),
+        '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+    }
   });
 
   // ── Assemble OOXML document ───────────────────────────────────────────────
