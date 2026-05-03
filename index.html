@@ -7071,7 +7071,7 @@ function buildResumeDocx(text, filename, markedUp) {
     return /^[-•*▸]/.test(t) || /^\d+\./.test(t);
   }
 
-  // Bold red phrases in Select Client Wins
+  // Bold red phrases in Select Client Wins (case-insensitive match)
   var BOLD_PHRASES = [
     '6 Emmy Awards and 9 Promax/BDA honors',
     'Drove 4x revenue growth',
@@ -7180,7 +7180,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Select Client Wins bullets — bold red phrase + black rest
     if (inWins) {
-      var winsText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+      var winsText = cl.replace(/^[^a-zA-Z0-9+]+/,'');
       var matched = false;
       for (var bp = 0; bp < BOLD_PHRASES.length; bp++) {
         if (winsText.toLowerCase().indexOf(BOLD_PHRASES[bp].toLowerCase()) === 0) {
