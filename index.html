@@ -7043,11 +7043,13 @@ function buildResumeDocx(text, filename, markedUp) {
     var cu = t.toUpperCase();
     var kwMatch = SECTION_KW.some(function(k){ return cu.indexOf(k) !== -1; });
     var isAllCaps = t === cu;
-    // Mixed-case allowed only for "Select Client Wins" pattern — short, no &, no lowercase interior words
-    var isMixedSectionHdr = kwMatch && !isAllCaps && t.length < 40 &&
+    // Explicit whitelist for mixed-case section headers
+    var isWhitelisted = /^Select Client Wins$/i.test(t);
+    // Mixed-case allowed only for short lines without & or lowercase runs (filters "Leadership Experience")
+    var isMixedSectionHdr = kwMatch && !isAllCaps && !isWhitelisted && t.length < 40 &&
       !/&/.test(t) && !/^[-*•]/.test(t) && !/\|/.test(t) && !/\d{4}/.test(t) &&
-      !/[a-z]{4}/.test(t); // no run of 4+ lowercase chars (filters "Experience", "Operations" etc)
-    return kwMatch && (isAllCaps || isMixedSectionHdr) && t.length < 100 && !/^[-*•]/.test(t);
+      !/[a-z]{4}/.test(t);
+    return kwMatch && (isAllCaps || isWhitelisted || isMixedSectionHdr) && t.length < 100 && !/^[-*•]/.test(t);
   }
 
   function isJobTitle(t) {
