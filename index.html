@@ -7164,7 +7164,7 @@ function buildResumeDocx(text, filename, markedUp) {
     }
 
     // Italic description lines (lines directly after company line, before result headers)
-    if (inExp && !isBullet(cl) && !isResultHdr(cl) && !isCoLine(cl) && !/^[A-Z]{4}/.test(cl)) {
+    if (inExp && !inWins && !isBullet(cl) && !isResultHdr(cl) && !isCoLine(cl) && !/^[A-Z]{4}/.test(cl)) {
       bodyXml += P(ppr({sp:['0','80']}),
         '<w:r>'+rpr(CL,null,BK,null,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
       return;
