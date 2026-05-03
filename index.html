@@ -7180,7 +7180,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Select Client Wins bullets — bold red phrase + black rest
     if (inWins) {
-      var winsText = cl.replace(/^[^a-zA-Z0-9+]+/,'');
+      var winsText = cl.replace(/\[\/?YLW\]/g,'').replace(/^[^a-zA-Z0-9+]+/,'');
       var matched = false;
       for (var bp = 0; bp < BOLD_PHRASES.length; bp++) {
         if (winsText.toLowerCase().indexOf(BOLD_PHRASES[bp].toLowerCase()) === 0) {
@@ -7296,7 +7296,7 @@ function buildResumeDocx(text, filename, markedUp) {
     }
 
     // Default: check BOLD_PHRASES first, then plain body paragraph
-    var rlStripped2 = cl.replace(/^[^a-zA-Z0-9+]+/,'').replace(/\*\*/g,'');
+    var rlStripped2 = cl.replace(/\[\/?YLW\]/g,'').replace(/^[^a-zA-Z0-9+]+/,'').replace(/\*\*/g,'');
     var bpMatched = false;
     for (var bpi = 0; bpi < BOLD_PHRASES.length; bpi++) {
       if (rlStripped2.toLowerCase().indexOf(BOLD_PHRASES[bpi].toLowerCase()) === 0) {
