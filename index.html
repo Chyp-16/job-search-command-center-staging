@@ -7270,15 +7270,16 @@ function buildResumeDocx(text, filename, markedUp) {
 
     // Recognition/Awards bullets
     if (inRec) {
-      var recText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
-      var recMatch = recText.match(/^(\d+[^,]+?(?:Awards?|Honors?|Emmy|Promax|BDA)[^,]*)(.*)$/i);
+      var recText = cl.replace(/^[-\u2022*]\s*/,'').replace(/\*\*/g,'');
+      // Match ONLY the award name: digits + "Emmy Awards", "Promax/BDA Awards" etc — stop before " for "
+      var recMatch = recText.match(/^(\d+\s+(?:Emmy\s+Awards?|Promax\/BDA\s+Awards?|[A-Za-z/]+\s+Awards?))(.*)$/i);
       if (recMatch) {
         bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
-          '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(recMatch[1].trim())+'</w:t></w:r>'+
-          (recMatch[2].trim() ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(recMatch[2].trim())+'</w:t></w:r>' : ''));
+          '<w:r>'+rpr(CA,null,RE,true,null)+'<w:t xml:space="preserve">'+esc(recMatch[1].trim())+'</w:t></w:r>'+
+          (recMatch[2].trim() ? '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(recMatch[2].trim())+'</w:t></w:r>' : ''));
       } else {
         bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
-          '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(recText)+'</w:t></w:r>');
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(recText)+'</w:t></w:r>');
       }
       return;
     }
