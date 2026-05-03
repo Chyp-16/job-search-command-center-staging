@@ -7351,17 +7351,15 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Core Expertise sub-headers + content
+    // Core Expertise category headers — standalone lines with & or / pattern, inside expertise section
     if (inExp === false && !inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
-      // Could be expertise sub-header (bold burgundy) or content (inherited)
-      if (/^[A-Z]/.test(cl) && cl.length < 60 && !/\|/.test(cl) && !isBullet(cl)) {
-        // Check if it looks like an expertise category
-        var isExpCat = /Strategy|Creative|Growth|Leadership|Technical|Partnership|Content|Operations|Digital|Performance|Brand|Marketing|Analytics|Management/i.test(cl);
-        if (isExpCat) {
-          bodyXml += P(ppr({sp:['40','40']}),
-            '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
-          return;
-        }
+      // Category headers: short, start with capital, contain & or /, no bullet, not a job title
+      var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
+        /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
+      if (isExpCatHdr) {
+        bodyXml += P(ppr({sp:['40','40']}),
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
       }
     }
 
