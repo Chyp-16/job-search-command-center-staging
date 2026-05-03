@@ -7357,7 +7357,7 @@ function buildResumeDocx(text, filename, markedUp) {
       var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
         /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
       if (isExpCatHdr) {
-        bodyXml += P(ppr({sp:['0','40']}),
+        bodyXml += P(ppr({sp:['40','40']}),
           '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
       }
@@ -7378,7 +7378,7 @@ function buildResumeDocx(text, filename, markedUp) {
       }
     }
     if (!bpMatched) {
-      bodyXml += P(ppr({sp:['0','70']}),
+      bodyXml += P(ppr({sp:['0','60']}),
         '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
     }
   });
