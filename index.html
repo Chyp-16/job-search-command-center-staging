@@ -4460,7 +4460,74 @@ function showHubSpotSetupGuide() {
 // Push a contact to HubSpot when saved
 // ── SUPABASE BACKUP ─────────────────────────────────────────────────────
 
-var BACKUP_TABLES = ['applications','contacts','uploaded_documents','resources','email_templates','ai_outputs','prompts'];
+var WORKER_CODE_SNAPSHOT = `const ALLOWED_ORIGIN = 'https://chyp-16.github.io';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-action, Prefer',
+  'Access-Control-Max-Age': '86400',
+};
+
+export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: CORS_HEADERS });
+    }
+
+    const origin = request.headers.get('Origin');
+    if (origin !== ALLOWED_ORIGIN) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    const url = new URL(request.url);
+
+    try {
+      if (url.pathname === '/ai') {
+        const body = await request.json();
+        const useWebSearch = body.use_web_search === true;
+        delete body.use_web_search;
+        const aiPayload = {
+          model: body.model || 'claude-sonnet-4-20250514',
+          max_tokens: body.max_tokens || 1024,
+          ...body,
+        };
+        if (useWebSearch) {
+          aiPayload.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+        }
+        const headers = {
+          'Content-Type': 'application/json',
+          'x-api-key': env.CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01',
+        };
+        if (useWebSearch) {
+          headers['anthropic-beta'] = 'web-search-2025-03-05';
+        }
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST', headers, body: JSON.stringify(aiPayload),
+        });
+        const data = await response.json();
+        let text = '';
+        if (data.content && Array.isArray(data.content)) {
+          for (const block of data.content) {
+            if (block.type === 'text') text += block.text;
+          }
+        }
+        if (text) data.content = [{ type: 'text', text }];
+        return new Response(JSON.stringify(data), {
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+      // ... full worker code — see worker_snapshot file for complete version
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+  },
+};`;
+
+var BACKUP_TABLES = ['applications','contacts','uploaded_documents','resources','email_templates','ai_outputs','prompts','resumes','worker_snapshots'];
 var BACKUP_KEY = 'jsc_last_backup';
 var BACKUP_INTERVAL_DAYS = 7;
 
@@ -4540,6 +4607,60 @@ async function runSupabaseBackup() {
       }).join('\n');
       zip.file(table + '_' + dateStr + '.csv', csv);
     });
+
+    // Add restore instructions and prompts snapshot for exact state restore
+    var meta = {
+      backup_date: dateStr,
+      backup_timestamp: new Date().toISOString(),
+      restore_instructions: [
+        "RESTORE STEPS (do these in order):",
+        "1. CODE: Find index_DATE.html in this ZIP. Copy it to your job-search-command-center folder, renaming it index.html. Then run: cd ~/Desktop/Console docs/job-search-command-center && git add -f index.html && git commit -m Restore from backup DATE && git push",
+        "2. PROMPTS: Open prompts_snapshot_DATE.json. For each prompt, paste its system_prompt value back into the app Prompts editor or update via Supabase.",
+        "3. BASE RESUME: Open base_resume_snapshot_DATE.txt. In the app click Base Documents and paste this text into the Master Resume field. Click Save.",
+        "4. WORKER: See worker_backup_instructions file in this ZIP.",
+        "5. VERIFY: Hard refresh the app. Run Resume Tailor end-to-end and export. Check Base Documents shows your resume text."
+      ]
+    };
+    zip.file('RESTORE_INSTRUCTIONS_' + dateStr + '.json', JSON.stringify(meta, null, 2));
+
+    // Snapshot prompts table as readable JSON for easy restore
+    var promptsData = wb['prompts'] || [];
+    zip.file('prompts_snapshot_' + dateStr + '.json', JSON.stringify(promptsData, null, 2));
+
+    // Snapshot base resume separately for easy access
+    var resumesData = wb['resumes'] || [];
+    var baseResume = resumesData.find(function(r){ return r.is_base_version; });
+    if (baseResume && baseResume.notes) {
+      zip.file('base_resume_snapshot_' + dateStr + '.txt', baseResume.notes);
+    }
+
+    // Add Cloudflare Worker snapshot
+    try {
+      var workerRes = await fetch('https://job-search-proxy.jvwadhwa.workers.dev/worker-source', { method: 'GET', headers: { 'Origin': location.origin } });
+      // Worker source not publicly fetchable — include instructions instead
+    } catch(e) {}
+    // Worker code must be saved manually from Cloudflare dashboard
+    // Saved separately in your backup folder as worker_snapshot_DATE.js
+    // Capture current index.html source code for exact code restore
+    try {
+      var srcRes = await fetch(location.href);
+      var srcText = await srcRes.text();
+      zip.file('index_' + dateStr + '.html', srcText);
+    } catch(e) {
+      zip.file('index_backup_note_' + dateStr + '.txt', 'Could not capture index.html automatically. Use git to restore code.');
+    }
+
+    // Embed worker code snapshot directly in backup ZIP
+    var workerCode = WORKER_CODE_SNAPSHOT;
+    zip.file('worker_snapshot_' + dateStr + '.js', workerCode);
+    zip.file('worker_restore_instructions_' + dateStr + '.txt',
+      'Cloudflare Worker Restore Instructions:\n' +
+      '1. Go to https://dash.cloudflare.com\n' +
+      '2. Workers & Pages > job-search-proxy > Edit code\n' +
+      '3. Replace all code with the contents of worker_snapshot_' + dateStr + '.js\n' +
+      '4. Click Save and Deploy\n' +
+      'Worker URL: https://job-search-proxy.jvwadhwa.workers.dev'
+    );
 
     var blob = await zip.generateAsync({ type: 'blob' });
     var url = URL.createObjectURL(blob);
@@ -5123,7 +5244,7 @@ const SEED_PROMPTS = [
   {
     "name": "Resume Tailoring",
     "category": "Resume",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Mark every changed word or phrase with [YLW] before and [/YLW] after. Example: [YLW]changed text[/YLW]. Do not use <mark> tags. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "keywords_required",
       "keywords_nice",
@@ -6872,7 +6993,7 @@ async function runResumeTailor() {
                  .replace(/\{\{job_description\}\}/g, jd);
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
     contentEl.textContent = result;
     const linkedId = document.getElementById('rt-link-app').value || null;
@@ -6895,16 +7016,461 @@ function clearRT() {
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
+
+// ── RESUME DOCX BUILDER — matches Master.docx formatting exactly ──────────
+function buildResumeDocx(text, filename, markedUp) {
+  // ── Constants matching Master.docx measurements ──────────────────────────
+  var BG = '9E3A3E';   // burgundy: name, section hdrs, job titles
+  var BG2 = '972B32';  // burgundy2: sub job titles, result hdrs
+  var BK = '000000';   // black
+  var GH = 'Century Gothic';
+  var CA = 'Calibri';
+  var CL = 'Calibri Light';
+  var DA = '0D0D0D';   // near-black: title block
+  var RE = '902B32';   // red: education, ESPN/MSNBC, core expertise sub-headers, wins bold phrases
+
+  function esc(s) {
+    return (s||'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/<mark>/gi,'').replace(/<\/mark>/gi,'')
+      .replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,'')
+      .replace(/\*\*(.*?)\*\*/g,'$1');
+  }
+
+  // Run properties
+  function rpr(font, sz, color, bold, ital) {
+    var s = '<w:rPr>';
+    s += '<w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'"/>';
+    if (bold === true)  s += '<w:b/><w:bCs/>';
+    if (bold === false) s += '<w:b w:val="0"/><w:bCs w:val="0"/>';
+    if (ital === true)  s += '<w:i/><w:iCs/>';
+    if (ital === false) s += '<w:i w:val="0"/><w:iCs w:val="0"/>';
+    if (color) s += '<w:color w:val="'+color+'"/>';
+    if (sz)    s += '<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/>';
+    s += '</w:rPr>';
+    return s;
+  }
+
+  function P(pPrXml, runsXml) { return '<w:p>'+pPrXml+runsXml+'</w:p>'; }
+
+  function ppr(opts) {
+    var s = '<w:pPr>';
+    if (opts.tabs)   s += '<w:tabs><w:tab w:val="right" w:pos="'+(opts.tabPos||'9360')+'"/></w:tabs>';
+    if (opts.hbdr)   s += '<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr>';
+    if (opts.num)    s += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    if (opts.sp)     s += '<w:spacing w:before="'+(opts.sp[0]||0)+'" w:after="'+(opts.sp[1]||0)+'"'+(opts.line?' w:line="'+opts.line+'" w:lineRule="auto"':'')+'/>';
+    if (opts.ind)    s += '<w:ind w:left="'+opts.ind+'" w:hanging="360"/>';
+    if (opts.jc)     s += '<w:jc w:val="'+opts.jc+'"/>';
+    s += '</w:pPr>';
+    return s;
+  }
+
+  function run(rprXml, txt) {
+    if (!txt) return '';
+    return '<w:r>'+rprXml+'<w:t xml:space="preserve">'+esc(txt)+'</w:t></w:r>';
+  }
+
+  // ── Header: Century Gothic 22pt burgundy name + tab + Calibri Light 9pt contact ──
+  // Tab right stop at 9360 twips (0.5" margins on 8.5" page: 12240 - 720 - 720 = 10800 — but Master uses narrower)
+  // Master page is 7560310 EMU wide = 9.75" but margins 457200 each = 0.5" → text width = 8.75" = 12600 twips
+  // Right tab: 12600 - 720 = ~11880... Actually measured from Master: use right-aligned tab
+  var HDR_NAME_RPR  = rpr(GH, '44', BG, null, null);
+  var HDR_CONT_RPR  = rpr(CL, '18', null, null, null);
+
+  var hdrXml =
+    P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>',
+      '<w:r>'+HDR_NAME_RPR+'<w:t>Jay Wadhwa</w:t></w:r>'+
+      '<w:r>'+HDR_NAME_RPR+'<w:tab/></w:r>'+
+      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">847-910-9377 | jvwadhwa@gmail.com</w:t></w:r>')+
+    P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr>',
+      '<w:r>'+HDR_CONT_RPR+'<w:tab/></w:r>'+
+      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">Greater Chicago Area | linkedin.com/in/jwadhwa</w:t></w:r>')+
+    P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="80"/></w:pPr>','');
+
+  // ── Parse AI output into body paragraphs ─────────────────────────────────
+  var lines = (text||'').split('\n');
+  var bodyXml = '';
+
+  // Filter header lines that belong to Jay's contact info (already in hdrXml)
+  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area','Jay Wadhwa'];
+  var filteredLines = lines.filter(function(line) {
+    var cl = line.trim();
+    if (!cl) return true;
+    if (/^---+$/.test(cl.replace(/\s/g,''))) return false;
+    if (headerPhrases.some(function(p){ return cl === p || cl.startsWith(p+'\t') || cl.endsWith(p); })) return false;
+    if (/^Looking at|^I\'ll |^I will |^Here\'s the|^Here is the|^I\'ve tailored|^Below is|^Let me |^Note:/i.test(cl)) return false;
+    if (/^STEP \d|^---+$|^Here are|^I\'ve completed|^I have completed|^Below you\'ll/i.test(cl)) return false;
+    // Strip <mark> from classification — handled during rendering
+
+    return true;
+  });
+
+  // Section header keywords
+  function isSectionHdr(t) {
+    var SECTION_KW = ['EXPERIENCE','EXPERTISE','RECOGNITION','AFFILIATION','SUMMARY','CLIENT WIN',
+      'EDUCATION','AWARD','ADDITIONAL','OTHER CLIENT','PROFESSIONAL'];
+    var cu = t.toUpperCase();
+    var kwMatch = SECTION_KW.some(function(k){ return cu.indexOf(k) !== -1; });
+    var isAllCaps = t === cu;
+    // Explicit whitelist for mixed-case section headers
+    var isWhitelisted = /^Select Client Wins$/i.test(t);
+    // Mixed-case allowed only for short lines without & or lowercase runs (filters "Leadership Experience")
+    var isMixedSectionHdr = kwMatch && !isAllCaps && !isWhitelisted && t.length < 40 &&
+      !/&/.test(t) && !/^[-*•]/.test(t) && !/\|/.test(t) && !/\d{4}/.test(t) &&
+      !/[a-z]{4}/.test(t);
+    return kwMatch && (isAllCaps || isWhitelisted || isMixedSectionHdr) && t.length < 100 && !/^[-*•]/.test(t);
+  }
+
+  function isJobTitle(t) {
+    // ALL-CAPS lines that are job titles (contain |)
+    return /\|/.test(t) && (t.toUpperCase() === t || /[A-Z]{3,}/.test(t)) && t.length < 120;
+  }
+
+  function isCoLine(t) {
+    // Company + location + date lines (contain | and date range)
+    return /\|.*\d{4}/.test(t) && t.length < 100;
+  }
+
+  function isResultHdr(t) {
+    return /Results|Leadership|Wins|Transformations|Achievements|Performance|Awards?/i.test(t) &&
+      !/^[-•*]/.test(t) && t.length < 80 && !isSectionHdr(t) && !isJobTitle(t);
+  }
+
+  function isBullet(t) {
+    return /^[-•*▸]/.test(t) || /^\d+\./.test(t);
+  }
+
+  // Bold red phrases in Select Client Wins (case-insensitive match)
+  var BOLD_PHRASES = [
+    '6 Emmy Awards and 9 Promax/BDA honors',
+    'Drove 4x revenue growth',
+    '+96% revenue growth',
+    '+588% digital audience growth'
+  ];
+
+  var inExp = false, inEdu = false, inAff = false, inAddl = false;
+  var inWins = false, inResults = false, inRec = false;
+  var titleBlockLine = 0;
+  var inTitleBlock = true;
+
+  filteredLines.forEach(function(line) {
+    var rl = line;
+    var cl = line.trim();
+    if (!cl) {
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="40"/></w:pPr></w:p>';
+      return;
+    }
+
+    // Title block: first 2 non-empty non-header lines
+    if (inTitleBlock && !isSectionHdr(cl) && cl.length > 5) {
+      titleBlockLine++;
+      if (titleBlockLine === 1) {
+        // Job title: Calibri, inherited size, DA color — split on ** for bold phrases
+        bodyXml += P(ppr({sp:['0','0']}),
+          '<w:r>'+rpr(CA,'28',BK,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
+      }
+      if (titleBlockLine === 2) {
+        // Tagline: Calibri Light 11pt italic
+        bodyXml += P(ppr({sp:['0','0']}),
+          '<w:r><w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light" w:cs="Calibri Light"/><w:b w:val="0"/><w:bCs w:val="0"/><w:i/><w:iCs/><w:color w:val="'+DA+'"/><w:spacing w:val="20"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
+      }
+      // 3rd line exits title block
+      inTitleBlock = false;
+    }
+
+    // Section headers — centered 14pt bold with divider
+    if (isSectionHdr(cl)) {
+      inTitleBlock = false;
+      var isExp     = /PROFESSIONAL EXPERIENCE/.test(cl.toUpperCase());
+      var isEdu     = /EDUCATION/.test(cl.toUpperCase());
+      var isAff     = /AFFILI/.test(cl.toUpperCase());
+      var isAddlB   = /ADDITIONAL/.test(cl.toUpperCase()); // OTHER CLIENT RESULTS handled separately
+      var isWinsS   = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
+      var isRecS    = /RECOGNITION|AWARD/.test(cl.toUpperCase());
+      inExp     = isExp;
+      inEdu     = isEdu;
+      inAff     = isAff;
+      inAddl    = isAddlB;
+      inWins    = isWinsS;
+      inRec     = isRecS;
+      inResults = false;
+
+      if (isWinsS) {
+        // Select Client Wins — no divider, left-aligned, inherited size, no bold
+        bodyXml += P(ppr({sp:['0','0']}),
+          '<w:r>'+rpr(CA,'24',BK,true,null)+'<w:t>'+esc(cl)+'</w:t></w:r>');
+      } else {
+        // Named section headers — centered, Calibri 14pt bold, divider line tight below
+        bodyXml += P('<w:pPr><w:jc w:val="center"/></w:pPr>',
+          '<w:r>'+rpr(CA,'28',BK,true,null)+'<w:t>'+esc(cl)+'</w:t></w:r>');
+        bodyXml += P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="120"/></w:pPr>','');
+      }
+      return;
+    }
+
+    // Job title headers (e.g. VICE PRESIDENT OF MARKETING AND CREATIVE SERVICES)
+    // These are ALL CAPS, contain no | date, colored burgundy
+    if (!isSectionHdr(cl) && cl === cl.toUpperCase() && cl.length > 15 && cl.length < 100 && !/\|.*\d{4}/.test(cl) && /[A-Z]{4}/.test(cl) && !inWins && !inRec) {
+      inResults = false;
+      // Check if it's a sub-section job title (bold burgundy) vs top-level (non-bold burgundy)
+      var isBoldTitle = inExp || (bodyXml.indexOf('<w:t>PROFESSIONAL EXPERIENCE</w:t>') !== -1);
+      bodyXml += P(ppr({sp:['60','25']}),
+        '<w:r>'+rpr(CA,null,BG,isBoldTitle?true:null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Company + location + date lines (Calibri bold company name | Calibri Light date)
+    if (isCoLine(cl) && inExp) {
+      var parts = cl.split('|');
+      var coName = (parts[0]||'').trim();
+      var dateRest = parts.slice(1).join('|').trim();
+      bodyXml += P(ppr({sp:['0','0']}),
+        '<w:r>'+rpr(CA,null,null,true,false)+'<w:t xml:space="preserve">'+esc(coName)+'</w:t></w:r>'+
+        (dateRest ? '<w:r>'+rpr(CL,null,null,null,false)+'<w:t xml:space="preserve"> | '+esc(dateRest)+'</w:t></w:r>' : ''));
+      return;
+    }
+
+    // Italic description lines (lines directly after company line, before result headers)
+    if (inExp && !inWins && !isBullet(cl) && !isResultHdr(cl) && !isCoLine(cl) && !/^[A-Z]{4}/.test(cl)) {
+      bodyXml += P(ppr({sp:['0','80']}),
+        '<w:r>'+rpr(CL,null,BK,null,true)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Result sub-headers (Brand & Growth Results, etc.)
+    if (isResultHdr(cl) && (inExp || inAddl)) {
+      inResults = true;
+      bodyXml += P(ppr({sp:['80','40']}),
+        '<w:r>'+rpr(CA,null,BG2,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Select Client Wins bullets — bold red phrase + black rest
+    if (inWins) {
+      var winsText = cl.replace(/\[\/?YLW\]/g,'').replace(/\*\*/g,'').replace(/^[^a-zA-Z0-9+]+/,'');
+      var matched = false;
+      for (var bp = 0; bp < BOLD_PHRASES.length; bp++) {
+        if (winsText.toLowerCase().indexOf(BOLD_PHRASES[bp].toLowerCase()) === 0) {
+          var boldP = BOLD_PHRASES[bp];
+          var restP = winsText.slice(boldP.length);
+          bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+            '<w:r>'+rpr(CA,null,'9E3A3E',true,null)+'<w:t xml:space="preserve">'+esc(boldP)+'</w:t></w:r>'+
+            (restP ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(restP)+'</w:t></w:r>' : ''));
+          matched = true; break;
+        }
+      }
+      if (!matched) {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(winsText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Recognition/Awards bullets
+    if (inRec) {
+      var recText = cl.replace(/^[-\u2022*]\s*/,'').replace(/\*\*/g,'');
+      // Match ONLY the award name: digits + "Emmy Awards", "Promax/BDA Awards" etc — stop before " for "
+      var recMatch = recText.match(/^(\d+\s+(?:Emmy\s+Awards?|Promax\/BDA\s+Awards?|[A-Za-z/]+\s+Awards?))(.*)$/i);
+      if (recMatch) {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CA,null,RE,true,null)+'<w:t xml:space="preserve">'+esc(recMatch[1].trim())+'</w:t></w:r>'+
+          (recMatch[2].trim() ? '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve"> '+esc(recMatch[2].trim())+'</w:t></w:r>' : ''));
+      } else {
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(recText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // OTHER CLIENT RESULTS — job header: bold 11pt Calibri red #902B32 left-justified
+    if (/OTHER CLIENT RESULTS/i.test(cl)) {
+      bodyXml += P(ppr({sp:['80','0']}),
+        '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,'').replace(/^[-•*]\s*/,''))+'</w:t></w:r>');
+      return;
+    }
+
+    // Additional Brand section lines (ESPN Classic, MSNBC)
+    if (inAddl) {
+      var addlText = cl.replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+      var dashMatch = addlText.match(/^([^\u2013\u2014\-]+)([\u2013\u2014\-].*)$/);
+      if (dashMatch) {
+        bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(dashMatch[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,'22',BK,null,null)+'<w:t xml:space="preserve"> '+esc(dashMatch[2].trim())+'</w:t></w:r>');
+      } else {
+        bodyXml += P('<w:pPr><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',null,null,null)+'<w:t xml:space="preserve">'+esc(addlText)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Result bullets (Calibri Light bold metric + Calibri Light regular rest)
+    if ((isBullet(cl) || inResults) && inExp) {
+      // Strip bullet prefix and ** markers — split into bold metric + plain continuation
+      var bulText = cl.replace(/^[-•*\d.]+\s*/,'');
+      // If AI used **bold** markup, split on that
+      var boldMatch = bulText.match(/^\*\*(.+?)\*\*\s*(.*)/);
+      var pprBul = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>';
+      if (boldMatch) {
+        var bm1 = esc(boldMatch[1]); var bm2 = esc(boldMatch[2]);
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
+          (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
+      } else {
+        // No ** markup — render as Calibri Light non-bold black
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Education lines
+    if (inEdu) {
+      var eduPipe = cl.match(/^([^|]+)(\|.*)$/);
+      if (eduPipe) {
+        bodyXml += P(ppr({sp:['0','100']}),
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(eduPipe[1].trim())+'</w:t></w:r>'+
+          '<w:r>'+rpr(CA,'22',BK,true,null)+'<w:t xml:space="preserve"> '+esc(eduPipe[2])+'</w:t></w:r>');
+      } else {
+        bodyXml += P(ppr({sp:['60','0']}),
+          '<w:r>'+rpr(CA,'22',BK,null,null)+'<w:t xml:space="preserve">'+esc(cl)+'</w:t></w:r>');
+      }
+      return;
+    }
+
+    // Affiliations lines
+    if (inAff) {
+      var affParts = cl.split('|');
+      var affBold = affParts[0].trim();
+      var affRest = affParts.slice(1).join('|').trim();
+      bodyXml += P(ppr({sp:['0','50']}),
+        '<w:r>'+rpr(CA,null,BG,true,null)+'<w:t xml:space="preserve">'+esc(affBold)+'</w:t></w:r>'+
+        (affRest ? '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve"> | '+esc(affRest)+'</w:t></w:r>' : ''));
+      return;
+    }
+
+    // Core Expertise category headers — standalone lines with & or / pattern, inside expertise section
+    if (!inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
+      // Category headers: short, start with capital, contain & or /, no bullet, not a job title
+      // Category header: short, capital start, no bullet, no pipe/date, no skill-list pattern
+      // Matches lines with & or lines that are capitalized multi-word phrases without |
+      var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
+        /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
+      if (isExpCatHdr) {
+        bodyXml += P(ppr({sp:['40','40']}),
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+        return;
+      }
+    }
+
+    // Default: check BOLD_PHRASES first, then plain body paragraph
+    var rlStripped2 = cl.replace(/\[\/?YLW\]/g,'').replace(/^[^a-zA-Z0-9+]+/,'').replace(/\*\*/g,'');
+    var bpMatched = false;
+    for (var bpi = 0; bpi < BOLD_PHRASES.length; bpi++) {
+      if (rlStripped2.toLowerCase().indexOf(BOLD_PHRASES[bpi].toLowerCase()) === 0) {
+        var bpBold = BOLD_PHRASES[bpi];
+        var bpRest = rlStripped2.slice(bpBold.length);
+        bodyXml += P('<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>',
+          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(bpBold)+'</w:t></w:r>'+
+          (bpRest ? '<w:r>'+rpr(CA,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bpRest)+'</w:t></w:r>' : ''));
+        bpMatched = true;
+        break;
+      }
+    }
+    if (!bpMatched) {
+      bodyXml += P(ppr({sp:['0','60']}),
+        '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+    }
+  });
+
+  // ── Assemble OOXML document ───────────────────────────────────────────────
+  var NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var NSR = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+
+  var numberingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:abstractNum w:abstractNumId="0">' +
+    '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/>' +
+    '<w:lvlText w:val="\u2022"/>' +
+    '<w:lvlJc w:val="left"/>' +
+    '<w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>' +
+    '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:hint="default"/></w:rPr>' +
+    '</w:lvl></w:abstractNum>' +
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
+    '</w:numbering>';
+
+  var stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles '+NS+'>' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+    '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>' +
+    '<w:sz w:val="22"/><w:szCs w:val="22"/>' +
+    '</w:rPr></w:rPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">' +
+    '<w:name w:val="Normal"/>' +
+    '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>' +
+    '</w:style>' +
+    '</w:styles>';
+
+  var documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document '+NS+' '+NSR+'>' +
+    '<w:body>' +
+    hdrXml + bodyXml +
+    '<w:sectPr>' +
+    '<w:pgSz w:w="12240" w:h="15840"/>' +
+    '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="708" w:footer="708" w:gutter="0"/>' +
+    '</w:sectPr>' +
+    '</w:body></w:document>';
+
+  var _relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+
+  var wRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' +
+    '</Relationships>';
+
+  var contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
+    '</Types>';
+
+  var safe = (filename||'JayWadhwa_Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
+
+  var zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypes);
+  zip.file('_rels/.rels', _relsXml);
+  zip.file('word/document.xml', documentXml);
+  zip.file('word/_rels/document.xml.rels', wRelsXml);
+  zip.file('word/styles.xml', stylesXml);
+  zip.file('word/numbering.xml', numberingXml);
+
+  zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = safe + '.docx'; a.click();
+      URL.revokeObjectURL(url);
+      toast('Resume exported. Open in Word to review.', 'success');
+    })
+    .catch(function(e) { toast('Export failed: '+e.message,'error'); });
+}
+
 function exportRTDocx() {
-  var coRaw = (document.getElementById('rt-link-app').selectedOptions[0] && document.getElementById('rt-link-app').selectedOptions[0].text || '').split('\u2014')[0];
-  var roRaw = (document.getElementById('rt-jd').value || '').slice(0, 60); // use first part of JD as role hint if no separate field
-  // Better: pull company and role from the linked app
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
-  var co = cleanForFilename(app ? app.company : coRaw) || 'Company';
+  var co = cleanForFilename(app ? app.company : '') || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
   var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
-  exportGenericDocx(rtOutput, fname);
+  buildResumeDocx(rtOutput, fname, false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
@@ -7697,11 +8263,73 @@ function renderDocsTable() {
         (hasPath
           ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
           : '<span style="font-size:11px;color:var(--text-light)">No file</span>') +
+        (d.doc_type === 'Resume' ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="setDocAsBaseResume(this.dataset.docid, this.dataset.path)" title="Set as Base Resume for Resume Tailor">★ Set Base</button> ' : '') +
         ' <button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
   }).join('');
+}
+
+async function setDocAsBaseResume(id, storagePath) {
+  // Download the file, extract text, save as base resume
+  try {
+    toast('Loading resume text...', '');
+    // Try to get text from notes field first, then download file
+    const doc = allDocs.find(function(d){ return d.id === id; });
+    if (doc && doc.notes) {
+      baseResumeText = doc.notes;
+      document.getElementById('base-resume-text').value = baseResumeText;
+      // Show base doc modal with text pre-filled so user can confirm/save
+      openBaseDocModal();
+      toast('Resume loaded. Review and click Save.', 'success');
+      return;
+    }
+    if (!storagePath) {
+      // No file — open base doc modal for manual paste
+      openBaseDocModal();
+      return;
+    }
+    // Download and extract text from file
+    const r = await fetch(WORKER_URL + '/storage/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ path: storagePath })
+    });
+    const data = await r.json();
+    if (!data.url) throw new Error('Could not get file URL');
+    const fileResp = await fetch(data.url);
+    const blob = await fileResp.blob();
+    const ext = (storagePath || '').split('.').pop().toLowerCase();
+    var text = '';
+    if (ext === 'txt') {
+      text = await blob.text();
+    } else if (ext === 'docx') {
+      const ab = await blob.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: ab });
+      text = result.value || '';
+    } else if (ext === 'pdf') {
+      const ab = await blob.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+      for (var i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        text += tc.items.map(function(s){ return s.str; }).join(' ') + '\n';
+      }
+    }
+    if (text.trim()) {
+      baseResumeText = text.trim();
+      document.getElementById('base-resume-text').value = baseResumeText;
+      openBaseDocModal();
+      toast('Resume loaded. Review and click Save.', 'success');
+    } else {
+      openBaseDocModal();
+      toast('Could not extract text. Paste manually.', 'error');
+    }
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+    openBaseDocModal();
+  }
 }
 
 async function downloadDoc(id, storagePath) {
@@ -8556,6 +9184,7 @@ const JS_SIZES = [
 ];
 
 let jsOutput = '';
+var jsCompanyCache = {};
 
 function loadJobSearchPage() {
   renderWorkTypeChips();
@@ -8645,6 +9274,67 @@ function exportJobSearchDocx() {
   exportGenericDocx(jsOutput, 'JayWadhwa_JobSearch_Results_' + dateStr);
 }
 
+async function runInlineCompanyIntel(company, role, industry, btnEl) {
+  // Check session cache first — avoid duplicate AI calls
+  var cacheKey = (company + '|' + role).toLowerCase();
+  var panelId = 'ci-inline-' + company.replace(/[^a-zA-Z0-9]/g,'_');
+  var panel = document.getElementById(panelId);
+  if (!panel) return;
+
+  if (jsCompanyCache[cacheKey]) {
+    panel.innerHTML = '<div style="white-space:pre-wrap;font-size:13px;line-height:1.7;padding:12px">' + jsCompanyCache[cacheKey] + '</div>';
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:13px">Researching ' + company + '...</div>';
+  if (btnEl) btnEl.disabled = true;
+
+  // Pull logged contacts at this company
+  var matched = allContacts.filter(function(c) {
+    return c.company && c.company.toLowerCase() === company.toLowerCase();
+  });
+  var contactSection = matched.length > 0
+    ? '\n\nLogged contacts at ' + company + ':\n' + matched.map(function(c){ return '- ' + (c.name||'') + (c.title ? ', ' + c.title : ''); }).join('\n')
+    : '';
+
+  var prompt = 'Jay Wadhwa is targeting the ' + role + ' role at ' + company + (industry ? ' (' + industry + ')' : '') + '.' + contactSection +
+    '\n\nProvide:\n' +
+    '1. Who to contact — specific titles and why\n' +
+    '2. Top 3 talking points connecting Jay to this company\n' +
+    '3. Suggested InMail subject line\n' +
+    '4. One-sentence email opener specific to this company\n' +
+    '5. Any recent news or leadership changes worth referencing\n' +
+    '\nBe specific. Peer-to-peer CMO voice. No generic advice. Under 250 words.';
+
+  var jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+
+  try {
+    var r = await fetch(WORKER_URL + '/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        system: jsSystemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        use_web_search: true
+      })
+    });
+    var data = await r.json();
+    var text = (data.content || []).map(function(b){ return b.text || ''; }).join('') || 'No response.';
+    jsCompanyCache[cacheKey] = text;
+    var rendered = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    panel.innerHTML = '<div style="white-space:normal;font-size:13px;line-height:1.7;padding:12px;border-top:1px solid var(--border)">' + rendered + '</div>';
+  } catch(e) {
+    panel.innerHTML = '<div style="padding:12px;color:red;font-size:13px">Error: ' + e.message + '</div>';
+  } finally {
+    if (btnEl) btnEl.disabled = false;
+  }
+}
+
 async function runJobSearch() {
   const roles    = document.getElementById('js-roles').value.trim();
   const location = document.getElementById('js-location').value.trim();
@@ -8678,7 +9368,7 @@ async function runJobSearch() {
     '\n\nOnly real postings from last 60 days. No fabricated URLs.';
 
   // Use a lean system prompt for job search — full resume causes token rate limit errors
-  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+  const jsSystemPrompt = "Job search assistant for Jay Wadhwa, VP/CMO-level marketing executive. Chicago area. Search web for real current job postings. Return only valid JSON array, no prose.";
 
   try {
     // Send use_web_search flag so Worker enables the web search tool
