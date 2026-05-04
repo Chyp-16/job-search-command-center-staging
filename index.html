@@ -7359,6 +7359,8 @@ function buildResumeDocx(text, filename, markedUp) {
       var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
         /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
       if (isExpCatHdr) {
+        inResults = false;
+        inExp = false;
         bodyXml += P(ppr({sp:['40','40']}),
           '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
         return;
