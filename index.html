@@ -1627,8 +1627,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card-header">✦ Tailored Resume Analysis
             <div style="display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(false)">⬇ Final Resume</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(true)">⬇ Markup</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -6896,15 +6895,16 @@ function clearRT() {
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
-function exportRTDocx(markupMode) {
+function exportRTDocx() {
   var coRaw = (document.getElementById('rt-link-app').selectedOptions[0] && document.getElementById('rt-link-app').selectedOptions[0].text || '').split('\u2014')[0];
+  var roRaw = (document.getElementById('rt-jd').value || '').slice(0, 60); // use first part of JD as role hint if no separate field
+  // Better: pull company and role from the linked app
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
   var co = cleanForFilename(app ? app.company : coRaw) || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
-  var suffix = markupMode ? '_Markup' : '_Final';
-  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
-  exportGenericDocx(rtOutput, fname, markupMode);
+  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
+  exportGenericDocx(rtOutput, fname);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
@@ -7066,14 +7066,13 @@ function _esc(s) {
 }
 
 function _rpr(opts) {
-  // opts: { bold, italic, color, sz, font, highlight }
+  // opts: { bold, italic, color, sz, font }
   var x = '';
-  if (opts && opts.bold)      x += '<w:b/><w:bCs/>';
-  if (opts && opts.italic)    x += '<w:i/><w:iCs/>';
-  if (opts && opts.color)     x += '<w:color w:val="' + opts.color + '"/>';
-  if (opts && opts.sz)        x += '<w:sz w:val="' + opts.sz + '"/><w:szCs w:val="' + opts.sz + '"/>';
-  if (opts && opts.font)      x += '<w:rFonts w:ascii="' + opts.font + '" w:hAnsi="' + opts.font + '" w:cs="' + opts.font + '"/>';
-  if (opts && opts.highlight) x += '<w:highlight w:val="' + opts.highlight + '"/>';
+  if (opts && opts.bold)   x += '<w:b/><w:bCs/>';
+  if (opts && opts.italic) x += '<w:i/><w:iCs/>';
+  if (opts && opts.color)  x += '<w:color w:val="' + opts.color + '"/>';
+  if (opts && opts.sz)     x += '<w:sz w:val="' + opts.sz + '"/><w:szCs w:val="' + opts.sz + '"/>';
+  if (opts && opts.font)   x += '<w:rFonts w:ascii="' + opts.font + '" w:hAnsi="' + opts.font + '" w:cs="' + opts.font + '"/>';
   return x ? '<w:rPr>' + x + '</w:rPr>' : '';
 }
 
@@ -7081,35 +7080,25 @@ function _run(text, opts) {
   return '<w:r>' + _rpr(opts) + '<w:t xml:space="preserve">' + _esc(text) + '</w:t></w:r>';
 }
 
-function _inlineRuns(text, markupMode) {
-  // Parse **bold**, *italic*, [YLW]...[/YLW] inline markdown into Word runs
-  // markupMode=true: render [YLW] as yellow highlight; false: strip markers
+function _inlineRuns(text) {
+  // Parse **bold**, *italic* inline markdown into Word runs
   if (!text) return _run('');
   var parts = [];
   var remaining = text;
   while (remaining.length > 0) {
-    // Check for [YLW]...[/YLW]
-    var ym = /\[YLW\]([\s\S]*?)\[\/YLW\]/.exec(remaining);
     // Check for **bold**
     var bm = /\*\*([^*]+)\*\*/.exec(remaining);
     // Check for *italic* (not **)
     var im = /(?<!\*)\*(?!\*)([^*]+)(?<!\*)\*(?!\*)/.exec(remaining);
     var next = null;
-    // Pick whichever marker comes first
-    if (ym && (!bm || ym.index <= bm.index) && (!im || ym.index <= im.index)) {
-      next = { idx: ym.index, len: ym[0].length, inner: ym[1], yellow: true };
-    } else if (bm && (!im || bm.index <= im.index)) {
+    if (bm && (!im || bm.index <= im.index)) {
       next = { idx: bm.index, len: bm[0].length, inner: bm[1], bold: true };
     } else if (im) {
       next = { idx: im.index, len: im[0].length, inner: im[1], italic: true };
     }
     if (next) {
       if (next.idx > 0) parts.push(_run(remaining.slice(0, next.idx), { sz: 22, font: 'Calibri' }));
-      var runOpts = { sz: 22, font: 'Calibri' };
-      if (next.bold) runOpts.bold = true;
-      if (next.italic) runOpts.italic = true;
-      if (next.yellow && markupMode) runOpts.highlight = 'yellow';
-      parts.push(_run(next.inner, runOpts));
+      parts.push(_run(next.inner, { bold: next.bold, italic: next.italic, sz: 22, font: 'Calibri' }));
       remaining = remaining.slice(next.idx + next.len);
     } else {
       parts.push(_run(remaining, { sz: 22, font: 'Calibri' }));
@@ -7167,14 +7156,14 @@ function _h3(text) {
   return _para(runs, ppr);
 }
 
-function _body(text, markupMode) {
+function _body(text) {
   var ppr = _ppr({ spacing_before: 0, spacing_after: 80 });
-  return _para(_inlineRuns(text, markupMode), ppr);
+  return _para(_inlineRuns(text), ppr);
 }
 
-function _bullet(text, numId, markupMode) {
+function _bullet(text, numId) {
   var ppr = _ppr({ numId: numId, ilvl: 0, spacing_before: 0, spacing_after: 40 });
-  return _para(_inlineRuns(text, markupMode), ppr);
+  return _para(_inlineRuns(text), ppr);
 }
 
 function _tableXml(rows) {
@@ -7258,7 +7247,7 @@ function _tableXml(rows) {
   return tbl;
 }
 
-function _mdToDocxXml(text, bulletNumId, numberedNumId, markupMode) {
+function _mdToDocxXml(text, bulletNumId, numberedNumId) {
   var parts = [];
   var rawLines = text.split('\n');
   var tableBuffer = [];
@@ -7308,12 +7297,12 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId, markupMode) {
 
     // Bullet
     if (t.startsWith('- ') || t.startsWith('* ') || t.startsWith('\u2022 ')) {
-      parts.push(_bullet(t.slice(2), bulletNumId, markupMode)); continue;
+      parts.push(_bullet(t.slice(2), bulletNumId)); continue;
     }
 
     // Numbered list
     if (/^\d+[.)]\s/.test(t)) {
-      parts.push(_bullet(t.replace(/^\d+[.)]\s+/, ''), numberedNumId, markupMode)); continue;
+      parts.push(_bullet(t.replace(/^\d+[.)]\s+/, ''), numberedNumId)); continue;
     }
 
     // Bold-only line
@@ -7322,13 +7311,13 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId, markupMode) {
     }
 
     // Normal body
-    parts.push(_body(t, markupMode));
+    parts.push(_body(t));
   }
   flushTable();
   return parts.join('\n');
 }
 
-async function makeDocxBlob(text, title, markupMode) {
+async function makeDocxBlob(text, title) {
   var BULLET_ID = 1;
   var NUMBERED_ID = 2;
 
@@ -7344,10 +7333,8 @@ async function makeDocxBlob(text, title, markupMode) {
     );
 
   // Strip leading DOC header line to avoid duplicate with document title
-  // For Final export: strip [YLW]...[/YLW] markers entirely
   var cleanText = text.replace(/^#+\s*DOC\s+\d+[:\s][^\n]*/im, '').replace(/^\s*---+\s*/m, '').trim();
-  if (!markupMode) cleanText = cleanText.replace(/\[YLW\]([\s\S]*?)\[\/YLW\]/g, '$1');
-  var bodyXml = _mdToDocxXml(cleanText, BULLET_ID, NUMBERED_ID, markupMode);
+  var bodyXml = _mdToDocxXml(cleanText, BULLET_ID, NUMBERED_ID);
 
   var sectPr =
     '<w:sectPr>' +
@@ -7464,11 +7451,11 @@ async function makeDocxBlob(text, title, markupMode) {
   });
 }
 
-async function exportGenericDocx(text, filename, markupMode) {
+async function exportGenericDocx(text, filename) {
   if (!text) { toast('No output to export.', 'error'); return; }
   const dateStr = new Date().toISOString().split('T')[0];
   try {
-    const blob = await makeDocxBlob(text, filename.replace(/_/g, ' '), markupMode);
+    const blob = await makeDocxBlob(text, filename.replace(/_/g, ' '));
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
