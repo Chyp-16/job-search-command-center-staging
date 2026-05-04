@@ -7232,6 +7232,20 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
+    // Core Expertise category headers — must come BEFORE italic check
+    // Headers: short, start capital, contain & or /, no pipe, no date, not a bullet
+    // Skill list lines always contain | so they won't match this
+    var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
+      /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl) &&
+      !inEdu && !inAff && !inWins && !inRec;
+    if (isExpCatHdr) {
+      inResults = false;
+      inExp = false;
+      bodyXml += P(ppr({sp:['40','40']}),
+        '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      return;
+    }
+
     // Italic description lines (lines directly after company line, before result headers)
     if (inExp && !inWins && !isBullet(cl) && !isResultHdr(cl) && !isCoLine(cl) && !/^[A-Z]{4}/.test(cl)) {
       bodyXml += P(ppr({sp:['0','80']}),
@@ -7351,20 +7365,7 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Core Expertise category headers — standalone lines with & or / pattern, inside expertise section
-    // Guard excludes education, affiliations, wins, recognition — but NOT inResults/inExp
-    // so headers are always bold/red even if AI places Core Expertise after Experience
-    if (!inEdu && !inAff && !inAddl && !inWins && !inRec) {
-      var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
-        /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
-      if (isExpCatHdr) {
-        inResults = false;
-        inExp = false;
-        bodyXml += P(ppr({sp:['40','40']}),
-          '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
-        return;
-      }
-    }
+
 
     // Default: check BOLD_PHRASES first, then plain body paragraph
     var rlStripped2 = cl.replace(/\[\/?YLW\]/g,'').replace(/^[^a-zA-Z0-9+]+/,'').replace(/\*\*/g,'');
