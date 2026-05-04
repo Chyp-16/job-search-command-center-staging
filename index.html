@@ -7354,6 +7354,8 @@ function buildResumeDocx(text, filename, markedUp) {
     // Core Expertise category headers — standalone lines with & or / pattern, inside expertise section
     if (!inEdu && !inAff && !inAddl && !inWins && !inRec && !inResults) {
       // Category headers: short, start with capital, contain & or /, no bullet, not a job title
+      // Category header: short, capital start, no bullet, no pipe/date, no skill-list pattern
+      // Matches lines with & or lines that are capitalized multi-word phrases without |
       var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
         /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl);
       if (isExpCatHdr) {
