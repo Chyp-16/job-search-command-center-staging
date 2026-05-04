@@ -1627,7 +1627,8 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card-header">✦ Tailored Resume Analysis
             <div style="display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="copyRTOutput()">Copy All</button>
-              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx()">⬇ Export .docx</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(false)">⬇ Final Resume</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportRTDocx(true)">⬇ Markup</button>
             </div>
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -7037,6 +7038,35 @@ function buildResumeDocx(text, filename, markedUp) {
       .replace(/\*\*(.*?)\*\*/g,'$1');
   }
 
+  // Build runs for a text segment — splits [YLW]...[/YLW] into yellow-highlighted runs
+  // Used only when markedUp=true; otherwise caller uses esc() as normal
+  function runsYlw(rawText, baseRprXml) {
+    if (!markedUp) return '<w:r>' + baseRprXml + '<w:t xml:space="preserve">' + esc(rawText) + '</w:t></w:r>';
+    var result = '';
+    var remaining = (rawText||'').replace(/<mark>/gi,'').replace(/<\/mark>/gi,'').replace(/\*\*(.*?)\*\*/g,'$1');
+    var re = /\[YLW\]([\s\S]*?)\[\/YLW\]/g;
+    var lastIndex = 0;
+    var m;
+    while ((m = re.exec(remaining)) !== null) {
+      // text before the marker
+      if (m.index > lastIndex) {
+        var before = remaining.slice(lastIndex, m.index).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        if (before) result += '<w:r>' + baseRprXml + '<w:t xml:space="preserve">' + before + '</w:t></w:r>';
+      }
+      // highlighted text
+      var inner = m[1].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (inner) {
+        var hlRpr = baseRprXml.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
+        result += '<w:r>' + hlRpr + '<w:t xml:space="preserve">' + inner + '</w:t></w:r>';
+      }
+      lastIndex = re.lastIndex;
+    }
+    // remaining text after last marker
+    var tail = remaining.slice(lastIndex).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (tail) result += '<w:r>' + baseRprXml + '<w:t xml:space="preserve">' + tail + '</w:t></w:r>';
+    return result || '<w:r>' + baseRprXml + '<w:t></w:t></w:r>';
+  }
+
   // Run properties
   function rpr(font, sz, color, bold, ital) {
     var s = '<w:rPr>';
@@ -7319,9 +7349,8 @@ function buildResumeDocx(text, filename, markedUp) {
           '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
           (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
       } else {
-        // No ** markup — render as Calibri Light non-bold black
-        bodyXml += P(pprBul,
-          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
+        // No ** markup — render with runsYlw to support yellow highlights in Markup mode
+        bodyXml += P(pprBul, runsYlw(bulText, rpr(CL,null,BK,null,null)));
       }
       return;
     }
@@ -7380,8 +7409,7 @@ function buildResumeDocx(text, filename, markedUp) {
       }
     }
     if (!bpMatched) {
-      bodyXml += P(ppr({sp:['0','60']}),
-        '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
+      bodyXml += P(ppr({sp:['0','60']}), runsYlw(cl, rpr(CA,null,null,null,null)));
     }
   });
 
@@ -7464,13 +7492,14 @@ function buildResumeDocx(text, filename, markedUp) {
     .catch(function(e) { toast('Export failed: '+e.message,'error'); });
 }
 
-function exportRTDocx() {
+function exportRTDocx(markedUp) {
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
   var co = cleanForFilename(app ? app.company : '') || 'Company';
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
-  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume';
-  buildResumeDocx(rtOutput, fname, false);
+  var suffix = markedUp ? '_Markup' : '_Final';
+  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
+  buildResumeDocx(rtOutput, fname, markedUp ? true : false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
