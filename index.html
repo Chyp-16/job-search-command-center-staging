@@ -7150,6 +7150,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
   var inExp = false, inEdu = false, inAff = false, inAddl = false;
   var inWins = false, inResults = false, inRec = false;
+  var inExpertise = false;
   var titleBlockLine = 0;
   var inTitleBlock = true;
 
@@ -7189,13 +7190,15 @@ function buildResumeDocx(text, filename, markedUp) {
       var isAddlB   = /ADDITIONAL/.test(cl.toUpperCase()); // OTHER CLIENT RESULTS handled separately
       var isWinsS   = /CLIENT WIN|SELECT CLIENT/.test(cl.toUpperCase());
       var isRecS    = /RECOGNITION|AWARD/.test(cl.toUpperCase());
-      inExp     = isExp;
-      inEdu     = isEdu;
-      inAff     = isAff;
-      inAddl    = isAddlB;
-      inWins    = isWinsS;
-      inRec     = isRecS;
-      inResults = false;
+      var isExpertiseS = /EXPERTISE/.test(cl.toUpperCase());
+      inExp       = isExp;
+      inEdu       = isEdu;
+      inAff       = isAff;
+      inAddl      = isAddlB;
+      inWins      = isWinsS;
+      inRec       = isRecS;
+      inExpertise = isExpertiseS;
+      inResults   = false;
 
       if (isWinsS) {
         // Select Client Wins — no divider, left-aligned, inherited size, no bold
@@ -7232,15 +7235,10 @@ function buildResumeDocx(text, filename, markedUp) {
       return;
     }
 
-    // Core Expertise category headers — must come BEFORE italic check
-    // Headers: short, start capital, contain & or /, no pipe, no date, not a bullet
-    // Skill list lines always contain | so they won't match this
-    var isExpCatHdr = /^[A-Z]/.test(cl) && cl.length < 55 && !isBullet(cl) &&
-      /[&\/]/.test(cl) && !/\|/.test(cl) && !/\d{4}/.test(cl) && !isCoLine(cl) &&
-      !inEdu && !inAff && !inWins && !inRec;
-    if (isExpCatHdr) {
-      inResults = false;
-      inExp = false;
+    // Core Expertise category headers — position-based, not text-based
+    // Rule: inside Core Expertise section, any line without | is a header
+    // Lines with | are skill lists — render plain (handled by default path)
+    if (inExpertise && !/\|/.test(cl) && !isBullet(cl)) {
       bodyXml += P(ppr({sp:['40','40']}),
         '<w:r>'+rpr(CA,'22',RE,true,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
       return;
