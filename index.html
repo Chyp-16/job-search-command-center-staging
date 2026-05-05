@@ -7174,7 +7174,18 @@ function buildResumeDocx(text, filename, markedUp) {
     P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="80"/></w:pPr>','');
 
   // ── Parse AI output into body paragraphs ─────────────────────────────────
-  var lines = (text||'').split('\n');
+  // Pre-process: collapse any [YLW]...[/YLW] pairs that span line breaks
+  // so every open/close tag pair is on the same line before per-line rendering
+  var textNorm = (text||'');
+  if (markedUp) {
+    textNorm = textNorm.replace(/\[YLW\]([^\[\]]*?)\n([^\[\]]*?)\[\/YLW\]/g, '[YLW]$1 $2[/YLW]');
+    // Also handle unclosed [YLW] at end of line — close it before the line break and reopen after
+    textNorm = textNorm.replace(/\[YLW\]([^\n]*?)(?=\n|$)/g, function(match, inner) {
+      if (match.indexOf('[/YLW]') === -1) return '[YLW]' + inner + '[/YLW]';
+      return match;
+    });
+  }
+  var lines = textNorm.split('\n');
   var bodyXml = '';
 
   // Filter header lines that belong to Jay's contact info (already in hdrXml)
@@ -7565,11 +7576,16 @@ function exportRTDocx(markedUp) {
       return;
     }
     textToExport = diffMarkWords(baseResumeText, rtOutput);
-    // DIAGNOSTIC: count changed words and report before export
+    // DIAGNOSTIC: count changed words and show which lines contain markers
     var ylwCount = (textToExport.match(/\[YLW\]/g) || []).length;
     var baseWordCount = (baseResumeText.match(/\S+/g) || []).length;
     var tailorWordCount = (rtOutput.match(/\S+/g) || []).length;
-    toast('Diff complete: ' + ylwCount + ' changed word group(s) found. Base: ' + baseWordCount + ' words. Tailored: ' + tailorWordCount + ' words. Exporting...', 'success');
+    // Show each marked line in console so we can see which render paths they hit
+    var markedLines = textToExport.split('\n').filter(function(l){ return l.indexOf('[YLW]') !== -1; });
+    console.log('=== MARKUP DIAGNOSTIC ===');
+    console.log('Base words:', baseWordCount, '| Tailored words:', tailorWordCount, '| Changed groups:', ylwCount);
+    markedLines.forEach(function(l, i){ console.log('MARKED LINE ' + (i+1) + ':', l.slice(0,120)); });
+    toast('Diff: ' + ylwCount + ' changes found across ' + markedLines.length + ' lines. Check browser console (Cmd+Option+J) for details. Exporting...', 'success');
     if (ylwCount === 0) {
       toast('WARNING: No changes detected. Base Resume may not match tailored output. Check that Base Resume is saved.', 'error');
       return;
