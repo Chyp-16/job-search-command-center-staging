@@ -7025,15 +7025,22 @@ function diffChangedWords(baseText, tailoredText) {
   function tokenize(str) { return (str||'').match(/\S+/g) || []; }
   function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%]/g,''); }
   function strip(s) { return s.replace(/\*\*/g,'').replace(/^[-•*]\s+/gm,'').replace(/\[\/?YLW\]/g,''); }
+  // Common English words that are never meaningful "changes"
+  var stopWords = {the:1,and:1,for:1,with:1,from:1,that:1,this:1,have:1,are:1,was:1,has:1,
+    through:1,across:1,into:1,their:1,been:1,they:1,will:1,not:1,but:1,all:1,each:1,more:1,
+    also:1,its:1,our:1,can:1,one:1,two:1,new:1,per:1,over:1,than:1,when:1,who:1,how:1,
+    media:1,value:1,paid:1,pages:1,execution:1,vision:1,data:1,driven:1,global:1,market:1,
+    build:1,built:1,drove:1,drive:1,grew:1,grow:1,led:1,lead:1,team:1,work:1,make:1,
+    manage:1,managed:1,create:1,created:1,develop:1,developed:1,deliver:1,delivered:1};
   var baseWords = tokenize(strip(baseText));
   var newWords  = tokenize(strip(tailoredText));
   var baseSet = {};
   baseWords.forEach(function(w){ var n=norm(w); if(n) baseSet[n]=true; });
-  // A word is "changed" if its normalized form does not appear in the base at all
+  // Only flag words that: are not in base, not stop words, at least 4 chars normalized
   var changed = {};
   newWords.forEach(function(w){
     var n = norm(w);
-    if (n && n.length > 2 && !baseSet[n]) changed[n] = true;
+    if (n && n.length >= 4 && !baseSet[n] && !stopWords[n]) changed[n] = true;
   });
   return Object.keys(changed);
 }
