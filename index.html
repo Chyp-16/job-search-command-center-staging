@@ -1644,6 +1644,13 @@ a { color: var(--burgundy); text-decoration: none; }
           </div>
           <div style="padding:20px"><div id="rt-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
         </div>
+        <div class="dash-card" id="rt-unused-keywords-panel" style="display:none;border-left:4px solid var(--burgundy)">
+          <div class="dash-card-header">⚠️ Keywords Not Incorporated</div>
+          <div style="padding:16px 20px">
+            <p style="font-size:13px;color:var(--text-light);margin:0 0 12px">These keywords could not be organically added to the resume. Consider adding them manually or revising for a better fit:</p>
+            <div id="rt-unused-keywords-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -7036,12 +7043,32 @@ async function runResumeTailor() {
       }
     }
     toast('Resume tailoring complete.', 'success');
+
+    // Check which required/nice keywords did not make it into the output
+    var allKeywords = [req, nice].join(',').split(',').map(function(k){ return k.trim(); }).filter(Boolean);
+    if (allKeywords.length > 0) {
+      var outputLower = result.toLowerCase();
+      var unused = allKeywords.filter(function(kw) {
+        return outputLower.indexOf(kw.toLowerCase()) === -1;
+      });
+      var unusedPanel = document.getElementById('rt-unused-keywords-panel');
+      var unusedList  = document.getElementById('rt-unused-keywords-list');
+      if (unused.length > 0) {
+        unusedList.innerHTML = unused.map(function(kw) {
+          return '<span style="background:var(--hover);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:12px;color:var(--burgundy);font-weight:600">' + kw + '</span>';
+        }).join('');
+        unusedPanel.style.display = 'block';
+      } else {
+        unusedPanel.style.display = 'none';
+      }
+    }
   } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
 }
 
 function clearRT() {
   ['rt-jd','rt-keywords-req','rt-keywords-nice'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
+  const u=document.getElementById('rt-unused-keywords-panel'); if(u) u.style.display='none';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
 
