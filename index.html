@@ -1616,8 +1616,11 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
               <div class="form-group"></div>
               <div class="form-group full">
-                <label class="form-label">Job Description (optional — paste or upload)</label>
-                <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                <label class="form-label">Job Description (optional — paste, upload, or drag &amp; drop)</label>
+                <textarea class="form-textarea" id="rt-jd" rows="8" placeholder="Paste the full job description here... or drag and drop a file (.pdf, .doc, .docx, .txt)"
+                  ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)';this.style.background='var(--hover)';"
+                  ondragleave="this.style.borderColor='';this.style.background='';"
+                  ondrop="event.preventDefault();this.style.borderColor='';this.style.background='';rtHandleDrop(event);"></textarea>
                 <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
                   <input type="file" id="rt-jd-file-page" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleRTFileUploadPage(event)">
                   <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rt-jd-file-page').click()">📎 Upload JD File</button>
@@ -6583,6 +6586,12 @@ async function handleJDFileUpload(event, inputId, labelId) {
 
 function handleIPFileUpload(event)     { handleJDFileUpload(event, 'ip-jd',       'ip-jd-file-name'); }
 function handleRTFileUploadPage(event) { handleJDFileUpload(event, 'rt-jd',        'rt-jd-file-page-name'); }
+function rtHandleDrop(event) {
+  var files = event.dataTransfer && event.dataTransfer.files;
+  if (!files || !files.length) return;
+  // Reuse existing upload handler by simulating a file input event
+  handleJDFileUpload({ target: { files: files } }, 'rt-jd', 'rt-jd-file-page-name');
+}
 function handleCLGFileUpload(event)    { handleJDFileUpload(event, 'clg-jd',       'clg-jd-file-name'); }
 function handleRTFileUpload(event)     { handleJDFileUpload(event, 'ai-jd-text',   'rt-jd-file-name'); }
 function handleCLFileUpload(event)     { handleJDFileUpload(event, 'ai-gen-jd',    'cl-jd-file-name'); }
