@@ -7013,7 +7013,12 @@ async function runResumeTailor() {
   try {
     const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     rtOutput = result;
-    contentEl.textContent = result;
+    // Display clean version — strip [YLW] markers and AI preamble for readability
+    var displayText = result
+      .replace(/\[YLW\]/g, '').replace(/\[\/YLW\]/g, '')  // strip highlight markers
+      .replace(/^\s*[\s\S]*?(?=(?:Jay Wadhwa|VP,|SUMMARY|PROFESSIONAL|SELECT CLIENT|Building ))/i, '') // strip AI preamble before resume content
+      .trim();
+    contentEl.textContent = displayText || result;
     const linkedId = document.getElementById('rt-link-app').value || null;
     await dbPost('ai_outputs', { output_type: 'resume_tailor', linked_application_id: linkedId, content: result });
     if (linkedId) {
