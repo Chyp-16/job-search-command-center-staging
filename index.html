@@ -7042,17 +7042,17 @@ function diffChangedWords(baseText, tailoredText) {
 // This runs AFTER buildResumeDocx produces the XML — zero formatting impact
 function applyMarkupHighlights(docXml, changedWords) {
   if (!changedWords || changedWords.length === 0) return docXml;
-  // Build a set for fast lookup
   var changed = {};
   changedWords.forEach(function(w){ changed[w] = true; });
-  // Match each <w:t> run text and inject highlight if it contains a changed word
+  // norm must match diffChangedWords: remove all non-alphanumeric
+  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%]/g,''); }
   return docXml.replace(/<w:r>(<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t[^>]*>([^<]+)<\/w:t><\/w:r>/g,
     function(match, rPr, text) {
       if (!text) return match;
-      var textNorm = text.toLowerCase().replace(/[^a-z0-9$%]/g,' ').trim().split(/\s+/);
-      var hasChanged = textNorm.some(function(w){ return changed[w]; });
+      // Split run text into tokens and normalize same way as diffChangedWords
+      var tokens = text.split(/\s+/);
+      var hasChanged = tokens.some(function(tok){ return changed[norm(tok)]; });
       if (!hasChanged) return match;
-      // Add highlight to existing rPr or create new one
       if (rPr) {
         var newRPr = rPr.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
         return match.replace(rPr, newRPr);
