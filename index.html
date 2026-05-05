@@ -7565,6 +7565,15 @@ function exportRTDocx(markedUp) {
       return;
     }
     textToExport = diffMarkWords(baseResumeText, rtOutput);
+    // DIAGNOSTIC: count changed words and report before export
+    var ylwCount = (textToExport.match(/\[YLW\]/g) || []).length;
+    var baseWordCount = (baseResumeText.match(/\S+/g) || []).length;
+    var tailorWordCount = (rtOutput.match(/\S+/g) || []).length;
+    toast('Diff complete: ' + ylwCount + ' changed word group(s) found. Base: ' + baseWordCount + ' words. Tailored: ' + tailorWordCount + ' words. Exporting...', 'success');
+    if (ylwCount === 0) {
+      toast('WARNING: No changes detected. Base Resume may not match tailored output. Check that Base Resume is saved.', 'error');
+      return;
+    }
   }
   buildResumeDocx(textToExport, fname, markedUp ? true : false);
 }
