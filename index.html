@@ -1601,6 +1601,14 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="rt-keywords-nice" placeholder="e.g. HubSpot, demand generation, B2B">
               </div>
               <div class="form-group">
+                <label class="form-label">Company Name</label>
+                <input class="form-input" type="text" id="rt-company" placeholder="e.g. Salesforce">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Job Title</label>
+                <input class="form-input" type="text" id="rt-job-title" placeholder="e.g. VP of Marketing">
+              </div>
+              <div class="form-group">
                 <label class="form-label">Link to Application (optional)</label>
                 <select class="form-select" id="rt-link-app">
                   <option value="">— Don't link —</option>
@@ -7544,8 +7552,11 @@ function buildResumeDocx(text, filename, markedUp) {
 function exportRTDocx(markedUp) {
   var linkedAppId = document.getElementById('rt-link-app').value;
   var app = allApps.find(function(a) { return a.id === linkedAppId; });
-  var co = cleanForFilename(app ? app.company : '') || 'Company';
-  var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
+  // Use linked app values first, then fall back to manual fields
+  var coRaw = (app && app.company) ? app.company : (document.getElementById('rt-company').value || '');
+  var roRaw = (app && app.job_title) ? app.job_title : (document.getElementById('rt-job-title').value || '');
+  var co = cleanForFilename(coRaw) || 'Company';
+  var ro = cleanForFilename(roRaw) || 'Role';
   var suffix = markedUp ? '_Markup' : '_Final';
   var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
   if (markedUp && !baseResumeText) {
