@@ -7024,7 +7024,11 @@ function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).t
 function buildBaseSentenceSet(baseText) {
   if (!baseText) return {};
   function normLine(s) {
-    return s.replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
+    return s
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+      .replace(/[\u2018\u2019\u201A\u201B]/g,"'")
+      .replace(/[\u201C\u201D\u201E\u201F]/g,'"')
+      .replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
   }
   var set = {};
   baseText.split('\n').forEach(function(line) {
@@ -7040,7 +7044,11 @@ function buildBaseSentenceSet(baseText) {
 function applyMarkupHighlights(docXml, baseSentenceSet) {
   if (!baseSentenceSet) return docXml;
   function normLine(s) {
-    return s.replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
+    return s
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')  // decode XML entities
+      .replace(/[\u2018\u2019\u201A\u201B]/g,"'")   // smart single quotes -> straight
+      .replace(/[\u201C\u201D\u201E\u201F]/g,'"')   // smart double quotes -> straight
+      .replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
   }
   // Patterns that should NEVER be highlighted — structural/identity content
   function isStructural(text) {
