@@ -7019,50 +7019,47 @@ function clearRT() {
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
 
 // ── RESUME DOCX BUILDER — matches Master.docx formatting exactly ──────────
-function diffMarkWords(baseText, tailoredText) {
-  if (!baseText || !tailoredText) return tailoredText;
-  function tokenize(str) { return str.match(/\S+|\s+/g) || []; }
-  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%+]/g,''); }
-  function stripMarkers(s) { return s.replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,''); }
-  var baseWords = tokenize(stripMarkers(baseText).replace(/\*\*/g,''));
-  var newWords  = tokenize(stripMarkers(tailoredText).replace(/\*\*/g,'').replace(/^[-•*]\s+/gm,''));
-  var m = baseWords.length, n = newWords.length;
-  var dp = new Array((m+1)*(n+1)).fill(0);
-  function idx(i,j){ return i*(n+1)+j; }
-  for (var i = m-1; i >= 0; i--) {
-    for (var j = n-1; j >= 0; j--) {
-      var bN = norm(baseWords[i]), nN = norm(newWords[j]);
-      if (bN && nN && bN === nN) dp[idx(i,j)] = 1 + dp[idx(i+1,j+1)];
-      else dp[idx(i,j)] = Math.max(dp[idx(i+1,j)], dp[idx(i,j+1)]);
-    }
-  }
-  var inLCS = new Array(n).fill(false);
-  var i = 0, j = 0;
-  while (i < m && j < n) {
-    var bN = norm(baseWords[i]), nN = norm(newWords[j]);
-    if (bN && nN && bN === nN) { inLCS[j] = true; i++; j++; }
-    else if (dp[idx(i+1,j)] >= dp[idx(i,j+1)]) i++;
-    else j++;
-  }
-  var out = '', inYlw = false;
-  for (var k = 0; k < newWords.length; k++) {
-    var tok = newWords[k];
-    var isSpace = /^\s+$/.test(tok);
-    var isSep   = /^[|&]$/.test(tok.trim());
-    if (isSpace || isSep) {
-      if (inYlw) { out += '[/YLW]'; inYlw = false; }
-      out += tok;
-    } else if (inLCS[k]) {
-      if (inYlw) { out += '[/YLW]'; inYlw = false; }
-      out += tok;
-    } else {
-      if (!inYlw) { out += '[YLW]'; inYlw = true; }
-      out += tok;
-    }
-  }
-  if (inYlw) out += '[/YLW]';
-  out = out.replace(/\[\/YLW\](\s+)\[YLW\]/g, '$1');
-  return out;
+// Word-level diff — returns list of changed words from tailored vs base
+function diffChangedWords(baseText, tailoredText) {
+  if (!baseText || !tailoredText) return [];
+  function tokenize(str) { return (str||'').match(/\S+/g) || []; }
+  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%]/g,''); }
+  function strip(s) { return s.replace(/\*\*/g,'').replace(/^[-•*]\s+/gm,'').replace(/\[\/?YLW\]/g,''); }
+  var baseWords = tokenize(strip(baseText));
+  var newWords  = tokenize(strip(tailoredText));
+  var baseSet = {};
+  baseWords.forEach(function(w){ var n=norm(w); if(n) baseSet[n]=true; });
+  // A word is "changed" if its normalized form does not appear in the base at all
+  var changed = {};
+  newWords.forEach(function(w){
+    var n = norm(w);
+    if (n && n.length > 2 && !baseSet[n]) changed[n] = true;
+  });
+  return Object.keys(changed);
+}
+
+// Inject yellow highlight into Word XML runs containing changed words
+// This runs AFTER buildResumeDocx produces the XML — zero formatting impact
+function applyMarkupHighlights(docXml, changedWords) {
+  if (!changedWords || changedWords.length === 0) return docXml;
+  // Build a set for fast lookup
+  var changed = {};
+  changedWords.forEach(function(w){ changed[w] = true; });
+  // Match each <w:t> run text and inject highlight if it contains a changed word
+  return docXml.replace(/<w:r>(<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t[^>]*>([^<]+)<\/w:t><\/w:r>/g,
+    function(match, rPr, text) {
+      if (!text) return match;
+      var textNorm = text.toLowerCase().replace(/[^a-z0-9$%]/g,' ').trim().split(/\s+/);
+      var hasChanged = textNorm.some(function(w){ return changed[w]; });
+      if (!hasChanged) return match;
+      // Add highlight to existing rPr or create new one
+      if (rPr) {
+        var newRPr = rPr.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
+        return match.replace(rPr, newRPr);
+      } else {
+        return match.replace('<w:r>', '<w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr>');
+      }
+    });
 }
 
 function buildResumeDocx(text, filename, markedUp) {
@@ -7082,35 +7079,6 @@ function buildResumeDocx(text, filename, markedUp) {
       .replace(/<mark>/gi,'').replace(/<\/mark>/gi,'')
       .replace(/\[YLW\]/g,'').replace(/\[\/YLW\]/g,'')
       .replace(/\*\*(.*?)\*\*/g,'$1');
-  }
-
-  // Emit Word runs — splits [YLW]...[/YLW] into yellow highlighted runs when markedUp=true
-  function runs(rawText, rprXml) {
-    if (!markedUp) {
-      return '<w:r>' + rprXml + '<w:t xml:space="preserve">' + esc(rawText) + '</w:t></w:r>';
-    }
-    var result = '';
-    var s = (rawText||'').replace(/<mark>/gi,'').replace(/<\/mark>/gi,'');
-    var re = /\[YLW\]([\s\S]*?)\[\/YLW\]/g;
-    var last = 0, m;
-    while ((m = re.exec(s)) !== null) {
-      if (m.index > last) {
-        var before = s.slice(last, m.index).replace(/\*\*(.*?)\*\*/g,'$1')
-          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        if (before) result += '<w:r>' + rprXml + '<w:t xml:space="preserve">' + before + '</w:t></w:r>';
-      }
-      var inner = m[1].replace(/\*\*(.*?)\*\*/g,'$1')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      if (inner) {
-        var hlRpr = rprXml.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
-        result += '<w:r>' + hlRpr + '<w:t xml:space="preserve">' + inner + '</w:t></w:r>';
-      }
-      last = re.lastIndex;
-    }
-    var tail = s.slice(last).replace(/\*\*(.*?)\*\*/g,'$1')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    if (tail) result += '<w:r>' + rprXml + '<w:t xml:space="preserve">' + tail + '</w:t></w:r>';
-    return result || '<w:r>' + rprXml + '<w:t></w:t></w:r>';
   }
 
   // Run properties
@@ -7409,7 +7377,7 @@ function buildResumeDocx(text, filename, markedUp) {
       } else {
         // No ** markup — render as Calibri Light non-bold black
         bodyXml += P(pprBul,
-          runs(bulText, rpr(CL,null,BK,null,null)));
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
       }
       return;
     }
@@ -7457,7 +7425,7 @@ function buildResumeDocx(text, filename, markedUp) {
     }
     if (!bpMatched) {
       bodyXml += P(ppr({sp:['0','60']}),
-        runs(cl, rpr(CA,null,null,null,null)));
+        '<w:r>'+rpr(CA,null,null,null,null)+'<w:t xml:space="preserve">'+esc(cl.replace(/\*\*/g,''))+'</w:t></w:r>');
     }
   });
 
@@ -7521,6 +7489,12 @@ function buildResumeDocx(text, filename, markedUp) {
 
   var safe = (filename||'JayWadhwa_Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
 
+  // Apply yellow highlights post-assembly — does not touch any formatting
+  if (markedUp && baseResumeText) {
+    var changedWords = diffChangedWords(baseResumeText, text);
+    documentXml = applyMarkupHighlights(documentXml, changedWords);
+  }
+
   var zip = new JSZip();
   zip.file('[Content_Types].xml', contentTypes);
   zip.file('_rels/.rels', _relsXml);
@@ -7547,25 +7521,11 @@ function exportRTDocx(markedUp) {
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
   var suffix = markedUp ? '_Markup' : '_Final';
   var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
-  var textToExport = rtOutput;
-  if (markedUp) {
-    if (!baseResumeText) {
-      toast('Master Resume not loaded. Open Base Documents and save your resume first.', 'error');
-      return;
-    }
-    // Run diff line-by-line so markers never cross line boundaries
-    textToExport = rtOutput.split('\n').map(function(line) {
-      if (!line.trim()) return line;
-      return diffMarkWords(baseResumeText, line);
-    }).join('\n');
-    var ylwCount = (textToExport.match(/\[YLW\]/g) || []).length;
-    if (ylwCount === 0) {
-      toast('No changes detected vs Master Resume. Check that Base Resume is saved correctly.', 'error');
-      return;
-    }
-    toast('Markup: ' + ylwCount + ' change(s) highlighted. Exporting...', 'success');
+  if (markedUp && !baseResumeText) {
+    toast('Master Resume not loaded. Open Base Documents and save your resume first.', 'error');
+    return;
   }
-  buildResumeDocx(textToExport, fname, markedUp ? true : false);
+  buildResumeDocx(rtOutput, fname, markedUp ? true : false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
