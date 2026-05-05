@@ -7029,7 +7029,7 @@ function buildBaseSentenceSet(baseText) {
   var set = {};
   baseText.split('\n').forEach(function(line) {
     var n = normLine(line);
-    if (n.length > 8) set[n] = true;
+    if (n.length > 0) set[n] = true;
   });
   return set;
 }
@@ -7042,18 +7042,36 @@ function applyMarkupHighlights(docXml, baseSentenceSet) {
   function normLine(s) {
     return s.replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
   }
+  // Patterns that should NEVER be highlighted — structural/identity content
+  function isStructural(text) {
+    var t = text.trim();
+    if (t.length < 25) return true;                           // too short — name, company, header
+    if (/^\d{4}/.test(t)) return true;                       // starts with year
+    if (/^\|/.test(t)) return true;                           // pipe fragment
+    if (/^\d{3}[-.]\d{3}/.test(t)) return true;             // phone number
+    if (/@/.test(t) && t.length < 60) return true;            // email
+    if (/linkedin\.com/i.test(t)) return true;               // linkedin
+    if (/^[A-Z][a-z]+ [A-Z][a-z]+$/.test(t)) return true;   // proper name e.g. "Jay Wadhwa"
+    if (/^[A-Z &|]+$/.test(t) && t.length < 40) return true; // ALL CAPS header
+    if (/Boston University|DePaul|Columbia|Oakton/i.test(t)) return true; // education
+    if (/^(BS|MBA|BA|MS)\b/.test(t)) return true;            // degree
+    // Company names and org names — contain LLC, Foundation, Inc, Labs, via, Chicago, IL
+    if (/\b(LLC|Foundation|Inc\.|Labs|Global|Network|via Rogue)\b/.test(t) && t.length < 80) return true;
+    // Sub-headers: "Brand & X Results" / "Brand X & Y Results" pattern
+    if (/^(Brand|Award|Growth|Content|Leadership).*Results$/.test(t)) return true;
+    // Tools line — all proper nouns separated by pipes
+    if (/HubSpot|Adobe|Canva|Figma|Google Analytics/i.test(t)) return true;
+    return false;
+  }
   return docXml.replace(/<w:r>(<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t[^>]*>([^<]+)<\/w:t><\/w:r>/g,
     function(match, rPr, text) {
-      if (!text || text.trim().length < 8) return match;
-      // Skip structural lines: section headers, names, dates, contact info
-      var trimmed = text.trim();
-      if (/^\d{4}/.test(trimmed)) return match;  // dates
-      if (/^\|/.test(trimmed)) return match;       // pipe-only fragments
+      if (!text) return match;
+      if (isStructural(text)) return match;
       var n = normLine(text);
-      if (!n || n.length < 8) return match;
-      // If this exact line exists in the base — no highlight
+      if (!n) return match;
+      // If this exact text exists in the base — no highlight
       if (baseSentenceSet[n]) return match;
-      // Line is new or changed — highlight the whole run
+      // Text is new or changed — highlight the whole run
       if (rPr) {
         var newRPr = rPr.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
         return match.replace(rPr, newRPr);
