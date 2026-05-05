@@ -7019,6 +7019,53 @@ function clearRT() {
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
 
 // ── RESUME DOCX BUILDER — matches Master.docx formatting exactly ──────────
+// Word-level diff: compare tailored text against base, mark only true changes
+function diffMarkWords(baseText, tailoredText) {
+  if (!baseText || !tailoredText) return tailoredText;
+  function tokenize(str) { return str.match(/\S+|\s+/g) || []; }
+  var baseWords = tokenize(baseText.replace(/\[\/?YLW\]/g,''));
+  var newWords  = tokenize(tailoredText.replace(/\[\/?YLW\]/g,''));
+  var m = baseWords.length, n = newWords.length;
+  var dp = new Array((m+1)*(n+1)).fill(0);
+  function idx(i,j){ return i*(n+1)+j; }
+  for (var i = m-1; i >= 0; i--) {
+    for (var j = n-1; j >= 0; j--) {
+      if (baseWords[i].toLowerCase() === newWords[j].toLowerCase()) {
+        dp[idx(i,j)] = 1 + dp[idx(i+1,j+1)];
+      } else {
+        dp[idx(i,j)] = Math.max(dp[idx(i+1,j)], dp[idx(i,j+1)]);
+      }
+    }
+  }
+  var inLCS = new Array(n).fill(false);
+  var i = 0, j = 0;
+  while (i < m && j < n) {
+    if (baseWords[i].toLowerCase() === newWords[j].toLowerCase()) {
+      inLCS[j] = true; i++; j++;
+    } else if (dp[idx(i+1,j)] >= dp[idx(i,j+1)]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  var out = '', inYlw = false;
+  for (var k = 0; k < newWords.length; k++) {
+    var tok = newWords[k];
+    var isSpace = /^\s+$/.test(tok);
+    if (isSpace) {
+      out += tok;
+    } else if (inLCS[k]) {
+      if (inYlw) { out += '[/YLW]'; inYlw = false; }
+      out += tok;
+    } else {
+      if (!inYlw) { out += '[YLW]'; inYlw = true; }
+      out += tok;
+    }
+  }
+  if (inYlw) out += '[/YLW]';
+  return out;
+}
+
 function buildResumeDocx(text, filename, markedUp) {
   // ── Constants matching Master.docx measurements ──────────────────────────
   var BG = '9E3A3E';   // burgundy: name, section hdrs, job titles
@@ -7502,7 +7549,16 @@ function exportRTDocx(markedUp) {
   var ro = cleanForFilename(app ? app.job_title : '') || 'Role';
   var suffix = markedUp ? '_Markup' : '_Final';
   var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
-  buildResumeDocx(rtOutput, fname, markedUp ? true : false);
+  // Markup: run true word-level diff against Master Resume before export
+  var textToExport = rtOutput;
+  if (markedUp) {
+    if (!baseResumeText) {
+      toast('Master Resume not loaded. Open Base Documents and save your resume first.', 'error');
+      return;
+    }
+    textToExport = diffMarkWords(baseResumeText, rtOutput);
+  }
+  buildResumeDocx(textToExport, fname, markedUp ? true : false);
 }
 
 // ── COVER LETTER GENERATOR PAGE JS ──────────────────────────────────────
