@@ -7020,46 +7020,40 @@ function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).t
 
 // ── RESUME DOCX BUILDER — matches Master.docx formatting exactly ──────────
 // Word-level diff — returns list of changed words from tailored vs base
-function diffChangedWords(baseText, tailoredText) {
-  if (!baseText || !tailoredText) return [];
-  function tokenize(str) { return (str||'').match(/\S+/g) || []; }
-  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%]/g,''); }
-  function strip(s) { return s.replace(/\*\*/g,'').replace(/^[-•*]\s+/gm,'').replace(/\[\/?YLW\]/g,''); }
-  // Common English words that are never meaningful "changes"
-  var stopWords = {the:1,and:1,for:1,with:1,from:1,that:1,this:1,have:1,are:1,was:1,has:1,
-    through:1,across:1,into:1,their:1,been:1,they:1,will:1,not:1,but:1,all:1,each:1,more:1,
-    also:1,its:1,our:1,can:1,one:1,two:1,new:1,per:1,over:1,than:1,when:1,who:1,how:1,
-    media:1,value:1,paid:1,pages:1,execution:1,vision:1,data:1,driven:1,global:1,market:1,
-    build:1,built:1,drove:1,drive:1,grew:1,grow:1,led:1,lead:1,team:1,work:1,make:1,
-    manage:1,managed:1,create:1,created:1,develop:1,developed:1,deliver:1,delivered:1};
-  var baseWords = tokenize(strip(baseText));
-  var newWords  = tokenize(strip(tailoredText));
-  var baseSet = {};
-  baseWords.forEach(function(w){ var n=norm(w); if(n) baseSet[n]=true; });
-  // Only flag words that: are not in base, not stop words, at least 4 chars normalized
-  var changed = {};
-  newWords.forEach(function(w){
-    var n = norm(w);
-    if (n && n.length >= 4 && !baseSet[n] && !stopWords[n]) changed[n] = true;
+// Build a set of normalized base sentences for line-level comparison
+function buildBaseSentenceSet(baseText) {
+  if (!baseText) return {};
+  function normLine(s) {
+    return s.replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
+  }
+  var set = {};
+  baseText.split('\n').forEach(function(line) {
+    var n = normLine(line);
+    if (n.length > 8) set[n] = true;
   });
-  return Object.keys(changed);
+  return set;
 }
 
-// Inject yellow highlight into Word XML runs containing changed words
-// This runs AFTER buildResumeDocx produces the XML — zero formatting impact
-function applyMarkupHighlights(docXml, changedWords) {
-  if (!changedWords || changedWords.length === 0) return docXml;
-  var changed = {};
-  changedWords.forEach(function(w){ changed[w] = true; });
-  // norm must match diffChangedWords: remove all non-alphanumeric
-  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%]/g,''); }
+// Inject yellow highlight into Word XML runs where the run text is not in the base
+// Compares each run's text against the base sentence set
+// If the run text does not exist in the base — whole run turns yellow
+function applyMarkupHighlights(docXml, baseSentenceSet) {
+  if (!baseSentenceSet) return docXml;
+  function normLine(s) {
+    return s.replace(/\*\*/g,'').replace(/^[-•*\s]+/,'').replace(/\s+/g,' ').trim().toLowerCase();
+  }
   return docXml.replace(/<w:r>(<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t[^>]*>([^<]+)<\/w:t><\/w:r>/g,
     function(match, rPr, text) {
-      if (!text) return match;
-      // Split run text into tokens and normalize same way as diffChangedWords
-      var tokens = text.split(/\s+/);
-      var hasChanged = tokens.some(function(tok){ return changed[norm(tok)]; });
-      if (!hasChanged) return match;
+      if (!text || text.trim().length < 8) return match;
+      // Skip structural lines: section headers, names, dates, contact info
+      var trimmed = text.trim();
+      if (/^\d{4}/.test(trimmed)) return match;  // dates
+      if (/^\|/.test(trimmed)) return match;       // pipe-only fragments
+      var n = normLine(text);
+      if (!n || n.length < 8) return match;
+      // If this exact line exists in the base — no highlight
+      if (baseSentenceSet[n]) return match;
+      // Line is new or changed — highlight the whole run
       if (rPr) {
         var newRPr = rPr.replace('</w:rPr>', '<w:highlight w:val="yellow"/></w:rPr>');
         return match.replace(rPr, newRPr);
@@ -7498,8 +7492,8 @@ function buildResumeDocx(text, filename, markedUp) {
 
   // Apply yellow highlights post-assembly — does not touch any formatting
   if (markedUp && baseResumeText) {
-    var changedWords = diffChangedWords(baseResumeText, text);
-    documentXml = applyMarkupHighlights(documentXml, changedWords);
+    var baseSentenceSet = buildBaseSentenceSet(baseResumeText);
+    documentXml = applyMarkupHighlights(documentXml, baseSentenceSet);
   }
 
   var zip = new JSZip();
