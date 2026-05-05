@@ -7023,14 +7023,18 @@ function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).t
 function diffMarkWords(baseText, tailoredText) {
   if (!baseText || !tailoredText) return tailoredText;
   function tokenize(str) { return str.match(/\S+|\s+/g) || []; }
-  var baseWords = tokenize(baseText.replace(/\[\/?YLW\]/g,''));
-  var newWords  = tokenize(tailoredText.replace(/\[\/?YLW\]/g,''));
+  // Strip punctuation for comparison only — keep original token in output
+  function norm(tok) { return tok.toLowerCase().replace(/[^a-z0-9$%+]/g,''); }
+  var baseWords = tokenize(baseText.replace(/\[\/?YLW\]/g,'').replace(/\*\*/g,''));
+  var newWords  = tokenize(tailoredText.replace(/\[\/?YLW\]/g,'').replace(/\*\*/g,''));
   var m = baseWords.length, n = newWords.length;
   var dp = new Array((m+1)*(n+1)).fill(0);
   function idx(i,j){ return i*(n+1)+j; }
   for (var i = m-1; i >= 0; i--) {
     for (var j = n-1; j >= 0; j--) {
-      if (baseWords[i].toLowerCase() === newWords[j].toLowerCase()) {
+      var bNorm = norm(baseWords[i]), nNorm = norm(newWords[j]);
+      // Match if normalized forms equal and both are non-empty
+      if (bNorm && nNorm && bNorm === nNorm) {
         dp[idx(i,j)] = 1 + dp[idx(i+1,j+1)];
       } else {
         dp[idx(i,j)] = Math.max(dp[idx(i+1,j)], dp[idx(i,j+1)]);
@@ -7040,7 +7044,8 @@ function diffMarkWords(baseText, tailoredText) {
   var inLCS = new Array(n).fill(false);
   var i = 0, j = 0;
   while (i < m && j < n) {
-    if (baseWords[i].toLowerCase() === newWords[j].toLowerCase()) {
+    var bNorm = norm(baseWords[i]), nNorm = norm(newWords[j]);
+    if (bNorm && nNorm && bNorm === nNorm) {
       inLCS[j] = true; i++; j++;
     } else if (dp[idx(i+1,j)] >= dp[idx(i,j+1)]) {
       i++;
