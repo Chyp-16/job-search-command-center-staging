@@ -7557,8 +7557,9 @@ function exportRTDocx(markedUp) {
   var roRaw = (app && app.job_title) ? app.job_title : (document.getElementById('rt-job-title').value || '');
   var co = cleanForFilename(coRaw) || 'Company';
   var ro = cleanForFilename(roRaw) || 'Role';
-  var suffix = markedUp ? '_Markup' : '_Final';
-  var fname = 'JayWadhwa_' + ro + '_' + co + '_Resume' + suffix;
+  var fname = markedUp
+    ? 'JayWadhwa_' + co + '_' + ro + '_Resume_Markup'
+    : 'JayWadhwa_' + co + '_' + ro + '_Resume';
   if (markedUp && !baseResumeText) {
     toast('Master Resume not loaded. Open Base Documents and save your resume first.', 'error');
     return;
