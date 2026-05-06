@@ -3381,14 +3381,14 @@ function editApp(id) {
 
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() || null : null; }
 
-function saveApp() {
-  var company = getVal('f-company');
-  var job_title = getVal('f-title');
+async function saveApp() {
+  const company = getVal('f-company');
+  const job_title = getVal('f-title');
   if (!company || !job_title) { toast('Company and job title are required.', 'error'); return; }
 
-  var payload = {
+  const payload = {
     date_applied: getVal('f-date'),
-    company: company, job_title: job_title,
+    company, job_title,
     job_url: getVal('f-url'),
     source: getVal('f-source'),
     status: getVal('f-status'),
@@ -3416,59 +3416,39 @@ function saveApp() {
     rejection_followup_notes: getVal('f-rf-notes'),
   };
 
-  // Store payload globally so setTimeout can access it after extension interference window
-  window._pendingAppPayload = payload;
-  window._pendingAppEditId = editingId;
-
-  // Check for duplicate synchronously before firing fetch
-  if (!editingId) {
-    var duplicate = allApps.find(function(a) {
-      return a.company && payload.company &&
-        a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
-        a.job_title && payload.job_title &&
-        a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
-    });
-    if (duplicate) {
-      if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
-    }
-  }
-
-  closeModal('modal-app');
-  toast('Saving application...', '');
-
-  // Fire fetch independently via setTimeout to bypass Chrome extension async interference
-  window.setTimeout(function() {
-    var p = window._pendingAppPayload;
-    var eid = window._pendingAppEditId;
-    if (!p) return;
-    window._pendingAppPayload = null;
-
-    if (eid) {
-      fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body: JSON.stringify(p)
-      }).then(function() {
-        var idx = allApps.findIndex(function(x) { return x.id === eid; });
-        if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
-        filterApps('keep-page');
-        toast('Application updated.', 'success');
-      }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
+  try {
+    let savedApp;
+    if (editingId) {
+      await dbPatch('applications', editingId, payload);
+      const idx = allApps.findIndex(x => x.id === editingId);
+      if (idx >= 0) allApps[idx] = { ...allApps[idx], ...payload };
+      savedApp = allApps.find(x => x.id === editingId);
+      toast('Application updated.', 'success');
     } else {
-      fetch(WORKER_URL + '/db/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body: JSON.stringify(p)
-      }).then(function(r) { return r.json(); }).then(function(result) {
-        var savedApp = Array.isArray(result) ? result[0] : result;
-        // Add to local list and refresh — trust the server response
-        if (savedApp) allApps.unshift(savedApp);
-        filterApps('keep-page');
-        toast('Application added.', 'success');
-        if (savedApp) syncOutreachToHubSpot(savedApp);
-      }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
+      // Check for duplicate before saving
+      const duplicate = allApps.find(function(a) {
+        return a.company && payload.company &&
+          a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
+          a.job_title && payload.job_title &&
+          a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
+      });
+      if (duplicate) {
+        if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
+      }
+      const result = await dbPost('applications', payload);
+      savedApp = Array.isArray(result) ? result[0] : result;
+      allApps.unshift(savedApp);
+      toast('Application added.', 'success');
     }
-  }, 100);
+    closeModal('modal-app');
+    filterApps('keep-page');
+
+    // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
+    if (savedApp) syncOutreachToHubSpot(savedApp);
+
+  } catch (e) {
+    toast('Error saving application: ' + e.message, 'error');
+  }
 }
 
 async function syncOutreachToHubSpot(app) {
