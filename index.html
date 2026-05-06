@@ -2831,7 +2831,7 @@ async function dbGet(table, params = '') {
 async function dbPost(table, body) {
   const r = await fetch(`${WORKER_URL}/db/${table}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
   });
   return r.json();
@@ -2840,7 +2840,7 @@ async function dbPost(table, body) {
 async function dbPatch(table, id, body) {
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
   });
   return r.json();
@@ -3446,7 +3446,7 @@ function saveApp() {
     if (eid) {
       fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
         body: JSON.stringify(p)
       }).then(function() {
         var idx = allApps.findIndex(function(x) { return x.id === eid; });
@@ -3457,7 +3457,7 @@ function saveApp() {
     } else {
       fetch(WORKER_URL + '/db/applications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
         body: JSON.stringify(p)
       }).then(function(r) { return r.json(); }).then(function(result) {
         var savedApp = Array.isArray(result) ? result[0] : result;
