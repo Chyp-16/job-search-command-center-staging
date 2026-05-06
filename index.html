@@ -3281,17 +3281,20 @@ function goPage(p) {
 
 // ── APP FORM ───────────────────────────────────────────────────────────
 function populateAppContactDropdown(selectedId) {
-  var sel = document.getElementById('f-linked-contact');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— None —</option>';
-  allContacts.forEach(function(c) {
-    if (!c.name) return;
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-    sel.appendChild(opt);
+  // Populate both contact dropdowns in the modal
+  ['f-contact', 'f-linked-contact'].forEach(function(dropId) {
+    var sel = document.getElementById(dropId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— None —</option>';
+    allContacts.forEach(function(c) {
+      if (!c.name) return;
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+      sel.appendChild(opt);
+    });
+    if (selectedId) sel.value = selectedId;
   });
-  if (selectedId) sel.value = selectedId;
 }
 
 function openAddApp() {
@@ -3432,10 +3435,14 @@ function saveApp() {
     }
   }
 
+  // Capture contact selection synchronously before modal closes
+  var contactEl = document.getElementById('f-contact') || document.getElementById('f-linked-contact');
+  var selectedContactId = contactEl ? (contactEl.value || null) : null;
+
   // Store payload in window global then dispatch custom event
-  // Custom events are not intercepted by Chrome extensions unlike setTimeout in click handlers
   window._saveAppPayload   = payload;
   window._saveAppEditingId = currentEditId;
+  window._saveAppContactId = selectedContactId;
 
   closeModal('modal-app');
   document.dispatchEvent(new CustomEvent('app-save-ready'));
@@ -3445,11 +3452,11 @@ function saveApp() {
 document.addEventListener('app-save-ready', function() {
   var p   = window._saveAppPayload;
   var eid = window._saveAppEditingId;
+  var cid = window._saveAppContactId;
   window._saveAppPayload   = null;
   window._saveAppEditingId = null;
-  console.log('[AppSave] listener fired, payload:', p ? 'present' : 'missing', 'editingId:', eid);
-  if (!p) { console.log('[AppSave] payload missing - aborting'); return; }
-  console.log('[AppSave] firing fetch to', eid ? 'PATCH' : 'POST');
+  window._saveAppContactId = null;
+  if (!p) return;
 
   if (eid) {
     fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
@@ -3461,6 +3468,17 @@ document.addEventListener('app-save-ready', function() {
       if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
       filterApps('keep-page');
       toast('Application updated.', 'success');
+      // Link selected contact to this application
+      if (cid) {
+        fetch(WORKER_URL + '/db/contacts?id=eq.' + cid, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+          body:    JSON.stringify({ linked_application_id: eid })
+        }).then(function() {
+          var c = allContacts.find(function(x) { return x.id === cid; });
+          if (c) c.linked_application_id = eid;
+        });
+      }
     }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
   } else {
     fetch(WORKER_URL + '/db/applications', {
@@ -3477,6 +3495,17 @@ document.addEventListener('app-save-ready', function() {
         var saved = Array.isArray(result) ? result[0] : result;
         toast('Application added.', 'success');
         if (saved) syncOutreachToHubSpot(saved);
+        // Link selected contact to this application
+        if (cid && saved && saved.id) {
+          fetch(WORKER_URL + '/db/contacts?id=eq.' + cid, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+            body:    JSON.stringify({ linked_application_id: saved.id })
+          }).then(function() {
+            var c = allContacts.find(function(x) { return x.id === cid; });
+            if (c) c.linked_application_id = saved.id;
+          });
+        }
         dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
           allApps = Array.isArray(data) ? data : [];
           filteredApps = allApps;
