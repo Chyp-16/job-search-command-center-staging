@@ -3468,19 +3468,15 @@ document.addEventListener('app-save-ready', function() {
     }).then(function(r) { return r.json(); })
     .then(function(result) {
       var saved = Array.isArray(result) ? result[0] : result;
-      if (saved && saved.id) {
-        allApps.unshift(saved);
-        filterApps('keep-page');
-        toast('Application added.', 'success');
-        syncOutreachToHubSpot(saved);
-      } else {
-        toast('Application added.', 'success');
-        // Force fresh fetch from server to get the new record with its real ID
-        dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
-          allApps = Array.isArray(data) ? data : [];
-          filterApps();
-        });
-      }
+      toast('Application added.', 'success');
+      if (saved) syncOutreachToHubSpot(saved);
+      // Always reload from server to guarantee the new entry appears
+      dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
+        allApps = Array.isArray(data) ? data : [];
+        filteredApps = allApps;
+        currentPage = 1;
+        renderAppsTable();
+      });
     }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
   }
 });
