@@ -3381,74 +3381,105 @@ function editApp(id) {
 
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() || null : null; }
 
-async function saveApp() {
-  const company = getVal('f-company');
-  const job_title = getVal('f-title');
+function saveApp() {
+  // Capture all form values synchronously — before any async work
+  var company   = getVal('f-company');
+  var job_title = getVal('f-title');
   if (!company || !job_title) { toast('Company and job title are required.', 'error'); return; }
 
-  const payload = {
-    date_applied: getVal('f-date'),
-    company, job_title,
-    job_url: getVal('f-url'),
-    source: getVal('f-source'),
-    status: getVal('f-status'),
-    salary: getVal('f-salary'),
-    industry: getVal('f-industry'),
-    job_type: getVal('f-jobtype'),
-    resume_version: getVal('f-resume'),
-    cover_letter_version: getVal('f-coverletter'),
-    notes: getVal('f-notes'),
-    linked_contact_id: getVal('f-linked-contact') || null,
-    initial_outreach_status: getVal('f-io-status'),
-    initial_outreach_date: getVal('f-io-date'),
-    initial_outreach_notes: getVal('f-io-notes'),
-    followup_3day_status: getVal('f-3d-status'),
-    followup_3day_date: getVal('f-3d-date'),
-    followup_3day_notes: getVal('f-3d-notes'),
-    followup_1week_status: getVal('f-1w-status'),
-    followup_1week_date: getVal('f-1w-date'),
-    followup_1week_notes: getVal('f-1w-notes'),
-    followup_2week_status: getVal('f-2w-status'),
-    followup_2week_date: getVal('f-2w-date'),
-    followup_2week_notes: getVal('f-2w-notes'),
+  var payload = {
+    date_applied:              getVal('f-date'),
+    company:                   company,
+    job_title:                 job_title,
+    job_url:                   getVal('f-url'),
+    source:                    getVal('f-source'),
+    status:                    getVal('f-status'),
+    salary:                    getVal('f-salary'),
+    industry:                  getVal('f-industry'),
+    job_type:                  getVal('f-jobtype'),
+    resume_version:            getVal('f-resume'),
+    cover_letter_version:      getVal('f-coverletter'),
+    notes:                     getVal('f-notes'),
+    linked_contact_id:         getVal('f-linked-contact') || null,
+    initial_outreach_status:   getVal('f-io-status'),
+    initial_outreach_date:     getVal('f-io-date'),
+    initial_outreach_notes:    getVal('f-io-notes'),
+    followup_3day_status:      getVal('f-3d-status'),
+    followup_3day_date:        getVal('f-3d-date'),
+    followup_3day_notes:       getVal('f-3d-notes'),
+    followup_1week_status:     getVal('f-1w-status'),
+    followup_1week_date:       getVal('f-1w-date'),
+    followup_1week_notes:      getVal('f-1w-notes'),
+    followup_2week_status:     getVal('f-2w-status'),
+    followup_2week_date:       getVal('f-2w-date'),
+    followup_2week_notes:      getVal('f-2w-notes'),
     rejection_followup_status: getVal('f-rf-status'),
-    rejection_followup_date: getVal('f-rf-date'),
-    rejection_followup_notes: getVal('f-rf-notes'),
+    rejection_followup_date:   getVal('f-rf-date'),
+    rejection_followup_notes:  getVal('f-rf-notes'),
   };
 
-  try {
-    let savedApp;
-    if (editingId) {
-      await dbPatch('applications', editingId, payload);
-      const idx = allApps.findIndex(x => x.id === editingId);
-      if (idx >= 0) allApps[idx] = { ...allApps[idx], ...payload };
-      savedApp = allApps.find(x => x.id === editingId);
-      toast('Application updated.', 'success');
-    } else {
-      // Check for duplicate before saving
-      const duplicate = allApps.find(function(a) {
-        return a.company && payload.company &&
-          a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
-          a.job_title && payload.job_title &&
-          a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
-      });
-      if (duplicate) {
-        if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
-      }
-      const result = await dbPost('applications', payload);
-      savedApp = Array.isArray(result) ? result[0] : result;
-      allApps.unshift(savedApp);
-      toast('Application added.', 'success');
+  // Check for duplicate synchronously before closing modal
+  var currentEditId = editingId;
+  if (!currentEditId) {
+    var duplicate = allApps.find(function(a) {
+      return a.company && payload.company &&
+        a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
+        a.job_title && payload.job_title &&
+        a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
+    });
+    if (duplicate) {
+      if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
     }
-    closeModal('modal-app');
-    filterApps('keep-page');
-
-    // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
-    if (savedApp) syncOutreachToHubSpot(savedApp);
-
-  } catch (e) {
-    toast('Error saving application: ' + e.message, 'error');
   }
+
+  // Store in window globals so setTimeout callback can access them
+  window._saveAppPayload   = payload;
+  window._saveAppEditingId = currentEditId;
+
+  closeModal('modal-app');
+
+  // Fire the actual save after a short delay to escape extension async interference
+  window.setTimeout(function() {
+    var p   = window._saveAppPayload;
+    var eid = window._saveAppEditingId;
+    window._saveAppPayload   = null;
+    window._saveAppEditingId = null;
+    if (!p) return;
+
+    if (eid) {
+      // Edit existing application
+      fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        body:    JSON.stringify(p)
+      }).then(function() {
+        var idx = allApps.findIndex(function(x) { return x.id === eid; });
+        if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
+        filterApps('keep-page');
+        toast('Application updated.', 'success');
+      }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
+    } else {
+      // New application
+      fetch(WORKER_URL + '/db/applications', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        body:    JSON.stringify(p)
+      }).then(function(r) { return r.json(); })
+      .then(function(result) {
+        var saved = Array.isArray(result) ? result[0] : result;
+        if (saved && saved.id) {
+          allApps.unshift(saved);
+          filterApps('keep-page');
+          toast('Application added.', 'success');
+          window.setTimeout(function() { syncOutreachToHubSpot(saved); }, 100);
+        } else {
+          // Save succeeded on server — reload to get the actual record
+          toast('Application saved. Refreshing...', 'success');
+          window.setTimeout(function() { loadApps(); }, 500);
+        }
+      }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
+    }
+  }, 100);
 }
 
 async function syncOutreachToHubSpot(app) {
