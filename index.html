@@ -1634,6 +1634,16 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
           </div>
         </div>
+        <div id="rt-progress-panel" style="display:none;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px" id="rt-progress-label">Starting resume tailoring...</div>
+          <div style="background:var(--hover);border-radius:4px;height:10px;overflow:hidden">
+            <div id="rt-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
+            <span>Step <span id="rt-progress-step">0</span> of 7</span>
+            <span id="rt-progress-pct">0%</span>
+          </div>
+        </div>
         <div class="dash-card" id="rt-unused-keywords-panel" style="display:none;border-left:4px solid var(--burgundy)">
           <div class="dash-card-header">⚠️ Keywords Not Incorporated</div>
           <div style="padding:16px 20px">
@@ -7003,9 +7013,37 @@ async function runResumeTailor() {
 
   const panel = document.getElementById('rt-output-panel');
   const contentEl = document.getElementById('rt-output-content');
-  panel.style.display = 'block';
-  contentEl.textContent = 'Running all 7 resume tailoring steps... This may take 30-60 seconds.';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  panel.style.display = 'none';
+  contentEl.innerHTML = '';
+
+  // Show progress bar and start simulated step progression
+  var rtProgressPanel = document.getElementById('rt-progress-panel');
+  var rtProgressBar   = document.getElementById('rt-progress-bar');
+  var rtProgressLabel = document.getElementById('rt-progress-label');
+  var rtProgressStep  = document.getElementById('rt-progress-step');
+  var rtProgressPct   = document.getElementById('rt-progress-pct');
+  rtProgressPanel.style.display = 'block';
+  rtProgressPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  var rtStepLabels = [
+    'Step 1 of 7 — Integrating must-have keywords...',
+    'Step 2 of 7 — Reviewing Core Expertise...',
+    'Step 3 of 7 — Running redundancy audit...',
+    'Step 4 of 7 — Preserving keyword integrity...',
+    'Step 5 of 7 — Final review pass...',
+    'Step 6 of 7 — Final redundancy check...',
+    'Step 7 of 7 — Preparing export...'
+  ];
+  var rtStepIndex = 0;
+  var rtProgressInterval = setInterval(function() {
+    if (rtStepIndex >= rtStepLabels.length) return;
+    rtProgressLabel.textContent = rtStepLabels[rtStepIndex];
+    rtProgressStep.textContent = rtStepIndex + 1;
+    var pct = Math.round(((rtStepIndex + 1) / 7) * 90); // cap at 90% until done
+    rtProgressBar.style.width = pct + '%';
+    rtProgressPct.textContent = pct + '%';
+    rtStepIndex++;
+  }, 6000); // advance every ~6s across ~42s total
 
   const promptsData = await dbGet('prompts', 'select=*&name=eq.Resume Tailoring');
   const rows = Array.isArray(promptsData) ? promptsData : [];
@@ -7019,6 +7057,14 @@ async function runResumeTailor() {
 
   try {
     const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    // Complete progress bar
+    clearInterval(rtProgressInterval);
+    rtProgressBar.style.width = '100%';
+    rtProgressPct.textContent = '100%';
+    rtProgressStep.textContent = '7';
+    rtProgressLabel.textContent = 'Complete — tailored resume ready.';
+    setTimeout(function() { rtProgressPanel.style.display = 'none'; }, 1200);
+    panel.style.display = 'block';
     rtOutput = result;
     // Display clean version — strip [YLW] markers and AI preamble for readability
     var displayText = result
@@ -7062,13 +7108,20 @@ async function runResumeTailor() {
         unusedPanel.style.display = 'none';
       }
     }
-  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+  } catch(e) {
+    clearInterval(rtProgressInterval);
+    rtProgressPanel.style.display = 'none';
+    panel.style.display = 'block';
+    contentEl.textContent = 'Error: ' + e.message;
+    toast('Failed: ' + e.message, 'error');
+  }
 }
 
 function clearRT() {
   ['rt-jd','rt-keywords-req','rt-keywords-nice'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('rt-output-panel'); if(p) p.style.display='none'; rtOutput='';
   const u=document.getElementById('rt-unused-keywords-panel'); if(u) u.style.display='none';
+  const pr=document.getElementById('rt-progress-panel'); if(pr) pr.style.display='none';
 }
 function copyRTOutput() { if(rtOutput) navigator.clipboard.writeText(rtOutput).then(function(){ toast('Copied.','success'); }); }
 
