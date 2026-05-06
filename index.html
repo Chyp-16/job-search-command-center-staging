@@ -3432,55 +3432,58 @@ function saveApp() {
     }
   }
 
-  // Store in window globals so setTimeout callback can access them
+  // Store payload in window global then dispatch custom event
+  // Custom events are not intercepted by Chrome extensions unlike setTimeout in click handlers
   window._saveAppPayload   = payload;
   window._saveAppEditingId = currentEditId;
 
   closeModal('modal-app');
-
-  // Fire the actual save after a short delay to escape extension async interference
-  window.setTimeout(function() {
-    var p   = window._saveAppPayload;
-    var eid = window._saveAppEditingId;
-    window._saveAppPayload   = null;
-    window._saveAppEditingId = null;
-    if (!p) return;
-
-    if (eid) {
-      // Edit existing application
-      fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body:    JSON.stringify(p)
-      }).then(function() {
-        var idx = allApps.findIndex(function(x) { return x.id === eid; });
-        if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
-        filterApps('keep-page');
-        toast('Application updated.', 'success');
-      }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
-    } else {
-      // New application
-      fetch(WORKER_URL + '/db/applications', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-        body:    JSON.stringify(p)
-      }).then(function(r) { return r.json(); })
-      .then(function(result) {
-        var saved = Array.isArray(result) ? result[0] : result;
-        if (saved && saved.id) {
-          allApps.unshift(saved);
-          filterApps('keep-page');
-          toast('Application added.', 'success');
-          window.setTimeout(function() { syncOutreachToHubSpot(saved); }, 100);
-        } else {
-          // Save succeeded on server — reload to get the actual record
-          toast('Application saved. Refreshing...', 'success');
-          window.setTimeout(function() { loadApps(); }, 500);
-        }
-      }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
-    }
-  }, 100);
+  document.dispatchEvent(new CustomEvent('app-save-ready'));
 }
+
+// Listener lives outside any click handler — extension cannot intercept it
+document.addEventListener('app-save-ready', function() {
+  var p   = window._saveAppPayload;
+  var eid = window._saveAppEditingId;
+  window._saveAppPayload   = null;
+  window._saveAppEditingId = null;
+  if (!p) return;
+
+  if (eid) {
+    fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body:    JSON.stringify(p)
+    }).then(function() {
+      var idx = allApps.findIndex(function(x) { return x.id === eid; });
+      if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
+      filterApps('keep-page');
+      toast('Application updated.', 'success');
+    }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
+  } else {
+    fetch(WORKER_URL + '/db/applications', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body:    JSON.stringify(p)
+    }).then(function(r) { return r.json(); })
+    .then(function(result) {
+      var saved = Array.isArray(result) ? result[0] : result;
+      if (saved && saved.id) {
+        allApps.unshift(saved);
+        filterApps('keep-page');
+        toast('Application added.', 'success');
+        syncOutreachToHubSpot(saved);
+      } else {
+        toast('Application added.', 'success');
+        // Force fresh fetch from server to get the new record with its real ID
+        dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
+          allApps = Array.isArray(data) ? data : [];
+          filterApps();
+        });
+      }
+    }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
+  }
+});
 
 async function syncOutreachToHubSpot(app) {
   // Build a task for each outreach step that is Scheduled with a date
