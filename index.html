@@ -2068,7 +2068,7 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-app')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveApp()">Save Application</button>
+      <button class="btn btn-primary" onclick="window.setTimeout(function(){ saveApp(); }, 0)">Save Application</button>
     </div>
   </div>
 </div>
@@ -3399,7 +3399,6 @@ async function saveApp() {
     cover_letter_version: getVal('f-coverletter'),
     notes: getVal('f-notes'),
     linked_contact_id: getVal('f-linked-contact') || null,
-    linked_contact_id: (document.getElementById('f-contact') || {}).value || null,
     initial_outreach_status: getVal('f-io-status'),
     initial_outreach_date: getVal('f-io-date'),
     initial_outreach_notes: getVal('f-io-notes'),
