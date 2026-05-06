@@ -5790,6 +5790,7 @@ For cover letters: Lead with strongest result. Match keywords naturally. Show co
 
 // ── BASE DOCUMENTS ─────────────────────────────────────────────────────
 let baseResumeText = '';
+let baseResumeDocId = null; // tracks which doc is currently set as Base Resume
 let baseCoverLetterText = '';
 
 async function loadBaseDocs() {
@@ -8456,7 +8457,12 @@ function renderDocsTable() {
         (hasPath
           ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="downloadDoc(this.dataset.docid, this.dataset.path)" title="Download">⬇</button>'
           : '<span style="font-size:11px;color:var(--text-light)">No file</span>') +
-        (d.doc_type === 'Resume' ? '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="setDocAsBaseResume(this.dataset.docid, this.dataset.path)" title="Set as Base Resume for Resume Tailor">★ Set Base</button> ' : '') +
+        (d.doc_type === 'Resume' ? (
+          (baseResumeDocId === d.id
+            ? '<span title="Active Base Resume" style="font-size:16px;color:var(--burgundy);margin-right:4px;vertical-align:middle">★</span>'
+            : '') +
+          '<button class="btn btn-secondary btn-sm" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="setDocAsBaseResume(this.dataset.docid, this.dataset.path)" title="Set as Base Resume for Resume Tailor">★ Set Base</button> '
+        ) : '') +
         ' <button class="action-btn" data-docid="' + d.id + '" onclick="editDocRecord(this.dataset.docid)" title="Edit">✏️</button>' +
         '<button class="action-btn danger" data-docid="' + d.id + '" data-path="' + (d.storage_path||'') + '" onclick="deleteDoc(this.dataset.docid, this.dataset.path)" title="Delete">🗑</button>' +
       '</div></td>' +
@@ -8466,6 +8472,8 @@ function renderDocsTable() {
 
 async function setDocAsBaseResume(id, storagePath) {
   // Download the file, extract text, save as base resume
+  baseResumeDocId = id; // track which doc is the base
+  renderDocsTable(); // refresh star indicator immediately
   try {
     toast('Loading resume text...', '');
     // Try to get text from notes field first, then download file
