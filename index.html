@@ -5790,7 +5790,7 @@ For cover letters: Lead with strongest result. Match keywords naturally. Show co
 
 // ── BASE DOCUMENTS ─────────────────────────────────────────────────────
 let baseResumeText = '';
-let baseResumeDocId = null; // tracks which doc is currently set as Base Resume
+let baseResumeDocId = localStorage.getItem('baseResumeDocId') || null; // persists across refreshes
 let baseCoverLetterText = '';
 
 async function loadBaseDocs() {
@@ -8473,6 +8473,7 @@ function renderDocsTable() {
 async function setDocAsBaseResume(id, storagePath) {
   // Download the file, extract text, save as base resume
   baseResumeDocId = id; // track which doc is the base
+  localStorage.setItem('baseResumeDocId', id); // persist across refreshes
   renderDocsTable(); // refresh star indicator immediately
   try {
     toast('Loading resume text...', '');
