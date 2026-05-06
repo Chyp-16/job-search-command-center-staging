@@ -3400,7 +3400,7 @@ function saveApp() {
     resume_version:            getVal('f-resume'),
     cover_letter_version:      getVal('f-coverletter'),
     notes:                     getVal('f-notes'),
-    linked_contact_id:         getVal('f-linked-contact') || null,
+    // linked_contact_id removed — column does not exist in applications table
     initial_outreach_status:   getVal('f-io-status'),
     initial_outreach_date:     getVal('f-io-date'),
     initial_outreach_notes:    getVal('f-io-notes'),
@@ -3447,7 +3447,9 @@ document.addEventListener('app-save-ready', function() {
   var eid = window._saveAppEditingId;
   window._saveAppPayload   = null;
   window._saveAppEditingId = null;
-  if (!p) return;
+  console.log('[AppSave] listener fired, payload:', p ? 'present' : 'missing', 'editingId:', eid);
+  if (!p) { console.log('[AppSave] payload missing - aborting'); return; }
+  console.log('[AppSave] firing fetch to', eid ? 'PATCH' : 'POST');
 
   if (eid) {
     fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
@@ -3465,17 +3467,22 @@ document.addEventListener('app-save-ready', function() {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
       body:    JSON.stringify(p)
-    }).then(function(r) { return r.json(); })
-    .then(function(result) {
-      var saved = Array.isArray(result) ? result[0] : result;
-      toast('Application added.', 'success');
-      if (saved) syncOutreachToHubSpot(saved);
-      // Always reload from server to guarantee the new entry appears
-      dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
-        allApps = Array.isArray(data) ? data : [];
-        filteredApps = allApps;
-        currentPage = 1;
-        renderAppsTable();
+    }).then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(err) {
+          toast('Error saving: ' + (err.message || r.status), 'error');
+        });
+      }
+      return r.json().then(function(result) {
+        var saved = Array.isArray(result) ? result[0] : result;
+        toast('Application added.', 'success');
+        if (saved) syncOutreachToHubSpot(saved);
+        dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
+          allApps = Array.isArray(data) ? data : [];
+          filteredApps = allApps;
+          currentPage = 1;
+          renderAppsTable();
+        });
       });
     }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
   }
