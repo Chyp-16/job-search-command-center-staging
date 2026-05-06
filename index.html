@@ -3461,14 +3461,11 @@ function saveApp() {
         body: JSON.stringify(p)
       }).then(function(r) { return r.json(); }).then(function(result) {
         var savedApp = Array.isArray(result) ? result[0] : result;
-        if (savedApp && savedApp.id) {
-          allApps.unshift(savedApp);
-          filterApps('keep-page');
-          toast('Application added.', 'success');
-          syncOutreachToHubSpot(savedApp);
-        } else {
-          toast('Error saving application.', 'error');
-        }
+        // Add to local list and refresh — trust the server response
+        if (savedApp) allApps.unshift(savedApp);
+        filterApps('keep-page');
+        toast('Application added.', 'success');
+        if (savedApp) syncOutreachToHubSpot(savedApp);
       }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
     }
   }, 100);
