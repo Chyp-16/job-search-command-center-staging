@@ -6121,18 +6121,36 @@ async function findHiringContacts() {
   result.style.display = 'block';
   result.innerHTML = '<div style="color:var(--text-secondary)">Searching for contacts with AI...</div>';
 
-  var prompt = 'Search LinkedIn, company websites, and professional sources to identify the following people at ' +
-    (company || url) + (url ? ' (' + url + ')' : '') + ':\n' +
-    '1. Recruiter or Talent Acquisition contact\n' +
-    '2. HR Director or HR Manager\n' +
-    '3. Hiring Manager most likely responsible for a senior marketing role\n\n' +
-    'For each person found, provide: Full Name, Title, LinkedIn URL (if available), Email (if available).\n' +
-    'If a specific person cannot be confirmed, say so clearly. Do not guess or fabricate names.' +
-    (jd ? '\n\nJob Description context:\n' + jd.slice(0, 800) : '');
+  // Extract job title from JD for more targeted search
+  var jdTitle = '';
+  if (jd) {
+    var titleMatch = jd.match(/(?:job title|position|role)[:\s]+([^\n]{5,60})/i) ||
+                     jd.match(/^([A-Z][^\n]{5,60}(?:Manager|Director|VP|President|Lead|Head|Officer|Specialist))/m);
+    if (titleMatch) jdTitle = titleMatch[1].trim();
+  }
+
+  var targetCompany = (company || url);
+  var prompt = 'I am Jay Wadhwa, a senior marketing executive with 25+ years of experience targeting VP, CMO, and Director-level marketing roles in the Chicago metro area. ' +
+    'I have just applied to ' + targetCompany + (jdTitle ? ' for a ' + jdTitle + ' role' : ' for a senior marketing leadership role') + '. ' +
+    'I need to identify the best people to reach out to for post-application follow-up.\n\n' +
+    'Search LinkedIn, the company website, press releases, news articles, and professional directories to identify:\n' +
+    '1. The most senior Marketing leader (CMO, VP Marketing, Chief Brand Officer, or equivalent) — this is the most important contact\n' +
+    '2. The Talent Acquisition, Recruiting, or HR contact most likely managing this search\n' +
+    '3. Any other marketing leadership contacts (Brand, Growth, Content, Creative) relevant to this role\n\n' +
+    'For each person found provide: Full Name, Exact Title, LinkedIn profile URL if found, Email if found, and one sentence on why they are relevant to contact.\n' +
+    'Prioritize confirmed, verifiable people only. If you cannot confirm a specific person, say so and explain what you did find.\n' +
+    'Do not fabricate names, titles, or emails under any circumstances.' +
+    (jd ? '\n\nJob Description:\n' + jd.slice(0, 1200) : '') +
+    (url ? '\n\nCompany website: ' + url : '');
+
+  var systemPrompt = 'You are an expert executive recruiting researcher helping a senior marketing leader identify post-application contacts. ' +
+    'Your job is to find real, verifiable people — not generic role descriptions. ' +
+    'Search thoroughly using multiple sources. Prioritize marketing leadership and talent acquisition contacts. ' +
+    'Be direct about what you found and what you could not confirm. Never invent contact information.';
 
   try {
     var messages = [{ role: 'user', content: prompt }];
-    var res = await callAIWithSearch(messages, 'You are a professional recruiting research assistant. Use web search to find verified contact information. Never fabricate names or emails.');
+    var res = await callAIWithSearch(messages, systemPrompt);
     result.innerHTML = res.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   } catch(e) {
     result.innerHTML = '<div style="color:var(--burgundy)">Error: ' + e.message + '</div>';
