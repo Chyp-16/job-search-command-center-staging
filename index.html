@@ -2898,7 +2898,7 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   const r = await fetch(WORKER_URL + '/ai', fetchOpts);
   if (!r.ok) throw new Error('API error: ' + r.status);
   const data = await r.json();
-  if (data.error) throw new Error(data.error);
+  if (data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)));
   return (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
 }
 
