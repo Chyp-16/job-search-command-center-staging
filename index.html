@@ -1657,7 +1657,14 @@ a { color: var(--burgundy); text-decoration: none; }
                 </div>
               </div>
             </div>
-            <div style="margin-top:16px;display:flex;gap:10px">
+            <div style="margin-top:16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--hover);border-radius:var(--radius);border:1px solid var(--border)">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);user-select:none">
+                <input type="checkbox" id="rt-test-mode" style="width:16px;height:16px;accent-color:var(--burgundy);cursor:pointer">
+                🧪 Test Mode — bypass AI, no API cost
+              </label>
+              <span style="font-size:12px;color:var(--text-light);margin-left:4px">Returns dummy output instantly for formatting checks.</span>
+            </div>
+            <div style="margin-top:4px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runResumeTailor()">✦ Tailor My Resume</button>
               <button class="btn btn-secondary" onclick="clearRT()">Clear</button>
             </div>
@@ -5564,6 +5571,7 @@ async function openFirePrompt(id) {
 
 
 async function runFirePrompt() {
+  if (!confirm('This will use Anthropic API credits (approx. $0.01\u20130.02).\n\nClick OK to continue or Cancel to abort.')) return;
   const data = await dbGet('prompts', 'select=*&id=eq.' + activePromptId);
   const p = Array.isArray(data) ? data[0] : data;
   if (!p) return;
@@ -6679,6 +6687,7 @@ function downloadInsightsDocx() {
 }
 
 async function generateDashboardInsights() {
+  if (!confirm('This will use Anthropic API credits (approx. $0.01–0.02).\n\nClick OK to continue or Cancel to abort.')) return;
   const btn = document.getElementById('insights-btn');
   const body = document.getElementById('ai-insights-body');
   if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
@@ -6887,6 +6896,7 @@ function ipSelectedDocs() {
 }
 
 async function runInterviewPrep() {
+  if (!confirm('Interview Prep generates multiple documents and uses Anthropic API credits (approx. $0.20\u20130.40).\n\nClick OK to continue or Cancel to abort.')) return;
   const company = (document.getElementById('ip-company').value || '').trim();
   const role = (document.getElementById('ip-role').value || '').trim();
   const jd = (document.getElementById('ip-jd').value || '').trim();
@@ -7274,6 +7284,22 @@ async function runResumeTailor() {
   const req = (document.getElementById('rt-keywords-req').value || '').trim();
   const nice = (document.getElementById('rt-keywords-nice').value || '').trim();
   if (!jd) { toast('Paste a job description first.', 'error'); return; }
+
+  // Test Mode — bypass API, return dummy output instantly
+  var testMode = document.getElementById('rt-test-mode') && document.getElementById('rt-test-mode').checked;
+  if (testMode) {
+    const panel = document.getElementById('rt-output-panel');
+    const contentEl = document.getElementById('rt-output-content');
+    panel.style.display = 'block';
+    rtOutput = '[TEST MODE — No API call made]\n\nJay Wadhwa\nVP of Marketing | Chicago, IL\n\n**SUMMARY**\nThis is dummy output for formatting tests. No Anthropic credits were used.\n\n**CORE EXPERTISE**\nBrand Strategy | GTM | SaaS | Revenue Growth\n\n**SELECT CLIENT WINS**\n- Grew revenue 130% at NBC Sports Chicago\n- Quadrupled ESPN Classic revenue to $40M\n- Created "programmable privacy" category at Secret Network\n\n[END TEST OUTPUT]';
+    var htmlText = rtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    contentEl.innerHTML = htmlText;
+    toast('Test Mode — dummy output loaded. No API cost.', 'success');
+    return;
+  }
+
+  // Cost confirmation before hitting Anthropic API
+  if (!confirm('This will use Anthropic API credits (approx. $0.03–0.06).\n\nClick OK to continue or Cancel to abort.')) return;
 
   const panel = document.getElementById('rt-output-panel');
   const contentEl = document.getElementById('rt-output-content');
@@ -7947,6 +7973,7 @@ function loadCLGPage() {
 }
 
 async function runCLGenerator() {
+  if (!confirm('This will use Anthropic API credits (approx. $0.03\u20130.06).\n\nClick OK to continue or Cancel to abort.')) return;
   const type = document.getElementById('clg-type').value;
   const company = (document.getElementById('clg-company').value || '').trim();
   const role = (document.getElementById('clg-role').value || '').trim();
@@ -8022,6 +8049,7 @@ function loadOBPage() {
 }
 
 async function runOutreachBuilder() {
+  if (!confirm('This will use Anthropic API credits (approx. $0.02\u20130.04).\n\nClick OK to continue or Cancel to abort.')) return;
   const company = (document.getElementById('ob-company').value||'').trim();
   const role = (document.getElementById('ob-role').value||'').trim();
   const recruiter = (document.getElementById('ob-recruiter').value||'').trim();
