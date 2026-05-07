@@ -3281,20 +3281,30 @@ function goPage(p) {
 
 // ── APP FORM ───────────────────────────────────────────────────────────
 function populateAppContactDropdown(selectedId) {
-  // Populate both contact dropdowns in the modal
-  ['f-contact', 'f-linked-contact'].forEach(function(dropId) {
-    var sel = document.getElementById(dropId);
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— None —</option>';
-    allContacts.forEach(function(c) {
-      if (!c.name) return;
-      var opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-      sel.appendChild(opt);
+  function doPopulate() {
+    ['f-contact', 'f-linked-contact'].forEach(function(dropId) {
+      var sel = document.getElementById(dropId);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— None —</option>';
+      allContacts.forEach(function(c) {
+        if (!c.name) return;
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+        sel.appendChild(opt);
+      });
+      if (selectedId) sel.value = selectedId;
     });
-    if (selectedId) sel.value = selectedId;
-  });
+  }
+  // If contacts not yet loaded, fetch a lightweight list first
+  if (allContacts.length === 0) {
+    dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000').then(function(data) {
+      if (Array.isArray(data) && data.length > 0) allContacts = data;
+      doPopulate();
+    });
+  } else {
+    doPopulate();
+  }
 }
 
 function openAddApp() {
