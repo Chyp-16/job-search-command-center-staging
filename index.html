@@ -6217,8 +6217,21 @@ async function hunterDomainSearch() {
       return score;
     }
 
+    // Filter out clearly irrelevant contacts (IT, legal, finance, admin, engineering)
+    function isIrrelevant(e) {
+      var t = (e.position || '').toLowerCase();
+      var d = (e.department || '').toLowerCase();
+      return /\b(it director|it manager|information tech|systems architect|network engineer|infrastructure|devops|sysadmin|security engineer|data engineer|software engineer|developer|programmer|accountant|bookkeeper|legal|counsel|attorney|compliance|facilities|office manager|executive assistant|admin assistant)\b/.test(t)
+        || d === 'it' || d === 'engineering' || d === 'legal';
+    }
+
+    var relevant   = emails.filter(function(e) { return !isIrrelevant(e); });
+    var irrelevant = emails.filter(function(e) { return isIrrelevant(e); });
+    // Use relevant contacts; only fall back to irrelevant if nothing else exists
+    var pool = relevant.length > 0 ? relevant : emails;
+
     // Sort by relevance score descending
-    var scored = emails.map(function(e) { return { e: e, score: scoreContact(e) }; });
+    var scored = pool.map(function(e) { return { e: e, score: scoreContact(e) }; });
     scored.sort(function(a, b) { return b.score - a.score; });
     var display = scored.slice(0, 8).map(function(s) { return s.e; });
 
