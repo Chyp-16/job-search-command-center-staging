@@ -2893,7 +2893,7 @@ async function dbDelete(table, id) {
 
 async function callAILong(messages, systemPrompt, useWebSearch) {
   // High token limit for long document generation
-  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
+  const body = { model: 'claude-sonnet-4-6', max_tokens: 4000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
@@ -7291,7 +7291,7 @@ async function runResumeTailor() {
     const panel = document.getElementById('rt-output-panel');
     const contentEl = document.getElementById('rt-output-content');
     panel.style.display = 'block';
-    rtOutput = '[TEST MODE — No API call made]\n\nJay Wadhwa\nVP of Marketing | Chicago, IL\n\n**SUMMARY**\nThis is dummy output for formatting tests. No Anthropic credits were used.\n\n**CORE EXPERTISE**\nBrand Strategy | GTM | SaaS | Revenue Growth\n\n**SELECT CLIENT WINS**\n- Grew revenue 130% at NBC Sports Chicago\n- Quadrupled ESPN Classic revenue to $40M\n- Created "programmable privacy" category at Secret Network\n\n[END TEST OUTPUT]';
+    rtOutput = 'Jay Wadhwa\nVP of Marketing | Greater Chicago Area\n\nPROFESSIONAL EXPERIENCE\n\nVICE PRESIDENT OF MARKETING\nNBC Sports Chicago | Chicago, IL | 2018 - 2021\n\nBrand & Growth Results\n- **130% advertiser revenue growth** in first 18 months\n- Built **25-person** internal creative agency from scratch\n- Delivered **$12M** in net-new revenue through sponsorship deals\n\nVICE PRESIDENT OF MARKETING\nESPN Classic | Bristol, CT | 2012 - 2018\n\nBrand & Growth Results\n- Quadrupled revenue to **$40M** over 6 years\n- Won **6 Emmy Awards** and **9 Promax/BDA honors**\n- Grew digital audience **+588%** year-over-year';
     var htmlText = rtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     contentEl.innerHTML = htmlText;
     toast('Test Mode — dummy output loaded. No API cost.', 'success');
@@ -7339,7 +7339,7 @@ async function runResumeTailor() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Wrap ALL statistics, percentages, dollar amounts, and metrics in **double asterisks** exactly like this: **$40M**, **130%**, **6 Emmy Awards**. No exceptions.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
   }
   prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
                  .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
