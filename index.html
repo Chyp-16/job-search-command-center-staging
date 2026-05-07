@@ -7790,21 +7790,19 @@ function buildResumeDocx(text, filename, markedUp) {
     if ((isBullet(cl) || inResults) && inExp) {
       // Strip bullet prefix and ** markers — split into bold metric + plain continuation
       var bulText = cl.replace(/^[-•*\d.]+\s*/,'');
-      // Parse all **bold** spans inline — handles both leading and mid-sentence bold
+      // If AI used **bold** markup, split on that
+      var boldMatch = bulText.match(/^\*\*(.+?)\*\*\s*(.*)/);
       var pprBul = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:before="0" w:after="0"/></w:pPr>';
-      var bulRuns = '';
-      var bulRemain = bulText;
-      var bulBoldRx = /\*\*(.+?)\*\*/;
-      var bulBoldMatch;
-      while ((bulBoldMatch = bulBoldRx.exec(bulRemain)) !== null) {
-        var bulBefore = bulRemain.slice(0, bulBoldMatch.index);
-        if (bulBefore) bulRuns += '<w:r>'+rpr(CL,null,BK,false,null)+'<w:t xml:space="preserve">'+esc(bulBefore)+'</w:t></w:r>';
-        bulRuns += '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+esc(bulBoldMatch[1])+'</w:t></w:r>';
-        bulRemain = bulRemain.slice(bulBoldMatch.index + bulBoldMatch[0].length);
+      if (boldMatch) {
+        var bm1 = esc(boldMatch[1]); var bm2 = esc(boldMatch[2]);
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
+          (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
+      } else {
+        // No ** markup — render as Calibri Light non-bold black
+        bodyXml += P(pprBul,
+          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText.replace(/\*\*/g,''))+'</w:t></w:r>');
       }
-      if (bulRemain) bulRuns += '<w:r>'+rpr(CL,null,BK,false,null)+'<w:t xml:space="preserve">'+esc(bulRemain)+'</w:t></w:r>';
-      if (!bulRuns) bulRuns = '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+esc(bulText)+'</w:t></w:r>';
-      bodyXml += P(pprBul, bulRuns);
       return;
     }
 
