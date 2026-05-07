@@ -7626,7 +7626,7 @@ function buildResumeDocx(text, filename, markedUp) {
     var rl = line;
     var cl = line.trim();
     if (!cl) {
-      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="10"/><w:szCs w:val="10"/></w:rPr><w:t> </w:t></w:r></w:p>';
+      bodyXml += '<w:p><w:pPr><w:spacing w:before="0" w:after="40"/></w:pPr></w:p>';
       return;
     }
 
