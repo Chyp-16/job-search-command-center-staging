@@ -2910,7 +2910,7 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
 }
 
 async function callAIWithSearch(messages, systemPrompt) {
-  var body = { messages: messages, max_tokens: 2048, web_search: true };
+  var body = { messages: messages, max_tokens: 2048, use_web_search: true };
   if (systemPrompt) body.system = systemPrompt;
   var r = await fetch(WORKER_URL + '/ai', {
     method: 'POST',
