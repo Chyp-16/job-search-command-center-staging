@@ -7796,8 +7796,8 @@ function buildResumeDocx(text, filename, markedUp) {
       if (boldMatch) {
         var bm1 = esc(boldMatch[1]); var bm2 = esc(boldMatch[2]);
         bodyXml += P(pprBul,
-          '<w:r>'+rpr(CL,null,BK,null,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
-          (bm2 ? '<w:r>'+rpr(CL,null,null,null,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
+          '<w:r>'+rpr(CL,null,BK,true,null)+'<w:t xml:space="preserve">'+bm1+'</w:t></w:r>'+
+          (bm2 ? '<w:r>'+rpr(CL,null,null,false,null)+'<w:t xml:space="preserve"> '+bm2+'</w:t></w:r>' : ''));
       } else {
         // No ** markup — render as Calibri Light non-bold black
         bodyXml += P(pprBul,
