@@ -2767,6 +2767,7 @@ a { color: var(--burgundy); text-decoration: none; }
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────
 const WORKER_URL = 'https://job-search-proxy.jvwadhwa.workers.dev';
+const HUNTER_API_KEY = 'dffcda29700229d71ca163abb7341a5550732075';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let allApps = [];
@@ -6123,9 +6124,66 @@ async function findHiringContacts() {
   try {
     var messages = [{ role: 'user', content: prompt }];
     var res = await callAIWithSearch(messages, 'You are a professional recruiting research assistant. Use web search to find verified contact information. Never fabricate names or emails.');
-    result.innerHTML = res.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    result.innerHTML = res.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') +
+      '<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">' +
+      '<button class="btn btn-secondary btn-sm" onclick="hunterDomainSearch()">📧 Find Verified Emails via Hunter.io</button>' +
+      '<div id="hunter-result" style="margin-top:10px;font-size:12px;line-height:1.7"></div>' +
+      '</div>';
   } catch(e) {
     result.innerHTML = '<div style="color:var(--burgundy)">Error: ' + e.message + '</div>';
+  }
+}
+
+async function hunterDomainSearch() {
+  var company = (document.getElementById('cf-company').value || '').trim();
+  var url     = (document.getElementById('cf-url').value || '').trim();
+  var hunterDiv = document.getElementById('hunter-result');
+  if (!hunterDiv) return;
+
+  // Extract domain from URL or derive from company name
+  var domain = '';
+  if (url) {
+    try { domain = new URL(url.indexOf('://') === -1 ? 'https://' + url : url).hostname.replace(/^www\./, ''); }
+    catch(e) { domain = url.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]; }
+  }
+  if (!domain && !company) { toast('Enter a company name or URL first.', 'error'); return; }
+
+  hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">Searching Hunter.io...</span>';
+
+  try {
+    var apiUrl = domain
+      ? 'https://api.hunter.io/v2/domain-search?domain=' + encodeURIComponent(domain) + '&limit=10&api_key=' + HUNTER_API_KEY
+      : 'https://api.hunter.io/v2/domain-search?company=' + encodeURIComponent(company) + '&limit=10&api_key=' + HUNTER_API_KEY;
+
+    var r = await fetch(apiUrl);
+    var data = await r.json();
+    var emails = (data.data && data.data.emails) || [];
+
+    if (!emails.length) {
+      hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">No verified emails found. Try adding the company URL for better results.</span>';
+      return;
+    }
+
+    // Filter for relevant roles: HR, recruiter, talent, marketing leadership
+    var priority = emails.filter(function(e) {
+      var t = (e.position || '').toLowerCase();
+      return /recruit|talent|hr |human resources|hiring|people ops|chief.*market|vp.*market|director.*market|cmo/.test(t);
+    });
+    var display = priority.length > 0 ? priority : emails.slice(0, 6);
+
+    hunterDiv.innerHTML = '<strong style="color:var(--burgundy)">Verified Emails from Hunter.io</strong><br><br>' +
+      display.map(function(e) {
+        var conf = e.confidence ? ' <span style="color:var(--text-secondary);font-size:11px">(' + e.confidence + '% confidence)</span>' : '';
+        var name = [e.first_name, e.last_name].filter(Boolean).join(' ') || '—';
+        var title = e.position || '—';
+        var dept = e.department ? ' · ' + e.department : '';
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">' +
+          '<strong>' + name + '</strong> — ' + title + dept + conf + '<br>' +
+          '<span style="color:var(--burgundy)">' + e.value + '</span>' +
+          '</div>';
+      }).join('');
+  } catch(e) {
+    hunterDiv.innerHTML = '<span style="color:var(--burgundy)">Error: ' + e.message + '</span>';
   }
 }
 
