@@ -1175,6 +1175,15 @@ a { color: var(--burgundy); text-decoration: none; }
               </div>
 
               <!-- Step 1: Hunter.io — always available -->
+              <div style="margin-bottom:10px;">
+                <label class="form-label" style="margin-bottom:6px">Search departments</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-marketing" checked> Marketing</label>
+                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-hr" checked> HR / Recruiting</label>
+                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-executive"> Executive</label>
+                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-sales"> Sales</label>
+                </div>
+              </div>
               <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="hunterDomainSearch()">
                 📧 Find Verified Emails
               </button>
@@ -6176,13 +6185,32 @@ async function hunterDomainSearch() {
   hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">Searching Hunter.io...</span>';
 
   try {
-    var apiUrl = domain
-      ? 'https://api.hunter.io/v2/domain-search?domain=' + encodeURIComponent(domain) + '&limit=10&api_key=' + HUNTER_API_KEY
-      : 'https://api.hunter.io/v2/domain-search?company=' + encodeURIComponent(company) + '&limit=10&api_key=' + HUNTER_API_KEY;
+    // Build department list from checked filters
+    var deptMap = { 'cf-dept-marketing': 'marketing', 'cf-dept-hr': 'hr', 'cf-dept-executive': 'executive', 'cf-dept-sales': 'sales' };
+    var selectedDepts = Object.keys(deptMap).filter(function(id) {
+      var el = document.getElementById(id); return el && el.checked;
+    }).map(function(id) { return deptMap[id]; });
 
-    var r = await fetch(apiUrl);
-    var data = await r.json();
-    var emails = (data.data && data.data.emails) || [];
+    // Run one search per selected department and merge results
+    var baseParams = (domain ? 'domain=' + encodeURIComponent(domain) : 'company=' + encodeURIComponent(company)) + '&limit=10&api_key=' + HUNTER_API_KEY;
+    var fetchPromises = selectedDepts.length > 0
+      ? selectedDepts.map(function(dept) {
+          return fetch('https://api.hunter.io/v2/domain-search?' + baseParams + '&department=' + dept).then(function(r){ return r.json(); });
+        })
+      : [fetch('https://api.hunter.io/v2/domain-search?' + baseParams).then(function(r){ return r.json(); })];
+
+    var results = await Promise.all(fetchPromises);
+    var seen = {};
+    var emails = [];
+    results.forEach(function(data) {
+      ((data.data && data.data.emails) || []).forEach(function(e) {
+        if (e.value && !seen[e.value]) { seen[e.value] = true; emails.push(e); }
+      });
+    });
+    // keep apiUrl reference satisfied for lint — not used
+    var apiUrl = '';
+
+    // emails already populated above via department-filtered fetches
 
     if (!emails.length) {
       hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">No verified emails found. Try adding the company URL for better results.</span>';
