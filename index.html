@@ -6171,14 +6171,59 @@ async function hunterDomainSearch() {
       return;
     }
 
-    // Filter for relevant roles: HR, recruiter, talent, marketing leadership
-    var priority = emails.filter(function(e) {
-      var t = (e.position || '').toLowerCase();
-      return /recruit|talent|hr |human resources|hiring|people ops|chief.*market|vp.*market|director.*market|cmo/.test(t);
-    });
-    var display = priority.length > 0 ? priority : emails.slice(0, 6);
+    // Extract job function from JD to drive relevance ranking
+    var jd = (document.getElementById('cf-jd').value || '').toLowerCase();
+    var jobFunction = 'general';
+    if (/\bmarket|brand|content|creative|growth|demand|campaign|social media|seo|paid media|gtm|go.to.market/.test(jd)) jobFunction = 'marketing';
+    else if (/\bsales|revenue|account exec|business dev|bdr|sdr|closing/.test(jd)) jobFunction = 'sales';
+    else if (/\bengineer|developer|software|product|technical|data|analytics|ml|ai|devops/.test(jd)) jobFunction = 'tech';
+    else if (/\bfinance|accounting|cfo|controller|fp&a|budget/.test(jd)) jobFunction = 'finance';
+    else if (/\boperations|ops|supply chain|logistics|process/.test(jd)) jobFunction = 'operations';
+    else if (/\bdesign|ux|ui|creative director|art director/.test(jd)) jobFunction = 'design';
 
-    hunterDiv.innerHTML = '<strong style="color:var(--burgundy)">Verified Emails from Hunter.io</strong><br><br>' +
+    // Relevance scoring — higher = shown first
+    function scoreContact(e) {
+      var t = (e.position || '').toLowerCase();
+      var d = (e.department || '').toLowerCase();
+      var score = 0;
+
+      // Always high priority: recruiting, HR, talent acquisition
+      if (/recruit|talent acquisition|talent partner|hr |human resources|people ops|hiring manager/.test(t)) score += 50;
+
+      // Function-specific leadership — highest value for direct hiring influence
+      var funcPatterns = {
+        marketing: /chief.*market|cmo|vp.*market|director.*market|head.*market|svp.*market|evp.*market/,
+        sales:     /chief.*sales|cso|vp.*sales|director.*sales|head.*sales|svp.*sales/,
+        tech:      /cto|vp.*eng|director.*eng|head.*eng|vp.*product|director.*product/,
+        finance:   /cfo|vp.*finance|director.*finance|controller/,
+        operations:/coo|vp.*ops|director.*ops|head.*ops/,
+        design:    /vp.*design|director.*design|head.*design|chief.*design/,
+        general:   /ceo|president|founder|chief/
+      };
+      if (funcPatterns[jobFunction] && funcPatterns[jobFunction].test(t)) score += 40;
+
+      // Department match
+      if (jobFunction !== 'general' && d.indexOf(jobFunction) !== -1) score += 20;
+
+      // Seniority boost
+      if (/\b(chief|president|founder|ceo|cmo|cto|cfo|coo)\b/.test(t)) score += 15;
+      if (/\b(vp|vice president|svp|evp)\b/.test(t)) score += 12;
+      if (/\bdirector\b/.test(t)) score += 8;
+      if (/\bmanager\b/.test(t)) score += 4;
+
+      // Confidence boost
+      score += (e.confidence || 0) / 20;
+
+      return score;
+    }
+
+    // Sort by relevance score descending
+    var scored = emails.map(function(e) { return { e: e, score: scoreContact(e) }; });
+    scored.sort(function(a, b) { return b.score - a.score; });
+    var display = scored.slice(0, 8).map(function(s) { return s.e; });
+
+    var funcLabel = jobFunction !== 'general' ? ' — ranked for <strong>' + jobFunction + '</strong> role' : '';
+    hunterDiv.innerHTML = '<strong style="color:var(--burgundy)">Verified Emails from Hunter.io</strong>' + funcLabel + '<br><br>' +
       display.map(function(e) {
         var conf = e.confidence ? ' <span style="color:var(--text-secondary);font-size:11px">(' + e.confidence + '% confidence)</span>' : '';
         var name = [e.first_name, e.last_name].filter(Boolean).join(' ') || '—';
