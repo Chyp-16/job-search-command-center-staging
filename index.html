@@ -2825,7 +2825,9 @@ async function dbGet(table, params = '') {
   const r = await fetch(`${WORKER_URL}/db/${table}${params ? '?' + params : ''}`, {
     headers: {  }
   });
-  return r.json();
+  const text = await r.text();
+  if (!text || text.trim() === '') return [];
+  try { return JSON.parse(text); } catch(e) { return []; }
 }
 
 async function dbPost(table, body) {
@@ -2834,7 +2836,9 @@ async function dbPost(table, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  return r.json();
+  const text = await r.text();
+  if (!text || text.trim() === '') return {};
+  try { return JSON.parse(text); } catch(e) { return {}; }
 }
 
 async function dbPatch(table, id, body) {
@@ -2843,7 +2847,9 @@ async function dbPatch(table, id, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  return r.json();
+  const text = await r.text();
+  if (!text || text.trim() === '') return {};
+  try { return JSON.parse(text); } catch(e) { return {}; }
 }
 
 async function dbDelete(table, id) {
