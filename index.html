@@ -3576,6 +3576,7 @@ function viewApp(id) {
   // Load linked uploaded documents and related contacts
   loadDetailDocs(id);
   loadDetailContacts(a.company, id);
+  loadDetailActivity(id);
   openModal('modal-detail');
 }
 
@@ -3735,6 +3736,73 @@ async function loadDetailDocs(appId) {
     detailBody.appendChild(docSection);
   } catch(e) {
     console.warn('Could not load docs for application:', e.message);
+  }
+}
+
+async function loadDetailActivity(appId) {
+  try {
+    const TYPE_LABEL = {
+      'resume_tailor': 'Resume Tailor',
+      'cover_letter': 'Cover Letter AI',
+      'thank_you': 'Thank You',
+      'follow_up': 'Follow-Up',
+      'outreach_sequence': 'Outreach Sequence',
+      'interview_prep': 'Interview Prep'
+    };
+
+    // Fetch cover letters and ai_outputs linked to this app in parallel
+    const [clData, aiData] = await Promise.all([
+      dbGet('cover_letters', 'select=id,version_name,date_created,target_role,target_company&linked_application_id=eq.' + appId + '&order=date_created.desc'),
+      dbGet('ai_outputs', 'select=id,output_type,created_at&linked_application_id=eq.' + appId + '&order=created_at.desc')
+    ]);
+
+    const cls = Array.isArray(clData) ? clData : [];
+    const ais = Array.isArray(aiData) ? aiData : [];
+
+    if (cls.length === 0 && ais.length === 0) return;
+
+    const detailBody = document.getElementById('detail-body');
+    if (!detailBody) return;
+
+    // Deduplicate ai_outputs — keep only the most recent per output_type
+    var seenTypes = {};
+    var deduped = ais.filter(function(o) {
+      if (seenTypes[o.output_type]) return false;
+      seenTypes[o.output_type] = true;
+      return true;
+    });
+
+    var rows = '';
+
+    cls.forEach(function(cl) {
+      rows += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:18px">✉️</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:600">' + (cl.version_name || 'Cover Letter') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-secondary)">Cover Letter · ' + fmt(cl.date_created) + '</div>' +
+        '</div>' +
+      '</div>';
+    });
+
+    deduped.forEach(function(o) {
+      var label = TYPE_LABEL[o.output_type] || o.output_type;
+      var icon = o.output_type === 'interview_prep' ? '🎯' : o.output_type === 'resume_tailor' ? '📝' : o.output_type === 'outreach_sequence' ? '📨' : '✦';
+      rows += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:18px">' + icon + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:600">' + label + '</div>' +
+          '<div style="font-size:11px;color:var(--text-secondary)">AI Output · ' + fmt(o.created_at ? o.created_at.split('T')[0] : null) + '</div>' +
+        '</div>' +
+      '</div>';
+    });
+
+    var section = document.createElement('div');
+    section.className = 'detail-section';
+    section.id = 'app-activity-section';
+    section.innerHTML = '<div class="detail-section-title">Related Activity (' + (cls.length + deduped.length) + ')</div>' + rows;
+    detailBody.appendChild(section);
+  } catch(e) {
+    console.warn('Could not load activity for application:', e.message);
   }
 }
 
