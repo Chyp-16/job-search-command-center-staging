@@ -1154,47 +1154,18 @@ a { color: var(--burgundy); text-decoration: none; }
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
 
-          <!-- Contact Finder -->
+          <!-- Job URL Extractor -->
           <div class="dash-card">
-            <div class="dash-card-header">🔍 Find Recruiter / Hiring Manager</div>
+            <div class="dash-card-header">🔗 Extract Job Details from URL</div>
             <div style="padding:16px;">
               <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Company Name</label>
-                <input class="form-input" type="text" id="cf-company" placeholder="e.g. Salesforce">
+                <label class="form-label">Job Posting URL</label>
+                <input class="form-input" type="url" id="ai-job-url" placeholder="https://...">
               </div>
-              <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Company URL (optional — improves results)</label>
-                <input class="form-input" type="url" id="cf-url" placeholder="https://...">
-              </div>
-              <div class="form-group" style="margin-bottom:10px;">
-                <label class="form-label">Job Description (optional — paste or drag &amp; drop)</label>
-                <textarea class="form-textarea" id="cf-jd" rows="3" placeholder="Paste or drag and drop a JD for better results..."
-                  ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)';"
-                  ondragleave="this.style.borderColor='';"
-                  ondrop="event.preventDefault();this.style.borderColor='';cfHandleDrop(event);"></textarea>
-              </div>
-
-              <!-- Step 1: Hunter.io — always available -->
-              <div style="margin-bottom:10px;">
-                <label class="form-label" style="margin-bottom:6px">Search departments</label>
-                <div style="display:flex;flex-wrap:wrap;gap:6px">
-                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-marketing" checked> Marketing</label>
-                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-hr" checked> HR / Recruiting</label>
-                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-executive"> Executive</label>
-                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="cf-dept-sales"> Sales</label>
-                </div>
-              </div>
-              <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="hunterDomainSearch()">
-                📧 Find Verified Emails
+              <button class="btn btn-primary" style="width:100%" onclick="extractJobURL()">
+                Extract Details
               </button>
-              <div id="hunter-result" style="margin-bottom:10px;font-size:12px;line-height:1.7;display:none;max-height:280px;overflow-y:auto;padding:10px;background:var(--hover);border-radius:6px"></div>
-
-              <!-- Step 2: AI research — optional, requires Anthropic credits -->
-              <button class="btn btn-secondary" style="width:100%;font-size:12px" onclick="findHiringContacts()">
-                🤖 Research Contacts with AI (optional)
-              </button>
-              <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;text-align:center">Requires Anthropic API credits</div>
-              <div id="cf-result" style="margin-top:10px;font-size:13px;line-height:1.7;display:none;max-height:280px;overflow-y:auto;padding:10px;background:var(--hover);border-radius:6px"></div>
+              <div id="extract-result" style="margin-top:12px;display:none;"></div>
             </div>
           </div>
 
@@ -1657,14 +1628,7 @@ a { color: var(--burgundy); text-decoration: none; }
                 </div>
               </div>
             </div>
-            <div style="margin-top:16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--hover);border-radius:var(--radius);border:1px solid var(--border)">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);user-select:none">
-                <input type="checkbox" id="rt-test-mode" style="width:16px;height:16px;accent-color:var(--burgundy);cursor:pointer">
-                🧪 Test Mode — bypass AI, no API cost
-              </label>
-              <span style="font-size:12px;color:var(--text-light);margin-left:4px">Returns dummy output instantly for formatting checks.</span>
-            </div>
-            <div style="margin-top:4px;display:flex;gap:10px">
+            <div style="margin-top:16px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runResumeTailor()">✦ Tailor My Resume</button>
               <button class="btn btn-secondary" onclick="clearRT()">Clear</button>
             </div>
@@ -2000,13 +1964,13 @@ a { color: var(--burgundy); text-decoration: none; }
           <input class="form-input" type="text" id="f-coverletter" placeholder="Version name">
         </div>
         <div class="form-group">
-          <label class="form-label">Recruiter / HR</label>
+          <label class="form-label">Primary Contact</label>
           <select class="form-select" id="f-contact">
             <option value="">— None —</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Hiring Manager</label>
+          <label class="form-label">Linked Contact</label>
           <select class="form-select" id="f-linked-contact">
             <option value="">— None —</option>
           </select>
@@ -2792,7 +2756,6 @@ a { color: var(--burgundy); text-decoration: none; }
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────
 const WORKER_URL = 'https://job-search-proxy.jvwadhwa.workers.dev';
-const HUNTER_API_KEY = 'eb0ba59f40871b3c4df7e46bb79cb31decb62645';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let allApps = [];
@@ -2893,7 +2856,7 @@ async function dbDelete(table, id) {
 
 async function callAILong(messages, systemPrompt, useWebSearch) {
   // High token limit for long document generation
-  const body = { model: 'claude-sonnet-4-6', max_tokens: 4000, messages };
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
@@ -2905,7 +2868,7 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   const r = await fetch(WORKER_URL + '/ai', fetchOpts);
   if (!r.ok) throw new Error('API error: ' + r.status);
   const data = await r.json();
-  if (data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)));
+  if (data.error) throw new Error(data.error);
   return (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
 }
 
@@ -2933,22 +2896,6 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   const data = await r.json();
   if (data.content && data.content[0]) return data.content[0].text;
   throw new Error(data.error?.message || 'AI request failed');
-}
-
-async function callAIWithSearch(messages, systemPrompt) {
-  var body = { messages: messages, max_tokens: 2048, use_web_search: true };
-  if (systemPrompt) body.system = systemPrompt;
-  var r = await fetch(WORKER_URL + '/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-    body: JSON.stringify(body)
-  });
-  var data = await r.json();
-  if (data.content) {
-    var text = data.content.filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('\n');
-    if (text) return text;
-  }
-  throw new Error((data.error && data.error.message) || 'Search request failed');
 }
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────
@@ -3334,30 +3281,17 @@ function goPage(p) {
 
 // ── APP FORM ───────────────────────────────────────────────────────────
 function populateAppContactDropdown(selectedId) {
-  function doPopulate() {
-    ['f-contact', 'f-linked-contact'].forEach(function(dropId) {
-      var sel = document.getElementById(dropId);
-      if (!sel) return;
-      sel.innerHTML = '<option value="">— None —</option>';
-      allContacts.forEach(function(c) {
-        if (!c.name) return;
-        var opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
-        sel.appendChild(opt);
-      });
-      if (selectedId) sel.value = selectedId;
-    });
-  }
-  // If contacts not yet loaded, fetch a lightweight list first
-  if (allContacts.length === 0) {
-    dbGet('contacts', 'select=id,name,company&order=name.asc&limit=2000').then(function(data) {
-      if (Array.isArray(data) && data.length > 0) allContacts = data;
-      doPopulate();
-    });
-  } else {
-    doPopulate();
-  }
+  var sel = document.getElementById('f-linked-contact');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>';
+  allContacts.forEach(function(c) {
+    if (!c.name) return;
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.company ? ' — ' + c.company : '');
+    sel.appendChild(opt);
+  });
+  if (selectedId) sel.value = selectedId;
 }
 
 function openAddApp() {
@@ -3447,138 +3381,76 @@ function editApp(id) {
 
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() || null : null; }
 
-function saveApp() {
-  // Capture all form values synchronously — before any async work
-  var company   = getVal('f-company');
-  var job_title = getVal('f-title');
+async function saveApp() {
+  const company = getVal('f-company');
+  const job_title = getVal('f-title');
   if (!company || !job_title) { toast('Company and job title are required.', 'error'); return; }
 
-  var payload = {
-    date_applied:              getVal('f-date'),
-    company:                   company,
-    job_title:                 job_title,
-    job_url:                   getVal('f-url'),
-    source:                    getVal('f-source'),
-    status:                    getVal('f-status'),
-    salary:                    getVal('f-salary'),
-    industry:                  getVal('f-industry'),
-    job_type:                  getVal('f-jobtype'),
-    resume_version:            getVal('f-resume'),
-    cover_letter_version:      getVal('f-coverletter'),
-    notes:                     getVal('f-notes'),
-    // linked_contact_id removed — column does not exist in applications table
-    initial_outreach_status:   getVal('f-io-status'),
-    initial_outreach_date:     getVal('f-io-date'),
-    initial_outreach_notes:    getVal('f-io-notes'),
-    followup_3day_status:      getVal('f-3d-status'),
-    followup_3day_date:        getVal('f-3d-date'),
-    followup_3day_notes:       getVal('f-3d-notes'),
-    followup_1week_status:     getVal('f-1w-status'),
-    followup_1week_date:       getVal('f-1w-date'),
-    followup_1week_notes:      getVal('f-1w-notes'),
-    followup_2week_status:     getVal('f-2w-status'),
-    followup_2week_date:       getVal('f-2w-date'),
-    followup_2week_notes:      getVal('f-2w-notes'),
+  const payload = {
+    date_applied: getVal('f-date'),
+    company, job_title,
+    job_url: getVal('f-url'),
+    source: getVal('f-source'),
+    status: getVal('f-status'),
+    salary: getVal('f-salary'),
+    industry: getVal('f-industry'),
+    job_type: getVal('f-jobtype'),
+    resume_version: getVal('f-resume'),
+    cover_letter_version: getVal('f-coverletter'),
+    notes: getVal('f-notes'),
+    linked_contact_id: getVal('f-linked-contact') || null,
+    linked_contact_id: (document.getElementById('f-contact') || {}).value || null,
+    initial_outreach_status: getVal('f-io-status'),
+    initial_outreach_date: getVal('f-io-date'),
+    initial_outreach_notes: getVal('f-io-notes'),
+    followup_3day_status: getVal('f-3d-status'),
+    followup_3day_date: getVal('f-3d-date'),
+    followup_3day_notes: getVal('f-3d-notes'),
+    followup_1week_status: getVal('f-1w-status'),
+    followup_1week_date: getVal('f-1w-date'),
+    followup_1week_notes: getVal('f-1w-notes'),
+    followup_2week_status: getVal('f-2w-status'),
+    followup_2week_date: getVal('f-2w-date'),
+    followup_2week_notes: getVal('f-2w-notes'),
     rejection_followup_status: getVal('f-rf-status'),
-    rejection_followup_date:   getVal('f-rf-date'),
-    rejection_followup_notes:  getVal('f-rf-notes'),
+    rejection_followup_date: getVal('f-rf-date'),
+    rejection_followup_notes: getVal('f-rf-notes'),
   };
 
-  // Check for duplicate synchronously before closing modal
-  var currentEditId = editingId;
-  if (!currentEditId) {
-    var duplicate = allApps.find(function(a) {
-      return a.company && payload.company &&
-        a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
-        a.job_title && payload.job_title &&
-        a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
-    });
-    if (duplicate) {
-      if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
-    }
-  }
-
-  // Capture contact selection synchronously before modal closes
-  var contactEl = document.getElementById('f-contact') || document.getElementById('f-linked-contact');
-  var selectedContactId = contactEl ? (contactEl.value || null) : null;
-
-  // Store payload in window global then dispatch custom event
-  window._saveAppPayload   = payload;
-  window._saveAppEditingId = currentEditId;
-  window._saveAppContactId = selectedContactId;
-
-  closeModal('modal-app');
-  document.dispatchEvent(new CustomEvent('app-save-ready'));
-}
-
-// Listener lives outside any click handler — extension cannot intercept it
-document.addEventListener('app-save-ready', function() {
-  var p   = window._saveAppPayload;
-  var eid = window._saveAppEditingId;
-  var cid = window._saveAppContactId;
-  window._saveAppPayload   = null;
-  window._saveAppEditingId = null;
-  window._saveAppContactId = null;
-  if (!p) return;
-
-  if (eid) {
-    fetch(WORKER_URL + '/db/applications?id=eq.' + eid, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body:    JSON.stringify(p)
-    }).then(function() {
-      var idx = allApps.findIndex(function(x) { return x.id === eid; });
-      if (idx >= 0) allApps[idx] = Object.assign({}, allApps[idx], p);
-      filterApps('keep-page');
+  try {
+    let savedApp;
+    if (editingId) {
+      await dbPatch('applications', editingId, payload);
+      const idx = allApps.findIndex(x => x.id === editingId);
+      if (idx >= 0) allApps[idx] = { ...allApps[idx], ...payload };
+      savedApp = allApps.find(x => x.id === editingId);
       toast('Application updated.', 'success');
-      // Link selected contact to this application
-      if (cid) {
-        fetch(WORKER_URL + '/db/contacts?id=eq.' + cid, {
-          method:  'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-          body:    JSON.stringify({ linked_application_id: eid })
-        }).then(function() {
-          var c = allContacts.find(function(x) { return x.id === cid; });
-          if (c) c.linked_application_id = eid;
-        });
-      }
-    }).catch(function(e) { toast('Error updating: ' + e.message, 'error'); });
-  } else {
-    fetch(WORKER_URL + '/db/applications', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body:    JSON.stringify(p)
-    }).then(function(r) {
-      if (!r.ok) {
-        return r.json().then(function(err) {
-          toast('Error saving: ' + (err.message || r.status), 'error');
-        });
-      }
-      return r.json().then(function(result) {
-        var saved = Array.isArray(result) ? result[0] : result;
-        toast('Application added.', 'success');
-        if (saved) syncOutreachToHubSpot(saved);
-        // Link selected contact to this application
-        if (cid && saved && saved.id) {
-          fetch(WORKER_URL + '/db/contacts?id=eq.' + cid, {
-            method:  'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-            body:    JSON.stringify({ linked_application_id: saved.id })
-          }).then(function() {
-            var c = allContacts.find(function(x) { return x.id === cid; });
-            if (c) c.linked_application_id = saved.id;
-          });
-        }
-        dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(data) {
-          allApps = Array.isArray(data) ? data : [];
-          filteredApps = allApps;
-          currentPage = 1;
-          renderAppsTable();
-        });
+    } else {
+      // Check for duplicate before saving
+      const duplicate = allApps.find(function(a) {
+        return a.company && payload.company &&
+          a.company.toLowerCase().trim() === payload.company.toLowerCase().trim() &&
+          a.job_title && payload.job_title &&
+          a.job_title.toLowerCase().trim() === payload.job_title.toLowerCase().trim();
       });
-    }).catch(function(e) { toast('Error saving: ' + e.message, 'error'); });
+      if (duplicate) {
+        if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
+      }
+      const result = await dbPost('applications', payload);
+      savedApp = Array.isArray(result) ? result[0] : result;
+      allApps.unshift(savedApp);
+      toast('Application added.', 'success');
+    }
+    closeModal('modal-app');
+    filterApps('keep-page');
+
+    // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
+    if (savedApp) syncOutreachToHubSpot(savedApp);
+
+  } catch (e) {
+    toast('Error saving application: ' + e.message, 'error');
   }
-});
+}
 
 async function syncOutreachToHubSpot(app) {
   // Build a task for each outreach step that is Scheduled with a date
@@ -5401,7 +5273,7 @@ const SEED_PROMPTS = [
   {
     "name": "Resume Tailoring",
     "category": "Resume",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Mark every changed word or phrase with [YLW] before and [/YLW] after. Example: [YLW]changed text[/YLW]. Do not use <mark> tags. Wrap ALL performance metrics, percentages, dollar amounts, and key stats in **double asterisks** exactly like this: **$40M**, **130%**, **6 Emmy Awards**. No exceptions. Every bullet must start with a **bold stat or achievement phrase**.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Mark every changed word or phrase with [YLW] before and [/YLW] after. Example: [YLW]changed text[/YLW]. Do not use <mark> tags. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "keywords_required",
       "keywords_nice",
@@ -5571,7 +5443,6 @@ async function openFirePrompt(id) {
 
 
 async function runFirePrompt() {
-  if (!confirm('This will use Anthropic API credits (approx. $0.01\u20130.02).\n\nClick OK to continue or Cancel to abort.')) return;
   const data = await dbGet('prompts', 'select=*&id=eq.' + activePromptId);
   const p = Array.isArray(data) ? data[0] : data;
   if (!p) return;
@@ -6128,188 +5999,46 @@ function showAIOutput(content, type = '') {
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function findHiringContacts() {
-  var company = (document.getElementById('cf-company').value || '').trim();
-  var url     = (document.getElementById('cf-url').value || '').trim();
-  var jd      = (document.getElementById('cf-jd').value || '').trim();
-  if (!company && !url) { toast('Enter a company name or URL.', 'error'); return; }
+async function extractJobURL() {
+  const url = document.getElementById('ai-job-url').value.trim();
+  if (!url) { toast('Please enter a job URL.', 'error'); return; }
 
-  var result = document.getElementById('cf-result');
+  const result = document.getElementById('extract-result');
   result.style.display = 'block';
-  result.innerHTML = '<div style="color:var(--text-secondary)">Searching for contacts with AI...</div>';
-
-  // Extract job title from JD for more targeted search
-  var jdTitle = '';
-  if (jd) {
-    var titleMatch = jd.match(/(?:job title|position|role)[:\s]+([^\n]{5,60})/i) ||
-                     jd.match(/^([A-Z][^\n]{5,60}(?:Manager|Director|VP|President|Lead|Head|Officer|Specialist))/m);
-    if (titleMatch) jdTitle = titleMatch[1].trim();
-  }
-
-  var targetCompany = (company || url);
-  var prompt = 'I am Jay Wadhwa, a senior marketing executive with 25+ years of experience targeting VP, CMO, and Director-level marketing roles in the Chicago metro area. ' +
-    'I have just applied to ' + targetCompany + (jdTitle ? ' for a ' + jdTitle + ' role' : ' for a senior marketing leadership role') + '. ' +
-    'I need to identify the best people to reach out to for post-application follow-up.\n\n' +
-    'Search LinkedIn, the company website, press releases, news articles, and professional directories to identify:\n' +
-    '1. The most senior Marketing leader (CMO, VP Marketing, Chief Brand Officer, or equivalent) — this is the most important contact\n' +
-    '2. The Talent Acquisition, Recruiting, or HR contact most likely managing this search\n' +
-    '3. Any other marketing leadership contacts (Brand, Growth, Content, Creative) relevant to this role\n\n' +
-    'For each person found provide: Full Name, Exact Title, LinkedIn profile URL if found, Email if found, and one sentence on why they are relevant to contact.\n' +
-    'Prioritize confirmed, verifiable people only. If you cannot confirm a specific person, say so and explain what you did find.\n' +
-    'Do not fabricate names, titles, or emails under any circumstances.' +
-    (jd ? '\n\nJob Description:\n' + jd.slice(0, 1200) : '') +
-    (url ? '\n\nCompany website: ' + url : '');
-
-  var systemPrompt = 'You are an expert executive recruiting researcher helping a senior marketing leader identify post-application contacts. ' +
-    'Your job is to find real, verifiable people — not generic role descriptions. ' +
-    'Search thoroughly using multiple sources. Prioritize marketing leadership and talent acquisition contacts. ' +
-    'Be direct about what you found and what you could not confirm. Never invent contact information.';
+  result.innerHTML = '<div class="loading-overlay" style="padding:12px"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Extracting...</div>';
 
   try {
-    var messages = [{ role: 'user', content: prompt }];
-    var res = await callAIWithSearch(messages, systemPrompt);
-    result.innerHTML = res.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  } catch(e) {
-    result.innerHTML = '<div style="color:var(--burgundy)">Error: ' + e.message + '</div>';
-  }
-}
-
-async function hunterDomainSearch() {
-  var company = (document.getElementById('cf-company').value || '').trim();
-  var url     = (document.getElementById('cf-url').value || '').trim();
-  if (!company && !url) { toast('Enter a company name or URL first.', 'error'); return; }
-  var hunterDiv = document.getElementById('hunter-result');
-  if (!hunterDiv) return;
-  hunterDiv.style.display = 'block';
-
-  // Extract domain from URL or derive from company name
-  var domain = '';
-  if (url) {
-    try { domain = new URL(url.indexOf('://') === -1 ? 'https://' + url : url).hostname.replace(/^www\./, ''); }
-    catch(e) { domain = url.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]; }
-  }
-  if (!domain && !company) { toast('Enter a company name or URL first.', 'error'); return; }
-
-  hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">Searching Hunter.io...</span>';
-
-  try {
-    // Build department list from checked filters
-    var deptMap = { 'cf-dept-marketing': 'marketing', 'cf-dept-hr': 'hr', 'cf-dept-executive': 'executive', 'cf-dept-sales': 'sales' };
-    var selectedDepts = Object.keys(deptMap).filter(function(id) {
-      var el = document.getElementById(id); return el && el.checked;
-    }).map(function(id) { return deptMap[id]; });
-
-    // Run one search per selected department and merge results
-    var baseParams = (domain ? 'domain=' + encodeURIComponent(domain) : 'company=' + encodeURIComponent(company)) + '&limit=10&api_key=' + HUNTER_API_KEY;
-    var fetchPromises = selectedDepts.length > 0
-      ? selectedDepts.map(function(dept) {
-          return fetch('https://api.hunter.io/v2/domain-search?' + baseParams + '&department=' + dept).then(function(r){ return r.json(); });
-        })
-      : [fetch('https://api.hunter.io/v2/domain-search?' + baseParams).then(function(r){ return r.json(); })];
-
-    var results = await Promise.all(fetchPromises);
-    var seen = {};
-    var emails = [];
-    results.forEach(function(data) {
-      ((data.data && data.data.emails) || []).forEach(function(e) {
-        if (e.value && !seen[e.value]) { seen[e.value] = true; emails.push(e); }
-      });
+    const r = await fetch(`${WORKER_URL}/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ job_url: url })
     });
-    // keep apiUrl reference satisfied for lint — not used
-    var apiUrl = '';
-
-    // emails already populated above via department-filtered fetches
-
-    if (!emails.length) {
-      hunterDiv.innerHTML = '<span style="color:var(--text-secondary)">No verified emails found. Try adding the company URL for better results.</span>';
-      return;
+    const data = await r.json();
+    let extracted;
+    if (data.content && data.content[0]) {
+      try { extracted = JSON.parse(data.content[0].text); }
+      catch(e) { extracted = null; }
     }
 
-    // Extract job function from JD to drive relevance ranking
-    var jd = (document.getElementById('cf-jd').value || '').toLowerCase();
-    var jobFunction = 'general';
-    if (/\bmarket|brand|content|creative|growth|demand|campaign|social media|seo|paid media|gtm|go.to.market/.test(jd)) jobFunction = 'marketing';
-    else if (/\bsales|revenue|account exec|business dev|bdr|sdr|closing/.test(jd)) jobFunction = 'sales';
-    else if (/\bengineer|developer|software|product|technical|data|analytics|ml|ai|devops/.test(jd)) jobFunction = 'tech';
-    else if (/\bfinance|accounting|cfo|controller|fp&a|budget/.test(jd)) jobFunction = 'finance';
-    else if (/\boperations|ops|supply chain|logistics|process/.test(jd)) jobFunction = 'operations';
-    else if (/\bdesign|ux|ui|creative director|art director/.test(jd)) jobFunction = 'design';
-
-    // Relevance scoring — higher = shown first
-    function scoreContact(e) {
-      var t = (e.position || '').toLowerCase();
-      var d = (e.department || '').toLowerCase();
-      var score = 0;
-
-      // Always high priority: recruiting, HR, talent acquisition
-      if (/recruit|talent acquisition|talent partner|hr |human resources|people ops|hiring manager/.test(t)) score += 50;
-
-      // Function-specific leadership — highest value for direct hiring influence
-      var funcPatterns = {
-        marketing: /chief.*market|cmo|vp.*market|director.*market|head.*market|svp.*market|evp.*market/,
-        sales:     /chief.*sales|cso|vp.*sales|director.*sales|head.*sales|svp.*sales/,
-        tech:      /cto|vp.*eng|director.*eng|head.*eng|vp.*product|director.*product/,
-        finance:   /cfo|vp.*finance|director.*finance|controller/,
-        operations:/coo|vp.*ops|director.*ops|head.*ops/,
-        design:    /vp.*design|director.*design|head.*design|chief.*design/,
-        general:   /ceo|president|founder|chief/
-      };
-      if (funcPatterns[jobFunction] && funcPatterns[jobFunction].test(t)) score += 40;
-
-      // Department match
-      if (jobFunction !== 'general' && d.indexOf(jobFunction) !== -1) score += 20;
-
-      // Seniority boost
-      if (/\b(chief|president|founder|ceo|cmo|cto|cfo|coo)\b/.test(t)) score += 15;
-      if (/\b(vp|vice president|svp|evp)\b/.test(t)) score += 12;
-      if (/\bdirector\b/.test(t)) score += 8;
-      if (/\bmanager\b/.test(t)) score += 4;
-
-      // Confidence boost
-      score += (e.confidence || 0) / 20;
-
-      return score;
+    if (extracted) {
+      result.innerHTML = `
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div><span style="color:var(--text-secondary);font-size:11px">Title</span><div><strong>${extracted.job_title||'—'}</strong></div></div>
+            <div><span style="color:var(--text-secondary);font-size:11px">Company</span><div><strong>${extracted.company||'—'}</strong></div></div>
+            <div><span style="color:var(--text-secondary);font-size:11px">Salary</span><div>${extracted.salary||'—'}</div></div>
+            <div><span style="color:var(--text-secondary);font-size:11px">Type</span><div>${extracted.job_type||'—'}</div></div>
+          </div>
+          ${extracted.requirements?.length ? `<div style="margin-bottom:8px"><span style="color:var(--text-secondary);font-size:11px;font-weight:700">Requirements</span><ul style="margin:4px 0 0 16px;font-size:12px">${extracted.requirements.map(r=>`<li>${r}</li>`).join('')}</ul></div>` : ''}
+          ${extracted.nice_to_have?.length ? `<div><span style="color:var(--text-secondary);font-size:11px;font-weight:700">Nice to Have</span><ul style="margin:4px 0 0 16px;font-size:12px">${extracted.nice_to_have.map(r=>`<li>${r}</li>`).join('')}</ul></div>` : ''}
+          <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="useExtracted(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">+ Add as Application</button>
+        </div>`;
+    } else {
+      result.innerHTML = `<div style="color:var(--burgundy);font-size:13px;padding:8px">Could not extract details from this URL. The site may block automated access. Try pasting the job description manually in the AI Tools section.</div>`;
     }
-
-    // Filter out clearly irrelevant contacts (IT, legal, finance, admin, engineering)
-    function isIrrelevant(e) {
-      var t = (e.position || '').toLowerCase();
-      var d = (e.department || '').toLowerCase();
-      return /\b(it director|it manager|information tech|systems architect|network engineer|infrastructure|devops|sysadmin|security engineer|data engineer|software engineer|developer|programmer|accountant|bookkeeper|legal|counsel|attorney|compliance|facilities|office manager|executive assistant|admin assistant)\b/.test(t)
-        || d === 'it' || d === 'engineering' || d === 'legal';
-    }
-
-    var relevant   = emails.filter(function(e) { return !isIrrelevant(e); });
-    var irrelevant = emails.filter(function(e) { return isIrrelevant(e); });
-    // Use relevant contacts; only fall back to irrelevant if nothing else exists
-    var pool = relevant.length > 0 ? relevant : emails;
-
-    // Sort by relevance score descending
-    var scored = pool.map(function(e) { return { e: e, score: scoreContact(e) }; });
-    scored.sort(function(a, b) { return b.score - a.score; });
-    var display = scored.slice(0, 8).map(function(s) { return s.e; });
-
-    var funcLabel = jobFunction !== 'general' ? ' — ranked for <strong>' + jobFunction + '</strong> role' : '';
-    hunterDiv.innerHTML = '<strong style="color:var(--burgundy)">Verified Emails from Hunter.io</strong>' + funcLabel + '<br><br>' +
-      display.map(function(e) {
-        var conf = e.confidence ? ' <span style="color:var(--text-secondary);font-size:11px">(' + e.confidence + '% confidence)</span>' : '';
-        var name = [e.first_name, e.last_name].filter(Boolean).join(' ') || '—';
-        var title = e.position || '—';
-        var dept = e.department ? ' · ' + e.department : '';
-        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">' +
-          '<strong>' + name + '</strong> — ' + title + dept + conf + '<br>' +
-          '<span style="color:var(--burgundy)">' + e.value + '</span>' +
-          '</div>';
-      }).join('');
   } catch(e) {
-    hunterDiv.innerHTML = '<span style="color:var(--burgundy)">Error: ' + e.message + '</span>';
+    result.innerHTML = `<div style="color:var(--burgundy);font-size:13px;padding:8px">Error: ${e.message}</div>`;
   }
-}
-
-function cfHandleDrop(event) {
-  var files = event.dataTransfer && event.dataTransfer.files;
-  if (!files || !files.length) return;
-  handleJDFileUpload({ target: { files: files } }, 'cf-jd', null);
 }
 
 function useExtracted(data) {
@@ -6687,7 +6416,6 @@ function downloadInsightsDocx() {
 }
 
 async function generateDashboardInsights() {
-  if (!confirm('This will use Anthropic API credits (approx. $0.01–0.02).\n\nClick OK to continue or Cancel to abort.')) return;
   const btn = document.getElementById('insights-btn');
   const body = document.getElementById('ai-insights-body');
   if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
@@ -6896,7 +6624,6 @@ function ipSelectedDocs() {
 }
 
 async function runInterviewPrep() {
-  if (!confirm('Interview Prep generates multiple documents and uses Anthropic API credits (approx. $0.20\u20130.40).\n\nClick OK to continue or Cancel to abort.')) return;
   const company = (document.getElementById('ip-company').value || '').trim();
   const role = (document.getElementById('ip-role').value || '').trim();
   const jd = (document.getElementById('ip-jd').value || '').trim();
@@ -7285,22 +7012,6 @@ async function runResumeTailor() {
   const nice = (document.getElementById('rt-keywords-nice').value || '').trim();
   if (!jd) { toast('Paste a job description first.', 'error'); return; }
 
-  // Test Mode — bypass API, return dummy output instantly
-  var testMode = document.getElementById('rt-test-mode') && document.getElementById('rt-test-mode').checked;
-  if (testMode) {
-    const panel = document.getElementById('rt-output-panel');
-    const contentEl = document.getElementById('rt-output-content');
-    panel.style.display = 'block';
-    rtOutput = 'Jay Wadhwa\nVP of Marketing | Greater Chicago Area\n\nPROFESSIONAL EXPERIENCE\n\nVICE PRESIDENT OF MARKETING\nNBC Sports Chicago | Chicago, IL | 2018 - 2021\n\nBrand & Growth Results\n- **130% advertiser revenue growth** in first 18 months\n- **Built 25-person internal creative agency** from scratch\n- **Delivered $12M in net-new revenue** through sponsorship deals\n\nVICE PRESIDENT OF MARKETING\nESPN Classic | Bristol, CT | 2012 - 2018\n\nBrand & Growth Results\n- **Quadrupled revenue to $40M** over 6 years\n- **Won 6 Emmy Awards and 9 Promax/BDA honors** for creative excellence\n- **Grew digital audience +588%** year-over-year';
-    var htmlText = rtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-    contentEl.innerHTML = htmlText;
-    toast('Test Mode — dummy output loaded. No API cost.', 'success');
-    return;
-  }
-
-  // Cost confirmation before hitting Anthropic API
-  if (!confirm('This will use Anthropic API credits (approx. $0.03–0.06).\n\nClick OK to continue or Cancel to abort.')) return;
-
   const panel = document.getElementById('rt-output-panel');
   const contentEl = document.getElementById('rt-output-content');
   panel.style.display = 'none';
@@ -7339,7 +7050,7 @@ async function runResumeTailor() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Wrap ALL statistics, percentages, dollar amounts, and metrics in **double asterisks** exactly like this: **$40M**, **130%**, **6 Emmy Awards**. No exceptions.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
   }
   prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
                  .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
@@ -7973,7 +7684,6 @@ function loadCLGPage() {
 }
 
 async function runCLGenerator() {
-  if (!confirm('This will use Anthropic API credits (approx. $0.03\u20130.06).\n\nClick OK to continue or Cancel to abort.')) return;
   const type = document.getElementById('clg-type').value;
   const company = (document.getElementById('clg-company').value || '').trim();
   const role = (document.getElementById('clg-role').value || '').trim();
@@ -8049,7 +7759,6 @@ function loadOBPage() {
 }
 
 async function runOutreachBuilder() {
-  if (!confirm('This will use Anthropic API credits (approx. $0.02\u20130.04).\n\nClick OK to continue or Cancel to abort.')) return;
   const company = (document.getElementById('ob-company').value||'').trim();
   const role = (document.getElementById('ob-role').value||'').trim();
   const recruiter = (document.getElementById('ob-recruiter').value||'').trim();
