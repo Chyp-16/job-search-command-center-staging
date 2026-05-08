@@ -4281,6 +4281,7 @@ async function syncHubSpot() {
       try {
         const url = WORKER_URL + '/hubspot/contacts' + (after ? '?after=' + after : '');
         r = await fetch(url, {
+          headers: { 'Origin': location.origin },
           signal: controller.signal
         });
         clearTimeout(timeout);
@@ -4351,11 +4352,12 @@ async function syncHubSpot() {
         name,
         company: hc.properties?.company || null,
         title: hc.properties?.jobtitle || null,
-        contact_type: hc.properties?.contact_type || 'Recruiter',
+        contact_type: 'Recruiter',
         connection_source: 'HubSpot',
         hubspot_contact_id: hsId,
         email: hc.properties?.email || null,
         linkedin_url: linkedInUrl,
+        notes: null,
         last_contact_date: hc.properties?.lastmodifieddate
           ? hc.properties.lastmodifieddate.split('T')[0] : null,
       };
@@ -4367,39 +4369,35 @@ async function syncHubSpot() {
       }
     }
 
-    // Insert new contacts, patch existing ones
+    // Batch UPSERT all contacts using hubspot_contact_id as the conflict key
+    // This handles both new and existing contacts in one operation
     const BATCH = 100;
     let created = 0, updated = 0;
+    const allPayloads = [...toCreate, ...toUpdate.map(function(u) {
+      return Object.assign({}, u.payload, { id: u.id });
+    })];
 
-    if (btn) btn.textContent = '⟳ Saving ' + (toCreate.length + toUpdate.length) + ' contacts...';
+    if (btn) btn.textContent = '⟳ Saving ' + allPayloads.length + ' contacts...';
 
-    // POST new contacts in batches
-    for (let i = 0; i < toCreate.length; i += BATCH) {
-      const batch = toCreate.slice(i, i + BATCH);
-      if (btn) btn.textContent = '⟳ Creating ' + i + '/' + toCreate.length + '...';
+    for (let i = 0; i < allPayloads.length; i += BATCH) {
+      const batch = allPayloads.slice(i, i + BATCH);
+      if (btn) btn.textContent = '⟳ Saving ' + i + '/' + allPayloads.length + '...';
       try {
-        const result = await fetch(WORKER_URL + '/db/contacts', {
+        const result = await fetch(WORKER_URL + '/db/contacts?on_conflict=hubspot_contact_id', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          headers: { 'Content-Type': 'application/json', 'Origin': location.origin,
+                     'Prefer': 'resolution=merge-duplicates' },
           body: JSON.stringify(batch)
         });
-        if (result.ok) created += batch.length;
-      } catch(batchErr) { console.warn('Create batch error:', batchErr.message); }
+        if (result.ok) {
+          const data = await result.json();
+          created += batch.filter(function(b) { return !b.id; }).length;
+          updated += batch.filter(function(b) { return !!b.id; }).length;
+        }
+      } catch(batchErr) {
+        console.warn('Batch error:', batchErr.message);
+      }
       await new Promise(function(res) { setTimeout(res, 200); });
-    }
-
-    // PATCH existing contacts one at a time
-    for (let i = 0; i < toUpdate.length; i++) {
-      const u = toUpdate[i];
-      if (btn && i % 10 === 0) btn.textContent = '⟳ Updating ' + i + '/' + toUpdate.length + '...';
-      try {
-        await fetch(WORKER_URL + '/db/contacts?id=eq.' + u.id, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(u.payload)
-        });
-        updated++;
-      } catch(patchErr) { console.warn('Patch error:', patchErr.message); }
     }
 
     // Reload contacts from DB to get full fresh list
@@ -7294,6 +7292,7 @@ function _mdToDocxXml(text, bulletNumId, numberedNumId) {
 
     // ALL CAPS section header (e.g. STRENGTHS, OPPORTUNITIES)
     if (t === t.toUpperCase() && t.length > 4 && t.length < 90 && /[A-Z]{3}/.test(t) && !/[.!?]$/.test(t) && !t.includes('|')) {
+      if (t === 'CORE EXPERTISE') { parts.push(_pageBreak()); }
       parts.push(_h2(t)); continue;
     }
 
