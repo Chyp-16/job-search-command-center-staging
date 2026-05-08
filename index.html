@@ -2866,9 +2866,12 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   };
   if (ipAbortController) fetchOpts.signal = ipAbortController.signal;
   const r = await fetch(WORKER_URL + '/ai', fetchOpts);
-  if (!r.ok) throw new Error('API error: ' + r.status);
-  const data = await r.json();
-  if (data.error) throw new Error(data.error);
+  const rawText = await r.text();
+  if (!rawText || rawText.trim() === '') throw new Error('Empty response from AI — check Worker logs');
+  let data;
+  try { data = JSON.parse(rawText); } catch(e) { throw new Error('AI response parse error: ' + rawText.slice(0, 200)); }
+  if (!r.ok) throw new Error('API error ' + r.status + ': ' + (data.error?.message || rawText.slice(0, 200)));
+  if (data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)));
   return (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
 }
 
