@@ -2823,7 +2823,7 @@ const INDUSTRIES = [
 // ── API HELPERS ────────────────────────────────────────────────────────
 async function dbGet(table, params = '') {
   const r = await fetch(`${WORKER_URL}/db/${table}${params ? '?' + params : ''}`, {
-    headers: { 'Origin': location.origin }
+    headers: {  }
   });
   return r.json();
 }
@@ -2831,7 +2831,7 @@ async function dbGet(table, params = '') {
 async function dbPost(table, body) {
   const r = await fetch(`${WORKER_URL}/db/${table}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   return r.json();
@@ -2840,7 +2840,7 @@ async function dbPost(table, body) {
 async function dbPatch(table, id, body) {
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   return r.json();
@@ -2849,7 +2849,7 @@ async function dbPatch(table, id, body) {
 async function dbDelete(table, id) {
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'DELETE',
-    headers: { 'Origin': location.origin }
+    headers: {  }
   });
   return r.ok;
 }
@@ -2861,7 +2861,7 @@ async function callAILong(messages, systemPrompt, useWebSearch) {
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   };
   if (ipAbortController) fetchOpts.signal = ipAbortController.signal;
@@ -2890,7 +2890,7 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   body.max_tokens = 1024;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const data = await r.json();
@@ -3481,7 +3481,7 @@ async function syncOutreachToHubSpot(app) {
       };
       const r = await fetch(WORKER_URL + '/hubspot/task', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskBody)
       });
       if (r.ok) created++;
@@ -4252,7 +4252,7 @@ async function deleteContact(id) {
     try {
       await fetch(WORKER_URL + '/hubspot/contact/' + c.hubspot_contact_id, {
         method: 'DELETE',
-        headers: { 'Origin': location.origin }
+        headers: {  }
       });
     } catch(e) {
       console.warn('HubSpot delete failed:', e.message);
@@ -4270,7 +4270,7 @@ async function importRecruiters() {
     const data = await r.json();
     const res = await fetch(WORKER_URL + '/db/contacts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Import request failed');
@@ -4310,7 +4310,7 @@ async function syncHubSpot() {
       try {
         const url = WORKER_URL + '/hubspot/contacts' + (after ? '?after=' + after : '');
         r = await fetch(url, {
-          headers: { 'Origin': location.origin },
+          headers: {  },
           signal: controller.signal
         });
         clearTimeout(timeout);
@@ -4414,7 +4414,7 @@ async function syncHubSpot() {
       try {
         const result = await fetch(WORKER_URL + '/db/contacts?on_conflict=hubspot_contact_id', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Origin': location.origin,
+          headers: { 'Content-Type': 'application/json',
                      'Prefer': 'resolution=merge-duplicates' },
           body: JSON.stringify(batch)
         });
@@ -4665,7 +4665,7 @@ async function runSupabaseBackup() {
 
     // Add Cloudflare Worker snapshot
     try {
-      var workerRes = await fetch('https://job-search-proxy.jvwadhwa.workers.dev/worker-source', { method: 'GET', headers: { 'Origin': location.origin } });
+      var workerRes = await fetch('https://job-search-proxy.jvwadhwa.workers.dev/worker-source', { method: 'GET', headers: {  } });
       // Worker source not publicly fetchable — include instructions instead
     } catch(e) {}
     // Worker code must be saved manually from Cloudflare dashboard
@@ -4841,7 +4841,7 @@ async function deleteTemplate(id) {
 
 async function fetchHubSpotTemplates() {
   try {
-    const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: { 'Origin': location.origin } });
+    const r = await fetch(WORKER_URL + '/hubspot/templates', { headers: {  } });
     const data = await r.json();
     var results = data.results || [];
     // Sort by name for easier browsing
@@ -5048,7 +5048,7 @@ async function loadContactHubSpotActivity(contactId, hubspotId) {
   el.textContent = 'Loading...';
   try {
     const r = await fetch(WORKER_URL + '/hubspot/contact-activity/' + hubspotId, {
-      headers: { 'Origin': location.origin }
+      headers: {  }
     });
     if (!r.ok) { el.textContent = 'Could not load activity.'; return; }
     const data = await r.json();
@@ -5093,7 +5093,7 @@ async function pushContactToHubSpot(contact) {
     console.log('HubSpot push:', hsId ? 'UPDATE ' + hsId : 'CREATE', contact.name);
     const r = await fetch(WORKER_URL + '/hubspot/contact', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (r.ok) {
@@ -5643,7 +5643,7 @@ async function submitResourceUpload() {
     var storagePath = 'resources/' + timestamp + '_' + safeName;
     var uploadRes = await fetch(WORKER_URL + '/storage/upload/' + encodeURIComponent(storagePath), {
       method: 'POST',
-      headers: { 'Content-Type': file.type || 'application/octet-stream', 'Origin': location.origin },
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
       body: file
     });
     if (!uploadRes.ok) { var err = await uploadRes.json().catch(function(){return{};}); throw new Error(err.message || 'Upload failed'); }
@@ -5672,7 +5672,7 @@ async function downloadResource(storagePath) {
   try {
     var r = await fetch(WORKER_URL + '/storage/url', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: storagePath })
     });
     var data = await r.json();
@@ -6010,7 +6010,7 @@ async function extractJobURL() {
   try {
     const r = await fetch(`${WORKER_URL}/scrape`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ job_url: url })
     });
     const data = await r.json();
@@ -6240,7 +6240,7 @@ async function runImport() {
         try {
           const res = await fetch(`${WORKER_URL}/db/applications`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(batch)
           });
           if (res.ok || res.status === 201) { success = true; break; }
@@ -8495,7 +8495,7 @@ async function setDocAsBaseResume(id, storagePath) {
     // Download and extract text from file
     const r = await fetch(WORKER_URL + '/storage/url', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: storagePath })
     });
     const data = await r.json();
@@ -8541,7 +8541,7 @@ async function downloadDoc(id, storagePath) {
     // Send path as a POST body to avoid URL encoding issues
     const r = await fetch(WORKER_URL + '/storage/url', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: storagePath })
     });
     const data = await r.json();
@@ -8760,7 +8760,6 @@ async function submitUpload() {
       method: 'POST',
       headers: {
         'Content-Type': uploadFile.type || 'application/octet-stream',
-        'Origin': location.origin,
       },
       body: uploadFile,
     });
@@ -8872,7 +8871,7 @@ async function syncHubSpotTasks() {
     const controller = new AbortController();
     const timeout = setTimeout(function() { controller.abort(); }, 10000);
     const r = await fetch(WORKER_URL + '/hubspot/tasks', {
-      headers: { 'Origin': location.origin },
+      headers: {  },
       signal: controller.signal
     });
     clearTimeout(timeout);
@@ -9009,7 +9008,7 @@ async function completeTask(taskId, btnEl) {
   try {
     const r = await fetch(WORKER_URL + '/hubspot/task/' + taskId, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ properties: { hs_task_status: 'COMPLETED' } })
     });
     if (!r.ok) throw new Error('Status ' + r.status);
@@ -9273,7 +9272,7 @@ async function syncHubSpotActivity() {
     const controller = new AbortController();
     const timeout = setTimeout(function() { controller.abort(); }, 10000);
     const r = await fetch(WORKER_URL + '/hubspot/activity', {
-      headers: { 'Origin': location.origin },
+      headers: {  },
       signal: controller.signal
     });
     clearTimeout(timeout);
@@ -9577,7 +9576,7 @@ async function runJobSearch() {
     const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
     const r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jsBody)
     });
     const data = await r.json();
