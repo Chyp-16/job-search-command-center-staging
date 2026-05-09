@@ -9872,8 +9872,14 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
       jobs = JSON.parse(extracted);
       if (!Array.isArray(jobs)) jobs = [];
     } catch(pe) {
-      // JSON unrecoverable — show friendly error, still show Load Next 10
-      contentEl.insertAdjacentHTML('beforeend', '<div style="padding:14px;color:var(--text-secondary);font-size:13px">Search returned an unreadable response. Try Load Next 10 or adjust your filters.</div>');
+      // JSON unrecoverable — show raw response in console and on screen for debugging
+      console.error('JS parse error:', pe.message);
+      console.error('Raw result:', result);
+      console.error('Extracted:', extracted);
+      contentEl.insertAdjacentHTML('beforeend', '<div style="padding:14px;color:var(--text-secondary);font-size:13px">Search returned an unreadable response. Try Load Next 10 or adjust your filters.</div>' +
+        '<details style="padding:0 14px 14px"><summary style="font-size:12px;color:var(--text-secondary);cursor:pointer">Show raw response (for debugging)</summary>' +
+        '<pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:var(--surface);padding:10px;border-radius:6px;margin-top:6px;max-height:300px;overflow-y:auto">' +
+        result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre></details>');
       var addBar2 = document.getElementById('js-add-bar');
       if (addBar2) addBar2.style.display = 'flex';
       var loadNextBtn2 = document.getElementById('js-load-next-btn');
