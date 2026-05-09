@@ -154,8 +154,6 @@ a { color: var(--burgundy); text-decoration: none; }
   user-select: none;
 }
 .nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
-.nav-item[draggable="true"] { cursor: grab; }
-.nav-item.drag-over { outline: 2px dashed rgba(255,255,255,0.4); border-radius: var(--radius); }
 .nav-item.active {
   color: #fff;
   background: rgba(151,43,50,0.25);
@@ -2941,70 +2939,6 @@ document.querySelector('.sidebar-nav').addEventListener('click', function(e) {
   const page = item.dataset.page;
   if (page) navigateTo(page);
 });
-
-// ── NAV REORDER ────────────────────────────────────────────────────────
-(function initNavReorder() {
-  var nav = document.querySelector('.sidebar-nav');
-  if (!nav) return;
-
-  // Apply saved order from localStorage
-  var saved = localStorage.getItem('navOrder');
-  if (saved) {
-    try {
-      var order = JSON.parse(saved);
-      order.forEach(function(page) {
-        var el = nav.querySelector('[data-page="' + page + '"]');
-        if (el) nav.appendChild(el);
-      });
-    } catch(e) {}
-  }
-
-  // Make only nav-items draggable
-  nav.querySelectorAll('.nav-item').forEach(function(item) {
-    item.setAttribute('draggable', 'true');
-  });
-
-  var dragging = null;
-
-  nav.addEventListener('dragstart', function(e) {
-    var item = e.target.closest('.nav-item');
-    if (!item) return;
-    dragging = item;
-    window.setTimeout(function() { item.style.opacity = '0.4'; }, 0);
-  });
-
-  nav.addEventListener('dragend', function(e) {
-    var item = e.target.closest('.nav-item');
-    if (!item) return;
-    item.style.opacity = '';
-    nav.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('drag-over'); });
-    dragging = null;
-    // Save new order
-    var order = [];
-    nav.querySelectorAll('.nav-item').forEach(function(i) { if (i.dataset.page) order.push(i.dataset.page); });
-    localStorage.setItem('navOrder', JSON.stringify(order));
-  });
-
-  nav.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    var target = e.target.closest('.nav-item');
-    if (!target || target === dragging) return;
-    nav.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('drag-over'); });
-    target.classList.add('drag-over');
-    var rect = target.getBoundingClientRect();
-    var mid = rect.top + rect.height / 2;
-    if (e.clientY < mid) {
-      nav.insertBefore(dragging, target);
-    } else {
-      nav.insertBefore(dragging, target.nextSibling);
-    }
-  });
-
-  nav.addEventListener('dragleave', function(e) {
-    var target = e.target.closest('.nav-item');
-    if (target) target.classList.remove('drag-over');
-  });
-})();
 
 // ── THEME ──────────────────────────────────────────────────────────────
 function toggleTheme() {
