@@ -7705,6 +7705,10 @@ function loadCLGPage() {
     opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     sel.appendChild(opt);
   });
+  var clgCo = document.getElementById('clg-company');
+  var clgRo = document.getElementById('clg-role');
+  if (clgCo && !clgCo.value) { var _lsCo = localStorage.getItem('rt_last_company'); if (_lsCo) clgCo.value = _lsCo; }
+  if (clgRo && !clgRo.value) { var _lsRo = localStorage.getItem('rt_last_role'); if (_lsRo) clgRo.value = _lsRo; }
 }
 
 async function runCLGenerator() {
