@@ -807,20 +807,27 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
     </div>
     <div class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
       <div class="nav-item active" data-page="dashboard">
         <span class="nav-icon">⬡</span><span>Dashboard</span>
       </div>
-      <div class="nav-section-label">Search</div>
-      <div class="nav-item" data-page="jobsearch">
-        <span class="nav-icon">🔍</span><span>Job Search</span>
-      </div>
+      <div class="nav-section-label">Tracking</div>
       <div class="nav-item" data-page="applications">
         <span class="nav-icon">📋</span><span>Applications</span>
       </div>
       <div class="nav-item" data-page="contacts">
         <span class="nav-icon">👥</span><span>Contacts</span>
       </div>
-      <div class="nav-section-label">Build</div>
+      <div class="nav-section-label">Documents</div>
+      <div class="nav-item" data-page="resumes">
+        <span class="nav-icon">📄</span><span>Resumes</span>
+      </div>
+      <div class="nav-item" data-page="coverletters">
+        <span class="nav-icon">✉️</span><span>Cover Letters</span>
+      </div>
+      <div class="nav-item" data-page="interviewprep">
+        <span class="nav-icon">🎯</span><span>Interview Prep</span>
+      </div>
       <div class="nav-item" data-page="resumetailor">
         <span class="nav-icon">📝</span><span>Resume Tailor</span>
       </div>
@@ -830,32 +837,25 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="nav-item" data-page="outreachbuilder">
         <span class="nav-icon">📨</span><span>Outreach Builder</span>
       </div>
-      <div class="nav-section-label">Prepare</div>
-      <div class="nav-item" data-page="interviewprep">
-        <span class="nav-icon">🎯</span><span>Interview Prep</span>
-      </div>
-      <div class="nav-section-label">Documents</div>
-      <div class="nav-item" data-page="resumes">
-        <span class="nav-icon">📄</span><span>Resumes</span>
-      </div>
-      <div class="nav-item" data-page="coverletters">
-        <span class="nav-icon">✉️</span><span>Cover Letters</span>
-      </div>
       <div class="nav-item" data-page="uploads">
         <span class="nav-icon">📁</span><span>My Documents</span>
       </div>
-      <div class="nav-section-label">Tools</div>
+      <div class="nav-section-label">Intelligence</div>
       <div class="nav-item" data-page="ai">
         <span class="nav-icon">✦</span><span>AI Tools</span>
       </div>
       <div class="nav-item" data-page="prompts">
         <span class="nav-icon">💬</span><span>Prompts</span>
       </div>
-      <div class="nav-item" data-page="templates">
-        <span class="nav-icon">📋</span><span>Email Templates</span>
+      <div class="nav-item" data-page="jobsearch">
+        <span class="nav-icon">🔍</span><span>Job Search</span>
       </div>
+      <div class="nav-section-label">Library</div>
       <div class="nav-item" data-page="resources">
         <span class="nav-icon">🔖</span><span>Resources</span>
+      </div>
+      <div class="nav-item" data-page="templates">
+        <span class="nav-icon">📋</span><span>Email Templates</span>
       </div>
     </div>
     <div class="sidebar-footer">
@@ -1770,6 +1770,15 @@ a { color: var(--burgundy); text-decoration: none; }
               <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
             </div>
           </div>
+          <div id="ob-progress-wrap" style="display:none;padding:20px 20px 0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span id="ob-progress-label" style="font-size:12px;font-weight:600;color:var(--burgundy)">Analyzing role...</span>
+              <span id="ob-progress-pct" style="font-size:12px;color:var(--text-secondary)">0%</span>
+            </div>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar" id="ob-progress-bar" style="width:0%;transition:width 0.4s ease"></div>
+            </div>
+          </div>
           <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
         </div>
       </div>
@@ -2379,7 +2388,6 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="btn btn-ghost" id="detail-edit-btn">Edit</button>
       <button class="btn btn-secondary btn-sm" id="detail-upload-btn" style="display:none" onclick="openUploadFromDetail()">⬆ Upload Resume</button>
       <button class="btn btn-secondary btn-sm" id="detail-email-btn" style="display:none" onclick="openGmailCompose()">✉️ Email</button>
-      <button class="btn btn-secondary btn-sm" id="detail-task-btn" style="display:none" onclick="openAddTaskForContact()">✅ Add Task</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Close</button>
     </div>
   </div>
@@ -2792,17 +2800,6 @@ const INDUSTRIES = [
   'Real Estate','Marketing','Other'
 ];
 
-// ── LINKEDIN URL NORMALIZER ─────────────────────────────────────────────
-function normalizeLinkedIn(url) {
-  if (!url || !url.trim()) return null;
-  var v = url.trim();
-  if (/^https?:\/\//i.test(v)) return v;
-  if (v.startsWith('linkedin.com')) return 'https://' + v;
-  if (v.startsWith('/in/')) return 'https://www.linkedin.com' + v;
-  if (v.indexOf('/') === -1) return 'https://www.linkedin.com/in/' + v;
-  return v;
-}
-
 // ── API HELPERS ────────────────────────────────────────────────────────
 async function dbGet(table, params = '') {
   const r = await fetch(`${WORKER_URL}/db/${table}${params ? '?' + params : ''}`, {
@@ -2826,8 +2823,7 @@ async function dbPatch(table, id, body) {
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
   });
-  if (!r.ok) { const t = await r.text(); throw new Error('PATCH failed: ' + t); }
-  return r.ok;
+  return r.json();
 }
 
 async function dbDelete(table, id) {
@@ -3537,8 +3533,6 @@ function viewApp(id) {
   document.getElementById('detail-edit-btn').onclick = () => { closeModal('modal-detail'); editApp(id); };
   var emailBtn = document.getElementById('detail-email-btn');
   if (emailBtn) emailBtn.style.display = 'none';
-  var taskBtnApp = document.getElementById('detail-task-btn');
-  if (taskBtnApp) taskBtnApp.style.display = 'none';
   window._detailContact = null;
 
   // Show upload button and wire it for this application
@@ -3588,7 +3582,7 @@ async function loadDetailContacts(company, appId) {
       ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0">No contacts at this company yet.</div>'
       : related.map(function(c) {
           const badgeCls = CONTACT_TYPE_BADGE[c.contact_type] || 'badge-other';
-          var linkedInHtml = c.linkedin_url ? '<a href="' + (normalizeLinkedIn(c.linkedin_url) || '#') + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
+          var linkedInHtml = c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="font-size:11px;color:var(--burgundy)" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '';
           return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
             '<div style="flex:1">' +
               '<div style="font-size:13px;font-weight:600">' + c.name + '</div>' +
@@ -3861,12 +3855,12 @@ function renderContactsTable() {
     return '<tr>' +
       '<td>' +
         '<div style="font-weight:600">' + c.name + hubspotLinked + '</div>' +
-        (c.linkedin_url ? '<a href="' + (normalizeLinkedIn(c.linkedin_url) || '#') + '" target="_blank" style="color:var(--burgundy);font-size:11px" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '') +
+        (c.linkedin_url ? '<a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy);font-size:11px" onclick="event.stopPropagation()">LinkedIn ↗</a>' : '') +
       '</td>' +
       '<td>' + (c.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></td>' +
-      '<td style="font-size:12px">' + (c.outreach_1_type ? '<div style="font-size:10px;color:var(--burgundy);font-weight:600;text-transform:uppercase;line-height:1.2">' + c.outreach_1_type + '</div>' : '') + fmt(c.last_contact_date) + '</td>' +
+      '<td style="font-size:12px">' + fmt(c.last_contact_date) + '</td>' +
       '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.next_action||'—') + '</td>' +
       '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
       '<td><div class="table-actions">' +
@@ -3897,7 +3891,7 @@ function buildContactDetailHTML(c) {
       '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
       '<div class="detail-field"><span class="detail-field-label">Next Action Date</span><span class="detail-field-value" style="' + (isOverdue(c.next_action_date)?'color:var(--burgundy);font-weight:700':'') + '">' + fmt(c.next_action_date) + '</span></div>' +
       (c.next_action ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + c.next_action + '</span></div>' : '') +
-      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + (normalizeLinkedIn(c.linkedin_url) || '#') + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+      (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
       (c.hubspot_contact_id ? '<div class="detail-field"><span class="detail-field-label">HubSpot ID</span><span class="detail-field-value" style="font-size:11px;color:var(--text-secondary)">' + c.hubspot_contact_id + '</span></div>' : '') +
       (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
     '</div>' +
@@ -3945,8 +3939,6 @@ function viewContact(id) {
     emailBtn.style.display = c.email ? '' : 'none';
     window._detailContact = c;
   }
-  var taskBtn = document.getElementById('detail-task-btn');
-  if (taskBtn) { taskBtn.style.display = ''; window._detailContactForTask = c; }
   // Load docs linked to this contact
   loadContactDocs(id);
   // Load related applications from same company
@@ -4118,7 +4110,7 @@ function viewContactFromApp(contactId) {
           '<div class="detail-field"><span class="detail-field-label">Last Contact</span><span class="detail-field-value">' + fmt(c.last_contact_date) + '</span></div>' +
           '<div class="detail-field"><span class="detail-field-label">Next Action</span><span class="detail-field-value">' + (c.next_action||'—') + '</span></div>' +
           (c.email ? '<div class="detail-field"><span class="detail-field-label">Email</span><span class="detail-field-value"><a href="mailto:' + c.email + '" style="color:var(--burgundy)">' + c.email + '</a></span></div>' : '') +
-        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + (normalizeLinkedIn(c.linkedin_url) || '#') + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
+        (c.linkedin_url ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">LinkedIn</span><span class="detail-field-value"><a href="' + c.linkedin_url + '" target="_blank" style="color:var(--burgundy)">' + c.linkedin_url + ' ↗</a></span></div>' : '') +
           (c.notes ? '<div class="detail-field" style="grid-column:1/-1"><span class="detail-field-label">Notes</span><span class="detail-field-value">' + c.notes + '</span></div>' : '') +
         '</div>' +
       '</div>';
@@ -4477,7 +4469,7 @@ function showHubSpotSetupGuide() {
 // Push a contact to HubSpot when saved
 // ── SUPABASE BACKUP ─────────────────────────────────────────────────────
 
-var BACKUP_TABLES = ['applications','contacts','cover_letters','resumes','uploaded_documents','resources','email_templates','ai_outputs','prompts'];
+var BACKUP_TABLES = ['applications','contacts','uploaded_documents','resources','email_templates','ai_outputs','prompts'];
 var BACKUP_KEY = 'jsc_last_backup';
 var BACKUP_INTERVAL_DAYS = 7;
 
@@ -4558,271 +4550,6 @@ async function runSupabaseBackup() {
       zip.file(table + '_' + dateStr + '.csv', csv);
     });
 
-    // ── FIX 2: Add index.html from GitHub Pages ──────────────────────
-    try {
-      var htmlRes = await fetch('https://chyp-16.github.io/job-search-command-center/index.html');
-      if (htmlRes.ok) {
-        var htmlText = await htmlRes.text();
-        zip.file('index.html', htmlText);
-      } else {
-        console.warn('Backup: could not fetch index.html — HTTP ' + htmlRes.status);
-      }
-    } catch(htmlErr) {
-      console.warn('Backup: index.html fetch failed —', htmlErr.message);
-    }
-
-    // ── FIX 3: Schema snapshot from actual table data ──────────────────
-    var schema = {};
-    Object.keys(wb).forEach(function(table) {
-      if (wb[table].length > 0) {
-        schema[table] = Object.keys(wb[table][0]);
-      } else {
-        schema[table] = 'no data — columns unknown';
-      }
-    });
-    zip.file('schema_snapshot.json', JSON.stringify(schema, null, 2));
-
-    // ── FIX 4: Cloudflare Worker script ───────────────────────────────
-    var workerJs = [
-      '// Job Search Command Center — Cloudflare Worker',
-      '// Deploy at: https://dash.cloudflare.com → Workers & Pages → Create Worker',
-      '// Required env vars: SUPABASE_URL, SUPABASE_KEY, HUBSPOT_API_KEY, ANTHROPIC_API_KEY',
-      '',
-      'const CORS_HEADERS = {',
-      "  'Access-Control-Allow-Origin': '*',",
-      "  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',",
-      "  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, Prefer',",
-      '};',
-      '',
-      'export default {',
-      '  async fetch(request, env) {',
-      '    const url = new URL(request.url);',
-      '',
-      '    // Handle CORS preflight',
-      "    if (request.method === 'OPTIONS') {",
-      "      return new Response(null, { headers: CORS_HEADERS });",
-      '    }',
-      '',
-      '    // ── /ai — Claude API proxy ─────────────────────────────────',
-      "    if (url.pathname === '/ai') {",
-      '      const body = await request.json();',
-      "      const res = await fetch('https://api.anthropic.com/v1/messages', {",
-      "        method: 'POST',",
-      '        headers: {',
-      "          'Content-Type': 'application/json',",
-      "          'x-api-key': env.ANTHROPIC_API_KEY,",
-      "          'anthropic-version': '2023-06-01',",
-      '        },',
-      '        body: JSON.stringify(body),',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /db/{table} — Supabase CRUD ───────────────────────────',
-      "    if (url.pathname.startsWith('/db/')) {",
-      "      const table = url.pathname.replace('/db/', '').split('?')[0];",
-      '      const params = url.search;',
-      "      const sbUrl = env.SUPABASE_URL + '/rest/v1/' + table + params;",
-      '      const sbHeaders = {',
-      "        'apikey': env.SUPABASE_KEY,",
-      "        'Authorization': 'Bearer ' + env.SUPABASE_KEY,",
-      "        'Content-Type': 'application/json',",
-      "        'Prefer': request.method === 'POST' ? 'return=representation' : 'return=minimal',",
-      '      };',
-      "      if (request.method === 'POST' || request.method === 'PATCH') {",
-      "        sbHeaders['Prefer'] = 'return=representation';",
-      '      }',
-      '      const body = (request.method !== "GET" && request.method !== "DELETE") ? await request.text() : undefined;',
-      '      const res = await fetch(sbUrl, { method: request.method, headers: sbHeaders, body });',
-      '      const text = await res.text();',
-      "      return new Response(text, { status: res.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });',",
-      '    }',
-      '',
-      '    // ── /storage/upload/{path} — Upload file to Supabase Storage ──',
-      "    if (url.pathname.startsWith('/storage/upload/')) {",
-      "      const path = decodeURIComponent(url.pathname.replace('/storage/upload/', ''));",
-      "      const sbUrl = env.SUPABASE_URL + '/storage/v1/object/documents/' + path;",
-      '      const body = await request.arrayBuffer();',
-      '      const res = await fetch(sbUrl, {',
-      "        method: 'POST',",
-      '        headers: {',
-      "          'apikey': env.SUPABASE_KEY,",
-      "          'Authorization': 'Bearer ' + env.SUPABASE_KEY,",
-      "          'Content-Type': request.headers.get('Content-Type') || 'application/octet-stream',",
-      '        },',
-      '        body,',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { status: res.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /storage/url — Generate signed download URL ───────────',
-      "    if (url.pathname === '/storage/url') {",
-      '      const { path } = await request.json();',
-      "      const sbUrl = env.SUPABASE_URL + '/storage/v1/object/sign/documents/' + path;",
-      '      const res = await fetch(sbUrl, {',
-      "        method: 'POST',",
-      '        headers: {',
-      "          'apikey': env.SUPABASE_KEY,",
-      "          'Authorization': 'Bearer ' + env.SUPABASE_KEY,",
-      "          'Content-Type': 'application/json',",
-      '        },',
-      '        body: JSON.stringify({ expiresIn: 3600 }),',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/contacts — Paginated contact list ────────────',
-      "    if (url.pathname === '/hubspot/contacts') {",
-      '      const after = url.searchParams.get("after") || "";',
-      "      const hsUrl = 'https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,email,company,jobtitle,hs_linkedin_url,lastmodifieddate' + (after ? '&after=' + after : '');",
-      '      const res = await fetch(hsUrl, {',
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY },",
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/contact — Create / Update / Delete contact ───',
-      "    if (url.pathname.startsWith('/hubspot/contact')) {",
-      '      const segments = url.pathname.split("/");',
-      '      const hsId = segments[3] || null;',
-      "      if (request.method === 'DELETE' && hsId) {",
-      "        const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/' + hsId, {",
-      "          method: 'DELETE',",
-      "          headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY },",
-      '        });',
-      "        return new Response(JSON.stringify({ deleted: true }), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '      }',
-      '      const body = await request.json();',
-      "      const method = (request.method === 'PATCH' || hsId) ? 'PATCH' : 'POST';",
-      "      const hsUrl = hsId ? 'https://api.hubapi.com/crm/v3/objects/contacts/' + hsId : 'https://api.hubapi.com/crm/v3/objects/contacts';",
-      '      const res = await fetch(hsUrl, {',
-      '        method,',
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },",
-      '        body: JSON.stringify({ properties: body.properties }),',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/task — Create / Complete task ────────────────',
-      "    if (url.pathname === '/hubspot/task') {",
-      '      const body = await request.json();',
-      "      if (request.method === 'PATCH') {",
-      "        const res = await fetch('https://api.hubapi.com/crm/v3/objects/tasks/' + body.id, {",
-      "          method: 'PATCH',",
-      "          headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },",
-      '          body: JSON.stringify({ properties: body.properties }),',
-      '        });',
-      '        const data = await res.json();',
-      "        return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '      }',
-      "      const res = await fetch('https://api.hubapi.com/crm/v3/objects/tasks', {",
-      "        method: 'POST',",
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },",
-      '        body: JSON.stringify({ properties: body.properties }),',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/tasks — Search tasks (NEQ COMPLETED) ─────────',
-      "    if (url.pathname === '/hubspot/tasks') {",
-      "      const res = await fetch('https://api.hubapi.com/crm/v3/objects/tasks/search', {",
-      "        method: 'POST',",
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY, 'Content-Type': 'application/json' },",
-      '        body: JSON.stringify({',
-      '          filterGroups: [{ filters: [{ propertyName: "hs_task_status", operator: "NEQ", value: "COMPLETED" }] }],',
-      '          properties: ["hs_task_subject","hs_task_status","hs_task_type","hs_timestamp","hs_task_body"],',
-      '          limit: 100,',
-      '        }),',
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/templates — Marketing email templates ─────────',
-      "    if (url.pathname === '/hubspot/templates') {",
-      "      const res = await fetch('https://api.hubapi.com/marketing/v3/emails?limit=50', {",
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY },",
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      '    // ── /hubspot/activity — Recent engagements ────────────────',
-      "    if (url.pathname === '/hubspot/activity' || url.pathname.startsWith('/hubspot/contact-activity/')) {",
-      '      const hsId = url.pathname.split("/").pop();',
-      "      const hsUrl = 'https://api.hubapi.com/crm/v3/objects/contacts/' + hsId + '/associations/engagements?limit=20';",
-      '      const res = await fetch(hsUrl, {',
-      "        headers: { 'Authorization': 'Bearer ' + env.HUBSPOT_API_KEY },",
-      '      });',
-      '      const data = await res.json();',
-      "      return new Response(JSON.stringify(data), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });",
-      '    }',
-      '',
-      "    return new Response('Not found', { status: 404, headers: CORS_HEADERS });",
-      '  },',
-      '};',
-    ].join('\n');
-    zip.file('cloudflare_worker.js', workerJs);
-
-    // ── FIX 5: Restore guide ───────────────────────────────────────────
-    var restoreGuide = [
-      '# Job Search Command Center — Restore Guide',
-      '',
-      '## What\'s In This Backup',
-      '',
-      '| File | Contents |',
-      '|------|----------|',
-      '| index.html | Full single-file PWA application code |',
-      '| cloudflare_worker.js | Complete Cloudflare Worker script with all routes |',
-      '| schema_snapshot.json | Column names for every Supabase table |',
-      '| RESTORE_GUIDE.md | This file |',
-      '| applications_YYYY-MM-DD.csv | All job applications |',
-      '| contacts_YYYY-MM-DD.csv | All 1,338+ contacts with HubSpot IDs |',
-      '| cover_letters_YYYY-MM-DD.csv | All saved cover letters |',
-      '| resumes_YYYY-MM-DD.csv | Resume versions and base resume text |',
-      '| uploaded_documents_YYYY-MM-DD.csv | File metadata (not the actual files) |',
-      '| resources_YYYY-MM-DD.csv | Saved links and resource file metadata |',
-      '| email_templates_YYYY-MM-DD.csv | Custom email templates |',
-      '| ai_outputs_YYYY-MM-DD.csv | Resume Tailor, Outreach, Interview Prep outputs |',
-      '| prompts_YYYY-MM-DD.csv | Saved AI prompts |',
-      '',
-      '## Credentials You\'ll Need',
-      '',
-      '| Credential | Purpose | Where to Get It |',
-      '|------------|---------|-----------------|',
-      '| Cloudflare Worker URL | App proxy endpoint | Currently: https://job-search-proxy.jvwadhwa.workers.dev |',
-      '| Supabase project URL | Database host | Supabase dashboard → Project Settings → API |',
-      '| Supabase anon key | Database auth | Supabase dashboard → Project Settings → API |',
-      '| HubSpot portal ID | CRM links | Currently: 242599414, region: na2 |',
-      '| HubSpot API token | CRM sync | HubSpot → Settings → Private Apps |',
-      '| Anthropic API key | AI features | console.anthropic.com |',
-      '',
-      '## Step-by-Step Restore',
-      '',
-      '1. **Restore the GitHub repo** — push index.html from this zip to chyp-16/job-search-command-center, enable GitHub Pages',
-      '2. **Redeploy the Cloudflare Worker** — paste cloudflare_worker.js into a new Worker at dash.cloudflare.com, set all 4 env vars (SUPABASE_URL, SUPABASE_KEY, HUBSPOT_API_KEY, ANTHROPIC_API_KEY)',
-      '3. **Restore Supabase data** — reimport each CSV to its matching table using Supabase dashboard → Table Editor → Import CSV. Use schema_snapshot.json to verify columns.',
-      '4. **Restore uploaded files** — actual binary files (resumes, JDs, cover letters) are NOT in this backup. Recover from Supabase dashboard → Storage section if the project still exists, or accept they are lost.',
-      '5. **Reconnect HubSpot** — verify HUBSPOT_API_KEY env var in Cloudflare Worker, then run ⟳ Sync HubSpot from the Dashboard tab',
-      '6. **Verify the app** — open the GitHub Pages URL, confirm Dashboard loads, contacts load, and AI tools respond',
-      '',
-      '## What Is NOT in This Backup',
-      '',
-      '- **Actual uploaded files** (resumes, cover letters, JDs) — only DB records are here; files live in Supabase Storage',
-      '- **HubSpot tasks** — stored in HubSpot only, not synced to Supabase',
-      '- **HubSpot activity history** — loaded live from HubSpot API, not persisted',
-      '- **HubSpot email templates** — fetched live from HubSpot, not stored locally',
-      '- **Cloudflare Worker env vars** (API keys) — stored only in Cloudflare dashboard; must be re-entered manually',
-      '- **localStorage values** (theme, backup timestamp) — reset automatically on first use',
-    ].join('\n');
-    zip.file('RESTORE_GUIDE.md', restoreGuide);
-
     var blob = await zip.generateAsync({ type: 'blob' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -4834,7 +4561,7 @@ async function runSupabaseBackup() {
     // Record backup time
     localStorage.setItem(BACKUP_KEY, String(Date.now()));
     if (banner) banner.remove();
-    toast('Backup downloaded — ' + Object.keys(wb).length + ' tables + index.html + schema + Worker script + restore guide.', 'success');
+    toast('Backup downloaded — ' + Object.keys(wb).length + ' tables exported.', 'success');
 
   } catch(e) {
     toast('Backup failed: ' + e.message, 'error');
@@ -7293,8 +7020,32 @@ async function runOutreachBuilder() {
   const panel = document.getElementById('ob-output-panel');
   const contentEl = document.getElementById('ob-output-content');
   panel.style.display = 'block';
-  contentEl.textContent = 'Building your outreach sequence...';
+  contentEl.textContent = '';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const obSteps = [
+    { pct: 20, label: 'Analyzing role and company...' },
+    { pct: 45, label: 'Drafting Day 1 InMail / Email...' },
+    { pct: 70, label: 'Writing Day 3\u20135 follow-ups...' },
+    { pct: 88, label: 'Composing Day 7 CEO/HM email...' }
+  ];
+  let obStepIdx = 0;
+  const obProgressWrap = document.getElementById('ob-progress-wrap');
+  const obProgressBar = document.getElementById('ob-progress-bar');
+  const obProgressLabel = document.getElementById('ob-progress-label');
+  const obProgressPct = document.getElementById('ob-progress-pct');
+  obProgressWrap.style.display = 'block';
+  obProgressBar.style.width = '0%';
+  obProgressLabel.textContent = obSteps[0].label;
+  obProgressPct.textContent = '0%';
+  const obTimer = window.setInterval(function() {
+    if (obStepIdx < obSteps.length) {
+      var s = obSteps[obStepIdx++];
+      obProgressBar.style.width = s.pct + '%';
+      obProgressLabel.textContent = s.label;
+      obProgressPct.textContent = s.pct + '%';
+    }
+  }, 6000);
 
   const promptsData = await dbGet('prompts', 'select=*&name=eq.Outreach Sequence (4-Part)');
   const rows = Array.isArray(promptsData) ? promptsData : [];
@@ -7327,12 +7078,24 @@ async function runOutreachBuilder() {
       }
     }
     toast('Outreach sequence generated.', 'success');
-  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+    window.clearInterval(obTimer);
+    obProgressBar.style.width = '100%';
+    obProgressLabel.textContent = 'Sequence complete.';
+    obProgressPct.textContent = '100%';
+    window.setTimeout(function() { obProgressWrap.style.display = 'none'; }, 1200);
+  } catch(e) {
+    window.clearInterval(obTimer);
+    obProgressWrap.style.display = 'none';
+    contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
 }
 
 function clearOB() {
   ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
+  const obWrap = document.getElementById('ob-progress-wrap');
+  if (obWrap) obWrap.style.display = 'none';
+  const obBar = document.getElementById('ob-progress-bar');
+  if (obBar) obBar.style.width = '0%';
 }
 function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
 function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
@@ -8613,25 +8376,6 @@ function renderTaskReminders() {
 
   banner.innerHTML = html;
   banner.style.display = 'block';
-}
-
-function openAddTaskForContact() {
-  var c = window._detailContactForTask;
-  if (!c) { openAddTask(); return; }
-  var tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  document.getElementById('task-due-date').value = tomorrow.toISOString().split('T')[0];
-  document.getElementById('task-subject').value = 'Follow up with ' + c.name + (c.company ? ' at ' + c.company : '');
-  document.getElementById('task-notes').value = '';
-  document.getElementById('task-type').value = 'EMAIL';
-  document.getElementById('task-due-time').value = '09:00';
-  var sel = document.getElementById('task-contact');
-  if (c.hubspot_contact_id) {
-    sel.innerHTML = '<option value="' + c.hubspot_contact_id + '" selected>' + c.name + (c.company ? ' — ' + c.company : '') + '</option>';
-  } else {
-    sel.innerHTML = '<option value="">— No contact —</option>';
-  }
-  openModal('modal-add-task');
 }
 
 function openAddTask() {
