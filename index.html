@@ -7063,7 +7063,7 @@ async function runOutreachBuilder() {
     .replace(/\{\{company_context\}\}/g, context);
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     obOutput = result;
     contentEl.textContent = result;
     const linkedId = document.getElementById('ob-link-app').value || null;
