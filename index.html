@@ -9915,16 +9915,35 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
         ? '<span style="background:#c0392b;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">✗ Unverified</span>'
         : '<span style="background:#f39c12;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">~ Unconfirmed</span>';
       var sourceBadge = safeSource ? '<span style="background:var(--surface-alt,#f0f0f0);color:var(--text-secondary);font-size:11px;padding:2px 7px;border-radius:10px;margin-left:4px;border:1px solid var(--border)">' + safeSource + '</span>' : '';
+
+      // Check against existing applications
+      var jobTitleLower   = (job.title   || '').toLowerCase().trim();
+      var jobCompanyLower = (job.company || '').toLowerCase().trim();
+      var appMatch = (allApps || []).find(function(a) {
+        var aComp  = (a.company   || '').toLowerCase().trim();
+        var aTitle = (a.job_title || '').toLowerCase().trim();
+        return aComp === jobCompanyLower && aTitle === jobTitleLower;
+      });
+      var companyMatch = !appMatch && (allApps || []).find(function(a) {
+        return (a.company || '').toLowerCase().trim() === jobCompanyLower;
+      });
+      var appliedBadge = appMatch
+        ? '<span style="background:#c0392b;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">✓ Already Applied</span>'
+        : companyMatch
+        ? '<span style="background:#e67e22;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">Applied at this company</span>'
+        : '';
+      var cardBorder = appMatch ? 'border:1px solid #c0392b' : companyMatch ? 'border:1px solid #e67e22' : 'border:1px solid var(--border)';
+
       var urlDisplay = job.url
         ? '<a href="' + safeUrl + '" target="_blank" style="color:var(--burgundy);font-size:12px;word-break:break-all">' + safeUrl + '</a>'
         : '<span style="color:var(--text-secondary);font-size:12px">No URL found</span>';
       var flagsHtml = safeFlags ? '<div style="margin-top:6px;font-size:12px;color:#c0392b"><strong>⚠ Red flags:</strong> ' + safeFlags + '</div>' : '';
-      return '<div class="js-result-card" style="display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--surface)">' +
+      return '<div class="js-result-card" style="display:flex;gap:12px;padding:14px;' + cardBorder + ';border-radius:8px;margin-bottom:10px;background:var(--surface)">' +
         '<div style="padding-top:2px">' +
           '<input type="checkbox" class="js-role-cb" data-idx="' + globalIdx + '" onchange="jsUpdateAddBar()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--burgundy)">' +
         '</div>' +
         '<div style="flex:1">' +
-          '<div style="font-weight:600;font-size:14px;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;gap:4px">' + safeTitle + badge + sourceBadge + '</div>' +
+          '<div style="font-weight:600;font-size:14px;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;gap:4px">' + safeTitle + badge + sourceBadge + appliedBadge + '</div>' +
           '<div style="font-size:13px;color:var(--text-secondary);margin-top:2px">' + safeCompany + (safeSalary ? ' &nbsp;·&nbsp; ' + safeSalary : '') + '</div>' +
           '<div style="margin-top:6px">' + urlDisplay + '</div>' +
           '<div style="margin-top:8px;font-size:13px;color:var(--text)">' + safeFit + '</div>' +
