@@ -1431,13 +1431,16 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card-header">
             ✦ Role Results
             <div style="display:flex;gap:8px">
-              <button class="btn btn-primary btn-sm" onclick="openAddApp()">+ Add to Applications</button>
               <button class="btn btn-secondary btn-sm" onclick="copyJobSearchOutput()">Copy All</button>
               <button class="btn btn-secondary btn-sm" onclick="exportJobSearchDocx()">⬇ Export .docx</button>
             </div>
           </div>
           <div style="padding:20px">
-            <div id="js-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:700px;overflow-y:auto"></div>
+            <div id="js-output-content" style="font-size:13px;line-height:1.8;color:var(--text);max-height:700px;overflow-y:auto"></div>
+          </div>
+          <div id="js-add-bar" style="padding:14px 20px;border-top:1px solid var(--border);display:none;align-items:center;gap:12px">
+            <span id="js-checked-count" style="font-size:13px;color:var(--text-secondary)">0 selected</span>
+            <button class="btn btn-primary btn-sm" id="js-add-selected-btn" onclick="addSelectedToApps()" disabled style="opacity:0.5">+ Add Selected to Applications</button>
           </div>
         </div>
 
@@ -3507,6 +3510,21 @@ async function saveApp() {
 
     // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
     if (savedApp) syncOutreachToHubSpot(savedApp);
+
+    // If Job Search bulk-add queue has remaining roles, open next
+    if (window._jsAddQueue && window._jsAddQueue.length > 0) {
+      var next = window._jsAddQueue.shift();
+      setTimeout(function() {
+        openAddApp();
+        if (next.title)   document.getElementById('f-title').value   = next.title;
+        if (next.company) document.getElementById('f-company').value = next.company;
+        if (next.url)     document.getElementById('f-url').value     = next.url;
+        document.getElementById('f-date').value = today();
+        if (window._jsAddQueue.length > 0) {
+          toast('Fill in details for ' + next.company + '. ' + window._jsAddQueue.length + ' more will open after.', 'success');
+        }
+      }, 300);
+    }
 
   } catch (e) {
     toast('Error saving application: ' + e.message, 'error');
@@ -9748,21 +9766,25 @@ async function runJobSearch() {
   const fmt = function(n) { return '$' + n.toLocaleString(); };
 
   const workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
-  const prompt = 'Find 6-8 real current marketing leadership job postings matching:' +
-    ' Roles: ' + roles.split(',').slice(0,4).join(',') + '.' +
-    ' Location: ' + location + ' (' + workTypes + ').' +
-    ' Industries: ' + selectedIndustries.slice(0,6).join(', ') + '.' +
-    ' Company size: ' + selectedSizes.slice(0,2).join(', ') + '.' +
-    ' Base salary min: ' + fmt(salaryFloor) + '.' +
-    (notes ? ' Notes: ' + notes + '.' : '') +
-    '\n\nFor each role return: Role title, Company, Posting URL, Salary, Hiring Manager + LinkedIn URL, Recruiter email if findable, Fit reason (1 sentence). Mark any red flags.' +
-    '\n\nOnly real postings from last 60 days. No fabricated URLs.';
+  const prompt = 'Find 6-8 real current marketing leadership job postings matching:\n' +
+    'Roles: ' + roles.split(',').slice(0,4).join(',') + '\n' +
+    'Location: ' + location + ' (' + workTypes + ')\n' +
+    'Industries: ' + selectedIndustries.slice(0,6).join(', ') + '\n' +
+    'Company size: ' + selectedSizes.slice(0,2).join(', ') + '\n' +
+    'Base salary min: ' + fmt(salaryFloor) + '\n' +
+    (notes ? 'Notes: ' + notes + '\n' : '') +
+    '\nReturn results as a JSON array. Each object must have these exact keys: title, company, url, salary, fit, flags\n' +
+    'title = job title\n' +
+    'company = company name\n' +
+    'url = direct posting URL (real, verified, from last 60 days only — no fabricated URLs)\n' +
+    'salary = salary range as string or empty string if unknown\n' +
+    'fit = one sentence explaining why this fits Jay\n' +
+    'flags = any red flags as string, or empty string\n' +
+    '\nReturn ONLY the JSON array. No prose, no markdown, no code fences.';
 
-  // Use a lean system prompt for job search — full resume causes token rate limit errors
-  const jsSystemPrompt = "Job search assistant for Jay Wadhwa, VP/CMO-level marketing executive. Chicago area. Search web for real current job postings. Return only valid JSON array, no prose.";
+  const jsSystemPrompt = 'Job search assistant for Jay Wadhwa, VP/CMO-level marketing executive. 25+ years experience. ESPN, NBC Sports, Web3, SaaS. Chicago area. Search the web for real current job postings. Return only a raw JSON array — no prose, no markdown, no backticks.';
 
   try {
-    // Send use_web_search flag so Worker enables the web search tool
     const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
     const r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
@@ -9773,17 +9795,98 @@ async function runJobSearch() {
     const result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
     jsOutput = result;
-    // Render markdown bold (**text**) as actual bold HTML
-    var rendered = result
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
-    contentEl.innerHTML = rendered;
+
+    // Parse JSON and render structured cards with checkboxes
+    var jobs = [];
+    try {
+      var clean = result.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      jobs = JSON.parse(clean);
+    } catch(pe) {
+      // Fallback: render as plain text if JSON parse fails
+      var fallback = result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      contentEl.innerHTML = '<div style="white-space:normal">' + fallback + '</div>';
+      contentEl.style.whiteSpace = 'normal';
+      toast('Search complete.', 'success');
+      return;
+    }
+
+    // Render cards
+    var html = jobs.map(function(job, idx) {
+      var safeTitle   = (job.title   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeCompany = (job.company || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeSalary  = (job.salary  || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeFit     = (job.fit     || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeFlags   = (job.flags   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeUrl     = (job.url     || '').replace(/"/g,'&quot;');
+      var urlDisplay  = job.url ? '<a href="' + safeUrl + '" target="_blank" style="color:var(--burgundy);font-size:12px;word-break:break-all">' + safeUrl + '</a>' : '<span style="color:var(--text-secondary);font-size:12px">No URL found</span>';
+      var flagsHtml   = safeFlags ? '<div style="margin-top:6px;font-size:12px;color:#c0392b"><strong>⚠ Red flags:</strong> ' + safeFlags + '</div>' : '';
+      return '<div class="js-result-card" style="display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--surface)">' +
+        '<div style="padding-top:2px">' +
+          '<input type="checkbox" class="js-role-cb" data-idx="' + idx + '" onchange="jsUpdateAddBar()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--burgundy)">' +
+        '</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-weight:600;font-size:14px;color:var(--text)">' + safeTitle + '</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);margin-top:2px">' + safeCompany + (safeSalary ? ' &nbsp;·&nbsp; ' + safeSalary : '') + '</div>' +
+          '<div style="margin-top:6px">' + urlDisplay + '</div>' +
+          '<div style="margin-top:8px;font-size:13px;color:var(--text)">' + safeFit + '</div>' +
+          flagsHtml +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    contentEl.innerHTML = html || '<div style="color:var(--text-secondary)">No results returned.</div>';
     contentEl.style.whiteSpace = 'normal';
+
+    // Store parsed jobs for add flow
+    window._jsJobs = jobs;
+
+    // Show add bar
+    var addBar = document.getElementById('js-add-bar');
+    if (addBar) addBar.style.display = 'flex';
+    jsUpdateAddBar();
+
     toast('Search complete.', 'success');
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
     toast('Search failed: ' + e.message, 'error');
+  }
+}
+
+function jsUpdateAddBar() {
+  var cbs = document.querySelectorAll('.js-role-cb:checked');
+  var count = cbs.length;
+  var countEl = document.getElementById('js-checked-count');
+  var btn = document.getElementById('js-add-selected-btn');
+  if (countEl) countEl.textContent = count + ' selected';
+  if (btn) {
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+  }
+}
+
+function addSelectedToApps() {
+  var cbs = document.querySelectorAll('.js-role-cb:checked');
+  if (!cbs.length) { toast('Select at least one role.', 'error'); return; }
+  var jobs = window._jsJobs || [];
+  var toAdd = [];
+  cbs.forEach(function(cb) {
+    var idx = parseInt(cb.getAttribute('data-idx'));
+    if (jobs[idx]) toAdd.push(jobs[idx]);
+  });
+  if (!toAdd.length) return;
+
+  // Open modal pre-filled with first selected role, queue the rest
+  window._jsAddQueue = toAdd.slice(1);
+  var first = toAdd[0];
+  openAddApp();
+  if (first.title)   document.getElementById('f-title').value   = first.title;
+  if (first.company) document.getElementById('f-company').value = first.company;
+  if (first.url)     document.getElementById('f-url').value     = first.url;
+  document.getElementById('f-date').value = today();
+
+  if (window._jsAddQueue.length > 0) {
+    toast('Fill in details for ' + first.company + '. ' + window._jsAddQueue.length + ' more will open after.', 'success');
   }
 }
 
