@@ -1797,6 +1797,30 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
       </div>
       <div style="padding:28px 32px;flex:1;overflow-y:auto;">
+
+        <!-- ── FIND RECRUITER / HIRING MANAGER ── -->
+        <div class="dash-card" style="margin-bottom:24px">
+          <div class="dash-card-header">🔍 Find Recruiter / Hiring Manager</div>
+          <div style="padding:20px">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Search Hunter.io for recruiters and hiring managers at any company. Save results directly as contacts.</p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Company Name *</label>
+                <input class="form-input" type="text" id="ob-hunter-company" placeholder="Acme Corp">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Company Domain *</label>
+                <input class="form-input" type="text" id="ob-hunter-domain" placeholder="acme.com">
+              </div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-primary" style="flex:1;padding:12px" onclick="obHunterSearch()">🔍 Search Contacts</button>
+              <button class="btn btn-secondary" onclick="obHunterClear()">Clear</button>
+            </div>
+            <div id="ob-hunter-results" style="margin-top:20px;display:none"></div>
+          </div>
+        </div>
+
         <div class="dash-card" style="margin-bottom:24px">
           <div class="dash-card-header">📨 4-Part Outreach Sequence Builder</div>
           <div style="padding:20px">
@@ -7997,6 +8021,71 @@ function clearOB() {
 }
 function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
 function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
+
+// ── HUNTER.IO SEARCH ────────────────────────────────────────────────────────
+function obHunterSearch() {
+  var company = (document.getElementById('ob-hunter-company').value || '').trim();
+  var domain = (document.getElementById('ob-hunter-domain').value || '').trim();
+  if (!company || !domain) { toast('Company name and domain are required.', 'error'); return; }
+  var resultsDiv = document.getElementById('ob-hunter-results');
+  resultsDiv.style.display = 'block';
+  resultsDiv.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">Searching...</p>';
+  fetch(WORKER_URL + '/hunter?domain=' + encodeURIComponent(domain) + '&company=' + encodeURIComponent(company))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var emails = (data && data.data && data.data.emails) ? data.data.emails : [];
+      if (!emails.length) {
+        resultsDiv.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">No contacts found for that domain.</p>';
+        return;
+      }
+      var html = '<div style="display:flex;flex-direction:column;gap:12px">';
+      emails.forEach(function(contact) {
+        var name = ((contact.first_name || '') + ' ' + (contact.last_name || '')).trim() || '—';
+        var title = contact.position || '—';
+        var email = contact.value || '—';
+        var confidence = contact.confidence ? contact.confidence + '%' : '';
+        html += '<div style="background:var(--bg-secondary);border-radius:8px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px">';
+        html += '<div style="flex:1">';
+        html += '<div style="font-size:13px;font-weight:600;color:var(--text)">' + name + '</div>';
+        html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">' + title + '</div>';
+        html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">' + email + (confidence ? ' &nbsp;<span style="color:var(--accent);font-size:11px">' + confidence + '% confidence</span>' : '') + '</div>';
+        html += '</div>';
+        html += '<button class="btn btn-secondary btn-sm" onclick="obHunterSaveContact(' +
+          JSON.stringify(name) + ',' +
+          JSON.stringify(company) + ',' +
+          JSON.stringify(title) + ',' +
+          JSON.stringify(email) +
+        ')">+ Save as Contact</button>';
+        html += '</div>';
+      });
+      html += '</div>';
+      resultsDiv.innerHTML = html;
+    })
+    .catch(function(err) {
+      console.error('Hunter search error:', err);
+      resultsDiv.innerHTML = '<p style="font-size:13px;color:var(--error)">Search failed. Check the domain and try again.</p>';
+    });
+}
+
+function obHunterClear() {
+  var e1 = document.getElementById('ob-hunter-company');
+  var e2 = document.getElementById('ob-hunter-domain');
+  var r = document.getElementById('ob-hunter-results');
+  if (e1) e1.value = '';
+  if (e2) e2.value = '';
+  if (r) { r.style.display = 'none'; r.innerHTML = ''; }
+}
+
+function obHunterSaveContact(name, company, title, email) {
+  openAddContact();
+  window.setTimeout(function() {
+    var sv = function(id, val) { var e = document.getElementById(id); if (e) e.value = val || ''; };
+    sv('cf-name', name);
+    sv('cf-company', company);
+    sv('cf-title', title);
+    sv('cf-email', email);
+  }, 150);
+}
 
 // ── SHARED DOCX EXPORT ───────────────────────────────────────────────────
 const BASE_URL = 'https://chyp-16.github.io/job-search-command-center';
