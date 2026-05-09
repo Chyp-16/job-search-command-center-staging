@@ -2825,7 +2825,8 @@ async function dbPatch(table, id, body) {
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
     body: JSON.stringify(body)
   });
-  return r.json();
+  if (!r.ok) { const t = await r.text(); throw new Error('PATCH failed: ' + t); }
+  return r.ok;
 }
 
 async function dbDelete(table, id) {
