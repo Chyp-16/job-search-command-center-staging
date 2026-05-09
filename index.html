@@ -6658,6 +6658,21 @@ function loadInterviewPrepPage() {
     opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     sel.appendChild(opt);
   });
+  sel.onchange = function() {
+    const compEl = document.getElementById('ip-company');
+    const roleEl = document.getElementById('ip-role');
+    if (!compEl || !roleEl) return;
+    const appId = sel.value;
+    if (!appId) {
+      compEl.value = '';
+      roleEl.value = '';
+      return;
+    }
+    const app = allApps.find(function(a) { return a.id === appId; });
+    if (!app) return;
+    compEl.value = app.company || '';
+    roleEl.value = app.job_title || '';
+  };
 }
 
 // File upload handlers for AI tools
