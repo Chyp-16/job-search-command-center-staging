@@ -3946,6 +3946,7 @@ function buildContactDetailHTML(c) {
         '<div class="detail-section-title" style="margin:0">HubSpot Activity</div>' +
         '<div style="display:flex;gap:8px">' +
           '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" data-hsid="' + c.hubspot_contact_id + '" onclick="loadContactHubSpotActivity(this.dataset.cid,this.dataset.hsid)">⟳ Load</button>' +
+          '<button class="btn btn-primary btn-sm" data-hsid="' + c.hubspot_contact_id + '" onclick="openAddTaskForContact(this.dataset.hsid)">+ Add Task</button>' +
           '<a href="https://app.hubspot.com/contacts/242599414/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' +
         '</div>' +
       '</div>' +
@@ -9219,6 +9220,31 @@ function openAddTask() {
           c.name + (c.company ? ' — ' + c.company : '') + '</option>';
       }).join('');
   })();
+}
+
+function openAddTaskForContact(hsContactId) {
+  openAddTask();
+  if (!hsContactId) return;
+  // Wait for the async contact dropdown to populate, then select the contact
+  var attempts = 0;
+  var interval = window.setInterval(function() {
+    attempts++;
+    var sel = document.getElementById('task-contact');
+    if (!sel) { window.clearInterval(interval); return; }
+    // Still loading
+    if (sel.options.length <= 1 && sel.options[0] && sel.options[0].value === '') {
+      if (attempts > 40) window.clearInterval(interval);
+      return;
+    }
+    // Dropdown populated — select matching contact
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === String(hsContactId)) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+    window.clearInterval(interval);
+  }, 150);
 }
 
 function saveTask() {
