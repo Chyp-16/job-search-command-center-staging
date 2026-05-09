@@ -6661,17 +6661,20 @@ function loadInterviewPrepPage() {
   sel.onchange = function() {
     const compEl = document.getElementById('ip-company');
     const roleEl = document.getElementById('ip-role');
+    const urlEl  = document.getElementById('ip-url');
     if (!compEl || !roleEl) return;
     const appId = sel.value;
     if (!appId) {
       compEl.value = '';
       roleEl.value = '';
+      if (urlEl) urlEl.value = '';
       return;
     }
     const app = allApps.find(function(a) { return a.id === appId; });
     if (!app) return;
     compEl.value = app.company || '';
     roleEl.value = app.job_title || '';
+    if (urlEl) urlEl.value = app.job_url || '';
   };
 }
 
