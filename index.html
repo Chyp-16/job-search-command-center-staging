@@ -2379,6 +2379,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="btn btn-ghost" id="detail-edit-btn">Edit</button>
       <button class="btn btn-secondary btn-sm" id="detail-upload-btn" style="display:none" onclick="openUploadFromDetail()">⬆ Upload Resume</button>
       <button class="btn btn-secondary btn-sm" id="detail-email-btn" style="display:none" onclick="openGmailCompose()">✉️ Email</button>
+      <button class="btn btn-secondary btn-sm" id="detail-task-btn" style="display:none" onclick="openAddTaskForContact()">✅ Add Task</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Close</button>
     </div>
   </div>
@@ -3536,6 +3537,8 @@ function viewApp(id) {
   document.getElementById('detail-edit-btn').onclick = () => { closeModal('modal-detail'); editApp(id); };
   var emailBtn = document.getElementById('detail-email-btn');
   if (emailBtn) emailBtn.style.display = 'none';
+  var taskBtnApp = document.getElementById('detail-task-btn');
+  if (taskBtnApp) taskBtnApp.style.display = 'none';
   window._detailContact = null;
 
   // Show upload button and wire it for this application
@@ -3942,6 +3945,8 @@ function viewContact(id) {
     emailBtn.style.display = c.email ? '' : 'none';
     window._detailContact = c;
   }
+  var taskBtn = document.getElementById('detail-task-btn');
+  if (taskBtn) { taskBtn.style.display = ''; window._detailContactForTask = c; }
   // Load docs linked to this contact
   loadContactDocs(id);
   // Load related applications from same company
@@ -8608,6 +8613,25 @@ function renderTaskReminders() {
 
   banner.innerHTML = html;
   banner.style.display = 'block';
+}
+
+function openAddTaskForContact() {
+  var c = window._detailContactForTask;
+  if (!c) { openAddTask(); return; }
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('task-due-date').value = tomorrow.toISOString().split('T')[0];
+  document.getElementById('task-subject').value = 'Follow up with ' + c.name + (c.company ? ' at ' + c.company : '');
+  document.getElementById('task-notes').value = '';
+  document.getElementById('task-type').value = 'EMAIL';
+  document.getElementById('task-due-time').value = '09:00';
+  var sel = document.getElementById('task-contact');
+  if (c.hubspot_contact_id) {
+    sel.innerHTML = '<option value="' + c.hubspot_contact_id + '" selected>' + c.name + (c.company ? ' — ' + c.company : '') + '</option>';
+  } else {
+    sel.innerHTML = '<option value="">— No contact —</option>';
+  }
+  openModal('modal-add-task');
 }
 
 function openAddTask() {
