@@ -3501,7 +3501,7 @@ async function saveApp() {
 
     // Show interview prep nudge banner if status is an interview stage
     if (payload.status === 'Interview — Recruiter' || payload.status === 'Interview — Company') {
-      showInterviewPrepBanner();
+      showInterviewPrepBanner(savedApp);
     }
 
     // Sync scheduled outreach steps to HubSpot as tasks (best-effort, silent fail)
@@ -3512,15 +3512,70 @@ async function saveApp() {
   }
 }
 
-function showInterviewPrepBanner() {
+function showInterviewPrepBanner(app) {
   var existing = document.getElementById('interview-prep-banner');
   if (existing) existing.remove();
+  // Store app data for prefill on click
+  window._ipBannerApp = app || null;
   var banner = document.createElement('div');
   banner.id = 'interview-prep-banner';
   banner.innerHTML = '<span class="ipb-text">Ready to prep for this interview?</span>' +
-    '<button class="ipb-btn" onclick="document.getElementById(\'interview-prep-banner\').remove(); navigateTo(\'interviewprep\');">Go to Interview Prep</button>' +
+    '<button class="ipb-btn" onclick="document.getElementById(\'interview-prep-banner\').remove(); navigateTo(\'interviewprep\'); window.setTimeout(function(){ prefillInterviewPrep(window._ipBannerApp); }, 80);">Go to Interview Prep</button>' +
     '<button class="ipb-dismiss" title="Dismiss" onclick="this.parentElement.remove();">&times;</button>';
   document.body.appendChild(banner);
+}
+
+function prefillInterviewPrep(app) {
+  if (!app) return;
+
+  // Company name
+  var compEl = document.getElementById('ip-company');
+  if (compEl && app.company) compEl.value = app.company;
+
+  // Role title
+  var roleEl = document.getElementById('ip-role');
+  if (roleEl && app.job_title) roleEl.value = app.job_title;
+
+  // Link to application dropdown
+  var linkSel = document.getElementById('ip-link-app');
+  if (linkSel && app.id) {
+    // Option may already exist from loadInterviewPrepPage(); set value
+    for (var i = 0; i < linkSel.options.length; i++) {
+      if (linkSel.options[i].value == app.id) {
+        linkSel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  // Company / job URL
+  var urlEl = document.getElementById('ip-url');
+  if (urlEl && app.job_url) urlEl.value = app.job_url;
+
+  // Interviewer name and title from linked contact
+  if (app.linked_contact_id && allContacts && allContacts.length) {
+    var contact = allContacts.find(function(c) { return c.id === app.linked_contact_id; });
+    if (contact) {
+      var nameEl = document.getElementById('ip-interviewer-name');
+      if (nameEl && contact.name) nameEl.value = contact.name;
+      var titleEl = document.getElementById('ip-interviewer-title');
+      if (titleEl && contact.title) titleEl.value = contact.title;
+    }
+  }
+
+  // Job description — pull from Resume Tailor JD field if it exists and is non-empty
+  var ipJd = document.getElementById('ip-jd');
+  if (ipJd && !ipJd.value) {
+    var rtJd = document.getElementById('rt-jd');
+    if (rtJd && rtJd.value && rtJd.value.trim()) {
+      // Only copy if the Resume Tailor was linked to the same application
+      var rtLinkApp = document.getElementById('rt-link-app');
+      var rtAppId = rtLinkApp ? rtLinkApp.value : '';
+      if (!rtAppId || !app.id || String(rtAppId) === String(app.id)) {
+        ipJd.value = rtJd.value.trim();
+      }
+    }
+  }
 }
 
 async function syncOutreachToHubSpot(app) {
