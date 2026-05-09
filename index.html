@@ -9911,9 +9911,7 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
       var v = (job.verified || 'unconfirmed').toLowerCase();
       var badge = v === 'yes'
         ? '<span style="background:#27ae60;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">✓ Verified</span>'
-        : v === 'no'
-        ? '<span style="background:#c0392b;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">✗ Unverified</span>'
-        : '<span style="background:#f39c12;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">~ Unconfirmed</span>';
+        : '<span style="background:#555;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">~ Unconfirmed</span>';
       var sourceBadge = safeSource ? '<span style="background:var(--surface-alt,#f0f0f0);color:var(--text-secondary);font-size:11px;padding:2px 7px;border-radius:10px;margin-left:4px;border:1px solid var(--border)">' + safeSource + '</span>' : '';
 
       // Check against existing applications
