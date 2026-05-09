@@ -3862,7 +3862,7 @@ function renderContactsTable() {
       '<td>' + (c.company||'—') + '</td>' +
       '<td style="font-size:12px;color:var(--text-secondary)">' + (c.title||'—') + '</td>' +
       '<td><span class="badge ' + badgeCls + '">' + (c.contact_type||'—') + '</span></td>' +
-      '<td style="font-size:12px">' + fmt(c.last_contact_date) + '</td>' +
+      '<td style="font-size:12px">' + (c.outreach_1_type ? '<div style="font-size:10px;color:var(--burgundy);font-weight:600;text-transform:uppercase;line-height:1.2">' + c.outreach_1_type + '</div>' : '') + fmt(c.last_contact_date) + '</td>' +
       '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.next_action||'—') + '</td>' +
       '<td style="font-size:12px;' + overdueStyle + '">' + fmt(c.next_action_date) + '</td>' +
       '<td><div class="table-actions">' +
