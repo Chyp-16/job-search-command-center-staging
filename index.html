@@ -9839,7 +9839,7 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
   if (loadNextBtn) { loadNextBtn.disabled = true; loadNextBtn.textContent = 'Loading...'; }
 
   try {
-    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
+    const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true, max_tokens: 3000 };
     const r = await fetch(WORKER_URL + '/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
