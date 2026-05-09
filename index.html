@@ -1630,6 +1630,7 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
             <div style="margin-top:16px;display:flex;gap:10px">
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runResumeTailor()">✦ Tailor My Resume</button>
+              <button class="btn btn-secondary" onclick="rtOpenNewApp()">+ New Application</button>
               <button class="btn btn-secondary" onclick="clearRT()">Clear</button>
             </div>
           </div>
@@ -7015,7 +7016,21 @@ function loadRTPage() {
   });
 }
 
+function rtOpenNewApp() {
+  openAddApp();
+  window.setTimeout(function() {
+    var co = (document.getElementById('rt-company').value || '').trim();
+    var ro = (document.getElementById('rt-job-title').value || '').trim();
+    if (co) document.getElementById('f-company').value = co;
+    if (ro) document.getElementById('f-title').value = ro;
+  }, 100);
+}
+
 async function runResumeTailor() {
+  var _rtCo = (document.getElementById('rt-company').value || '').trim();
+  var _rtRo = (document.getElementById('rt-job-title').value || '').trim();
+  if (_rtCo) localStorage.setItem('rt_last_company', _rtCo);
+  if (_rtRo) localStorage.setItem('rt_last_role', _rtRo);
   const jd = (document.getElementById('rt-jd').value || '').trim();
   const req = (document.getElementById('rt-keywords-req').value || '').trim();
   const nice = (document.getElementById('rt-keywords-nice').value || '').trim();
