@@ -9822,7 +9822,7 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
   var params = window._jsSearchParams;
   var seenJobs = window._jsSeenJobs || [];
 
-  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a VP/CMO-level marketing executive with 25+ years experience at ESPN, NBC Sports, Web3 and SaaS companies in the Chicago area. Search the web and return job postings as a raw JSON array sorted by verification confidence (verified yes first). Never refuse because a field is unknown — use empty string. Always return the JSON array.';
+  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a VP/CMO-level marketing executive with 25+ years experience at ESPN, NBC Sports, Web3 and SaaS companies in the Chicago area. Search the web and return job postings as a JSON array. CRITICAL: Your response must start with [ and end with ]. No prose before or after the array. No markdown. No code fences. No preamble. No explanation. Just the raw JSON array. If a field is unknown use empty string — never skip a result.';
   const prompt = jsBuildPrompt(params, seenJobs);
 
   // Show loading indicator
@@ -9856,19 +9856,29 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
     // Accumulate raw output for export
     jsOutput = (jsOutput ? jsOutput + '\n\n' : '') + result;
 
-    // Parse JSON
+    // Parse JSON — extract array from anywhere in the response
     var jobs = [];
     try {
-      var clean = result.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-      jobs = JSON.parse(clean);
+      // Step 1: try to pull a JSON array out of the raw text regardless of surrounding prose
+      var extracted = result;
+      var arrStart = result.indexOf('[');
+      var arrEnd   = result.lastIndexOf(']');
+      if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
+        extracted = result.substring(arrStart, arrEnd + 1);
+      } else {
+        // Fall back to stripping code fences
+        extracted = result.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      }
+      jobs = JSON.parse(extracted);
       if (!Array.isArray(jobs)) jobs = [];
     } catch(pe) {
-      var loaderEl2 = document.getElementById(loaderId);
-      if (loaderEl2) loaderEl2.remove();
-      var fallback = result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-      contentEl.insertAdjacentHTML('beforeend', '<div style="white-space:normal;padding:14px">' + fallback + '</div>');
-      toast('Search complete.', 'success');
+      // JSON unrecoverable — show friendly error, still show Load Next 10
+      contentEl.insertAdjacentHTML('beforeend', '<div style="padding:14px;color:var(--text-secondary);font-size:13px">Search returned an unreadable response. Try Load Next 10 or adjust your filters.</div>');
+      var addBar2 = document.getElementById('js-add-bar');
+      if (addBar2) addBar2.style.display = 'flex';
+      var loadNextBtn2 = document.getElementById('js-load-next-btn');
+      if (loadNextBtn2) { loadNextBtn2.disabled = false; loadNextBtn2.textContent = 'Load Next 10 →'; loadNextBtn2.style.display = 'inline-block'; }
+      toast('Search returned an unreadable response.', 'error');
       return;
     }
 
