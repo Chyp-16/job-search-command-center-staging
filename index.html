@@ -1438,9 +1438,10 @@ a { color: var(--burgundy); text-decoration: none; }
           <div style="padding:20px">
             <div id="js-output-content" style="font-size:13px;line-height:1.8;color:var(--text);max-height:700px;overflow-y:auto"></div>
           </div>
-          <div id="js-add-bar" style="padding:14px 20px;border-top:1px solid var(--border);display:none;align-items:center;gap:12px">
+          <div id="js-add-bar" style="padding:14px 20px;border-top:1px solid var(--border);display:none;align-items:center;gap:12px;flex-wrap:wrap">
             <span id="js-checked-count" style="font-size:13px;color:var(--text-secondary)">0 selected</span>
             <button class="btn btn-primary btn-sm" id="js-add-selected-btn" onclick="addSelectedToApps()" disabled style="opacity:0.5">+ Add Selected to Applications</button>
+            <button class="btn btn-secondary btn-sm" id="js-load-next-btn" onclick="jsLoadNext()" style="display:none;margin-left:auto">Load Next 10 →</button>
           </div>
         </div>
 
@@ -9766,23 +9767,76 @@ async function runJobSearch() {
   const fmt = function(n) { return '$' + n.toLocaleString(); };
 
   const workTypes = JS_WORK_TYPES.filter(function(w){ return w.selected; }).map(function(w){ return w.label; }).join(', ');
-  const prompt = 'Find 6-8 real current marketing leadership job postings matching:\n' +
-    'Roles: ' + roles.split(',').slice(0,4).join(',') + '\n' +
-    'Location: ' + location + ' (' + workTypes + ')\n' +
-    'Industries: ' + selectedIndustries.slice(0,6).join(', ') + '\n' +
-    'Company size: ' + selectedSizes.slice(0,2).join(', ') + '\n' +
-    'Base salary min: ' + fmt(salaryFloor) + '\n' +
-    (notes ? 'Notes: ' + notes + '\n' : '') +
-    '\nReturn results as a JSON array. Each object must have these exact keys: title, company, url, salary, fit, flags\n' +
-    'title = job title\n' +
-    'company = company name\n' +
-    'url = direct posting URL (real, verified, from last 60 days only — no fabricated URLs)\n' +
-    'salary = salary range as string or empty string if unknown\n' +
-    'fit = one sentence explaining why this fits Jay\n' +
-    'flags = any red flags as string, or empty string\n' +
-    '\nReturn ONLY the JSON array. No prose, no markdown, no code fences.';
+  // Build search prompt — shared by initial search and Load Next 10
+  window._jsSearchParams = { roles, location, workTypes, selectedIndustries, selectedSizes, salaryFloor, notes, fmt };
+  window._jsSeenJobs = [];
+  window._jsJobs = [];
+  window._jsJobs = [];
 
-  const jsSystemPrompt = 'Job search assistant for Jay Wadhwa, VP/CMO-level marketing executive. 25+ years experience. ESPN, NBC Sports, Web3, SaaS. Chicago area. Search the web for real current job postings. Return only a raw JSON array — no prose, no markdown, no backticks.';
+  const contentEl2 = contentEl;
+  contentEl2.innerHTML = '';
+
+  await jsRunSearchBatch(contentEl2, false);
+}
+
+function jsBuildPrompt(params, seenJobs) {
+  var excludeBlock = seenJobs.length > 0
+    ? '\nDo NOT return any of these already-shown postings:\n' + seenJobs.map(function(j){ return '- ' + j.title + ' at ' + j.company; }).join('\n') + '\n'
+    : '';
+  return 'Search for 10 marketing leadership job postings for Jay Wadhwa matching these criteria:\n' +
+    'Roles: ' + params.roles.split(',').slice(0,4).join(',') + '\n' +
+    'Location: ' + params.location + ' (' + params.workTypes + ')\n' +
+    'Industries: ' + params.selectedIndustries.slice(0,6).join(', ') + '\n' +
+    'Company size: ' + params.selectedSizes.slice(0,2).join(', ') + '\n' +
+    'Base salary min: ' + params.fmt(params.salaryFloor) + '\n' +
+    (params.notes ? 'Notes: ' + params.notes + '\n' : '') +
+    excludeBlock +
+    '\nSearch these sources in this exact priority order — highest priority first:\n' +
+    '  1. Company career pages — search company websites directly (careers.company.com or company.com/careers)\n' +
+    '  2. LinkedIn Jobs — search linkedin.com/jobs for VP/CMO/Director-level marketing roles\n' +
+    '  3. ZipRecruiter, Dice, or Built In Chicago — whichever has the most relevant results for this role/industry\n' +
+    '  4. Glassdoor — prioritize listings that include salary ranges\n' +
+    '  5. Indeed — broad search across all relevant postings\n' +
+    '  6. Any other relevant job boards or sites not listed above\n' +
+    '\nSearch each source. Return as many results as you find across all sources, up to 10 total. Do not skip a source — move to the next if results are thin.\n' +
+    '\nAdd a source field to each result indicating which site it came from (e.g. "Company Career Page", "LinkedIn", "ZipRecruiter", "Built In Chicago", "Dice", "Glassdoor", "Indeed", or the site name).\n' +
+    '\nFor each posting, self-assess how confident you are the listing is real and current. Use the verified field:\n' +
+    '  "yes" = you found a direct URL to the posting and confirmed it exists\n' +
+    '  "unconfirmed" = you found the role referenced on a job board or aggregator but could not confirm the direct posting\n' +
+    '  "no" = you could not find a direct source — you are inferring this role may exist\n' +
+    '\nSort results: verified yes first, then unconfirmed, then no. Within each tier, maintain source priority order.\n' +
+    '\nReturn a JSON array. Each object must have these exact keys: title, company, url, salary, fit, flags, verified, source\n' +
+    'title = job title (required)\n' +
+    'company = company name (required)\n' +
+    'url = best URL found — job board link is fine, empty string if none\n' +
+    'salary = salary range if listed, empty string if unknown\n' +
+    'fit = one sentence why this fits Jay Wadhwa\n' +
+    'flags = any red flags, empty string if none\n' +
+    'verified = "yes", "unconfirmed", or "no"\n' +
+    'source = name of the site this posting was found on\n' +
+    '\nInclude any posting you find. Partial information is fine. Never skip a result because a field is missing.\n' +
+    '\nReturn ONLY the raw JSON array. No explanation, no markdown, no code fences.';
+}
+
+async function jsRunSearchBatch(contentEl, isLoadMore) {
+  var params = window._jsSearchParams;
+  var seenJobs = window._jsSeenJobs || [];
+
+  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a VP/CMO-level marketing executive with 25+ years experience at ESPN, NBC Sports, Web3 and SaaS companies in the Chicago area. Search the web and return job postings as a raw JSON array sorted by verification confidence (verified yes first). Never refuse because a field is unknown — use empty string. Always return the JSON array.';
+  const prompt = jsBuildPrompt(params, seenJobs);
+
+  // Show loading indicator
+  var loaderId = 'js-loader-' + Date.now();
+  var loaderHtml = '<div id="' + loaderId + '" style="padding:14px;color:var(--text-secondary);font-size:13px">' + (isLoadMore ? 'Loading next 10 results...' : 'Searching for matching roles... This may take 30-60 seconds.') + '</div>';
+  if (isLoadMore) {
+    contentEl.insertAdjacentHTML('beforeend', loaderHtml);
+  } else {
+    contentEl.innerHTML = loaderHtml;
+  }
+
+  // Show/update load next button as loading
+  var loadNextBtn = document.getElementById('js-load-next-btn');
+  if (loadNextBtn) { loadNextBtn.disabled = true; loadNextBtn.textContent = 'Loading...'; }
 
   try {
     const jsBody = { messages: [{ role: 'user', content: prompt }], system: jsSystemPrompt, use_web_search: true };
@@ -9794,39 +9848,67 @@ async function runJobSearch() {
     const data = await r.json();
     const result = (data.content && data.content[0]) ? data.content[0].text : null;
     if (!result) throw new Error(data.error?.message || 'No response');
-    jsOutput = result;
 
-    // Parse JSON and render structured cards with checkboxes
+    // Remove loader
+    var loaderEl = document.getElementById(loaderId);
+    if (loaderEl) loaderEl.remove();
+
+    // Accumulate raw output for export
+    jsOutput = (jsOutput ? jsOutput + '\n\n' : '') + result;
+
+    // Parse JSON
     var jobs = [];
     try {
       var clean = result.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
       jobs = JSON.parse(clean);
+      if (!Array.isArray(jobs)) jobs = [];
     } catch(pe) {
-      // Fallback: render as plain text if JSON parse fails
+      var loaderEl2 = document.getElementById(loaderId);
+      if (loaderEl2) loaderEl2.remove();
       var fallback = result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-      contentEl.innerHTML = '<div style="white-space:normal">' + fallback + '</div>';
-      contentEl.style.whiteSpace = 'normal';
+      contentEl.insertAdjacentHTML('beforeend', '<div style="white-space:normal;padding:14px">' + fallback + '</div>');
       toast('Search complete.', 'success');
       return;
     }
 
+    // Track seen jobs to exclude from next batch
+    window._jsSeenJobs = (window._jsSeenJobs || []).concat(jobs);
+
+    // Assign global indices based on total accumulated job list
+    var startIdx = (window._jsJobs || []).length;
+    window._jsJobs = (window._jsJobs || []).concat(jobs);
+
     // Render cards
-    var html = jobs.map(function(job, idx) {
+    var verifiedOrder = { 'yes': 0, 'unconfirmed': 1, 'no': 2 };
+    jobs.sort(function(a,b){ return (verifiedOrder[a.verified]||1) - (verifiedOrder[b.verified]||1); });
+
+    var html = jobs.map(function(job, localIdx) {
+      var globalIdx = startIdx + localIdx;
       var safeTitle   = (job.title   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var safeCompany = (job.company || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var safeSalary  = (job.salary  || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var safeFit     = (job.fit     || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var safeFlags   = (job.flags   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var safeSource  = (job.source  || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       var safeUrl     = (job.url     || '').replace(/"/g,'&quot;');
-      var urlDisplay  = job.url ? '<a href="' + safeUrl + '" target="_blank" style="color:var(--burgundy);font-size:12px;word-break:break-all">' + safeUrl + '</a>' : '<span style="color:var(--text-secondary);font-size:12px">No URL found</span>';
-      var flagsHtml   = safeFlags ? '<div style="margin-top:6px;font-size:12px;color:#c0392b"><strong>⚠ Red flags:</strong> ' + safeFlags + '</div>' : '';
+      var v = (job.verified || 'unconfirmed').toLowerCase();
+      var badge = v === 'yes'
+        ? '<span style="background:#27ae60;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">✓ Verified</span>'
+        : v === 'no'
+        ? '<span style="background:#c0392b;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">✗ Unverified</span>'
+        : '<span style="background:#f39c12;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:8px">~ Unconfirmed</span>';
+      var sourceBadge = safeSource ? '<span style="background:var(--surface-alt,#f0f0f0);color:var(--text-secondary);font-size:11px;padding:2px 7px;border-radius:10px;margin-left:4px;border:1px solid var(--border)">' + safeSource + '</span>' : '';
+      var urlDisplay = job.url
+        ? '<a href="' + safeUrl + '" target="_blank" style="color:var(--burgundy);font-size:12px;word-break:break-all">' + safeUrl + '</a>'
+        : '<span style="color:var(--text-secondary);font-size:12px">No URL found</span>';
+      var flagsHtml = safeFlags ? '<div style="margin-top:6px;font-size:12px;color:#c0392b"><strong>⚠ Red flags:</strong> ' + safeFlags + '</div>' : '';
       return '<div class="js-result-card" style="display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--surface)">' +
         '<div style="padding-top:2px">' +
-          '<input type="checkbox" class="js-role-cb" data-idx="' + idx + '" onchange="jsUpdateAddBar()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--burgundy)">' +
+          '<input type="checkbox" class="js-role-cb" data-idx="' + globalIdx + '" onchange="jsUpdateAddBar()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--burgundy)">' +
         '</div>' +
         '<div style="flex:1">' +
-          '<div style="font-weight:600;font-size:14px;color:var(--text)">' + safeTitle + '</div>' +
+          '<div style="font-weight:600;font-size:14px;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;gap:4px">' + safeTitle + badge + sourceBadge + '</div>' +
           '<div style="font-size:13px;color:var(--text-secondary);margin-top:2px">' + safeCompany + (safeSalary ? ' &nbsp;·&nbsp; ' + safeSalary : '') + '</div>' +
           '<div style="margin-top:6px">' + urlDisplay + '</div>' +
           '<div style="margin-top:8px;font-size:13px;color:var(--text)">' + safeFit + '</div>' +
@@ -9835,60 +9917,37 @@ async function runJobSearch() {
       '</div>';
     }).join('');
 
-    contentEl.innerHTML = html || '<div style="color:var(--text-secondary)">No results returned.</div>';
-    contentEl.style.whiteSpace = 'normal';
-
-    // Store parsed jobs for add flow
-    window._jsJobs = jobs;
+    contentEl.insertAdjacentHTML('beforeend', html || '<div style="color:var(--text-secondary);padding:14px">No additional results found.</div>');
 
     // Show add bar
     var addBar = document.getElementById('js-add-bar');
     if (addBar) addBar.style.display = 'flex';
     jsUpdateAddBar();
 
-    toast('Search complete.', 'success');
+    // Show/reset Load Next 10 button
+    if (loadNextBtn) {
+      loadNextBtn.disabled = false;
+      loadNextBtn.textContent = 'Load Next 10 →';
+      loadNextBtn.style.display = 'inline-block';
+    }
+
+    toast((isLoadMore ? 'Next 10 loaded.' : 'Search complete.'), 'success');
   } catch(e) {
-    contentEl.textContent = 'Error: ' + e.message;
+    var loaderEl3 = document.getElementById(loaderId);
+    if (loaderEl3) loaderEl3.remove();
+    contentEl.insertAdjacentHTML('beforeend', '<div style="color:var(--burgundy);padding:14px">Error: ' + e.message + '</div>');
+    if (loadNextBtn) { loadNextBtn.disabled = false; loadNextBtn.textContent = 'Load Next 10 →'; }
     toast('Search failed: ' + e.message, 'error');
   }
 }
 
-function jsUpdateAddBar() {
-  var cbs = document.querySelectorAll('.js-role-cb:checked');
-  var count = cbs.length;
-  var countEl = document.getElementById('js-checked-count');
-  var btn = document.getElementById('js-add-selected-btn');
-  if (countEl) countEl.textContent = count + ' selected';
-  if (btn) {
-    btn.disabled = count === 0;
-    btn.style.opacity = count === 0 ? '0.5' : '1';
-  }
+async function jsLoadNext() {
+  var contentEl = document.getElementById('js-output-content');
+  if (!contentEl) return;
+  await jsRunSearchBatch(contentEl, true);
 }
 
-function addSelectedToApps() {
-  var cbs = document.querySelectorAll('.js-role-cb:checked');
-  if (!cbs.length) { toast('Select at least one role.', 'error'); return; }
-  var jobs = window._jsJobs || [];
-  var toAdd = [];
-  cbs.forEach(function(cb) {
-    var idx = parseInt(cb.getAttribute('data-idx'));
-    if (jobs[idx]) toAdd.push(jobs[idx]);
-  });
-  if (!toAdd.length) return;
-
-  // Open modal pre-filled with first selected role, queue the rest
-  window._jsAddQueue = toAdd.slice(1);
-  var first = toAdd[0];
-  openAddApp();
-  if (first.title)   document.getElementById('f-title').value   = first.title;
-  if (first.company) document.getElementById('f-company').value = first.company;
-  if (first.url)     document.getElementById('f-url').value     = first.url;
-  document.getElementById('f-date').value = today();
-
-  if (window._jsAddQueue.length > 0) {
-    toast('Fill in details for ' + first.company + '. ' + window._jsAddQueue.length + ' more will open after.', 'success');
-  }
-}
+// runJobSearch batch logic above
 
 // ── INIT ───────────────────────────────────────────────────────────────
 populateDropdowns();
