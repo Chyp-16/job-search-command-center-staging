@@ -9963,6 +9963,42 @@ async function jsLoadNext() {
   await jsRunSearchBatch(contentEl, true);
 }
 
+function jsUpdateAddBar() {
+  var cbs = document.querySelectorAll('.js-role-cb:checked');
+  var count = cbs.length;
+  var countEl = document.getElementById('js-checked-count');
+  var btn = document.getElementById('js-add-selected-btn');
+  if (countEl) countEl.textContent = count + ' selected';
+  if (btn) {
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+  }
+}
+
+function addSelectedToApps() {
+  var cbs = document.querySelectorAll('.js-role-cb:checked');
+  if (!cbs.length) { toast('Select at least one role.', 'error'); return; }
+  var jobs = window._jsJobs || [];
+  var toAdd = [];
+  cbs.forEach(function(cb) {
+    var idx = parseInt(cb.getAttribute('data-idx'));
+    if (jobs[idx]) toAdd.push(jobs[idx]);
+  });
+  if (!toAdd.length) { toast('Could not match selected roles.', 'error'); return; }
+
+  window._jsAddQueue = toAdd.slice(1);
+  var first = toAdd[0];
+  openAddApp();
+  if (first.title)   document.getElementById('f-title').value   = first.title;
+  if (first.company) document.getElementById('f-company').value = first.company;
+  if (first.url)     document.getElementById('f-url').value     = first.url;
+  document.getElementById('f-date').value = today();
+
+  if (window._jsAddQueue.length > 0) {
+    toast('Fill in details for ' + first.company + '. ' + window._jsAddQueue.length + ' more will open after.', 'success');
+  }
+}
+
 // runJobSearch batch logic above
 
 // ── INIT ───────────────────────────────────────────────────────────────
