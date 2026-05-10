@@ -9034,7 +9034,7 @@ async function saveUserProfile() {
   };
   try {
     if (userProfile && userProfile.id) {
-      await dbPatch('user_profiles', 'id=eq.' + userProfile.id, payload);
+      await dbPatch('user_profiles', userProfile.id, payload);
     } else {
       await dbPost('user_profiles', payload);
     }
