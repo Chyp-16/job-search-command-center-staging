@@ -897,6 +897,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="theme-toggle" onclick="toggleTheme()">
         <span id="theme-icon">🌙</span><span>Dark mode</span>
       </button>
+      <div class="nav-item" data-page="profile" style="margin:4px 8px;border-radius:6px;">
+        <span class="nav-icon">👤</span><span>Profile</span>
+      </div>
       <button class="theme-toggle" onclick="signOut()" style="margin-top:4px;opacity:0.7" title="Sign out">
         <span>&#x23FB;</span><span>Sign out</span>
       </button>
@@ -1911,6 +1914,119 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
     </div>
 
+    <!-- ── PROFILE ──────────────────────────────────────────────────── -->
+    <div class="page" id="page-profile">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>My Profile</h2>
+          <p>This information powers the AI across all tools.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="saveUserProfile()">Save Profile</button>
+        </div>
+      </div>
+      <div class="page-content" style="max-width:820px;">
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h3 class="card-title">Basic Info</h3></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input class="form-input" id="prof-name" type="text" placeholder="Jay Wadhwa">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input class="form-input" id="prof-email" type="email" placeholder="you@example.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input class="form-input" id="prof-phone" type="text" placeholder="847-000-0000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location</label>
+                <input class="form-input" id="prof-location" type="text" placeholder="Greater Chicago Area">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Current Company</label>
+                <input class="form-input" id="prof-company" type="text" placeholder="Rogue Marketing LLC">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Current Title</label>
+                <input class="form-input" id="prof-title" type="text" placeholder="Fractional CMO / Founder">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Years of Experience</label>
+                <input class="form-input" id="prof-years" type="number" placeholder="25">
+              </div>
+              <div class="form-group">
+                <label class="form-label">LinkedIn URL</label>
+                <input class="form-input" id="prof-linkedin" type="url" placeholder="https://linkedin.com/in/yourname">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Portfolio / Website</label>
+                <input class="form-input" id="prof-portfolio" type="url" placeholder="https://yoursite.com">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h3 class="card-title">Job Search Targets</h3></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="form-group">
+                <label class="form-label">Target Titles</label>
+                <input class="form-input" id="prof-target-titles" type="text" placeholder="VP Marketing, CMO, Director of Marketing">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Target Industries</label>
+                <input class="form-input" id="prof-target-industries" type="text" placeholder="Sports Media, SaaS, Entertainment">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h3 class="card-title">Key Credentials</h3>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">One per line. These get injected into every AI prompt.</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-textarea" id="prof-credentials" rows="8" placeholder="4x revenue growth (ESPN Classic, year one)&#10;6 Emmy Awards&#10;588% social media audience growth (NBC Sports)&#10;$5M VC funding secured"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h3 class="card-title">Writing Style Notes</h3>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">These rules are appended to every AI system prompt.</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-textarea" id="prof-writing" rows="5" placeholder="Peer-to-peer, confident, direct. 15 words or fewer per sentence. Active voice. No em dashes. Contractions required. Sign off: Cheers."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h3 class="card-title">Base Resume Text</h3>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Plain text version of your master resume. Used by AI tools when no uploaded resume is available.</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-textarea" id="prof-resume" rows="12" placeholder="Paste your full resume text here..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:right;padding-bottom:40px;">
+          <button class="btn btn-primary" onclick="saveUserProfile()">Save Profile</button>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -2854,6 +2970,7 @@ let sortField = 'date_applied';
 let sortDir = 'desc';
 let lastAIOutput = '';
 let lastAIOutputType = '';
+let userProfile = null;
 
 // ── STATUS CONFIG ──────────────────────────────────────────────────────
 const STATUSES = [
@@ -3023,6 +3140,7 @@ function navigateTo(page) {
   if (page === 'coverlettergenerator') loadCLGPage();
   if (page === 'outreachbuilder') loadOBPage();
   if (page === 'uploads') loadDocsPage();
+  if (page === 'profile') loadUserProfile();
 }
 
 // Use event delegation on the sidebar so all nav items work regardless of when they were added
@@ -8843,6 +8961,64 @@ async function runJobSearch() {
   } catch(e) {
     contentEl.textContent = 'Error: ' + e.message;
     toast('Search failed: ' + e.message, 'error');
+  }
+}
+
+// ── USER PROFILE ───────────────────────────────────────────────────────
+async function loadUserProfile() {
+  try {
+    const data = await dbGet('user_profiles', 'select=*&limit=1');
+    const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+    if (row) {
+      userProfile = row;
+      document.getElementById('prof-name').value = row.full_name || '';
+      document.getElementById('prof-email').value = row.email || '';
+      document.getElementById('prof-phone').value = row.phone || '';
+      document.getElementById('prof-location').value = row.location || '';
+      document.getElementById('prof-company').value = row.current_company || '';
+      document.getElementById('prof-title').value = row.current_title || '';
+      document.getElementById('prof-years').value = row.years_experience || '';
+      document.getElementById('prof-linkedin').value = row.linkedin_url || '';
+      document.getElementById('prof-portfolio').value = row.portfolio_url || '';
+      document.getElementById('prof-target-titles').value = row.target_titles || '';
+      document.getElementById('prof-target-industries').value = row.target_industries || '';
+      document.getElementById('prof-credentials').value = row.key_credentials || '';
+      document.getElementById('prof-writing').value = row.writing_style_notes || '';
+      document.getElementById('prof-resume').value = row.base_resume_text || '';
+    }
+  } catch(e) {
+    toast('Could not load profile: ' + e.message, 'error');
+  }
+}
+
+async function saveUserProfile() {
+  const payload = {
+    full_name: document.getElementById('prof-name').value.trim(),
+    email: document.getElementById('prof-email').value.trim(),
+    phone: document.getElementById('prof-phone').value.trim(),
+    location: document.getElementById('prof-location').value.trim(),
+    current_company: document.getElementById('prof-company').value.trim(),
+    current_title: document.getElementById('prof-title').value.trim(),
+    years_experience: parseInt(document.getElementById('prof-years').value) || null,
+    linkedin_url: document.getElementById('prof-linkedin').value.trim(),
+    portfolio_url: document.getElementById('prof-portfolio').value.trim(),
+    target_titles: document.getElementById('prof-target-titles').value.trim(),
+    target_industries: document.getElementById('prof-target-industries').value.trim(),
+    key_credentials: document.getElementById('prof-credentials').value.trim(),
+    writing_style_notes: document.getElementById('prof-writing').value.trim(),
+    base_resume_text: document.getElementById('prof-resume').value.trim(),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (userProfile && userProfile.id) {
+      await dbPatch('user_profiles', 'id=eq.' + userProfile.id, payload);
+    } else {
+      await dbPost('user_profiles', payload);
+    }
+    userProfile = Object.assign(userProfile || {}, payload);
+    toast('Profile saved.', 'success');
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
   }
 }
 
