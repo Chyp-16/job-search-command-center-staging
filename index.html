@@ -163,11 +163,11 @@ a { color: var(--burgundy); text-decoration: none; }
 }
 .nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
 .sidebar-footer {
-  padding: 16px 20px;
+  padding: 16px 12px;
   border-top: 1px solid rgba(255,255,255,0.08);
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 .theme-toggle {
   background: rgba(255,255,255,0.08);
@@ -897,9 +897,9 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="theme-toggle" onclick="toggleTheme()">
         <span id="theme-icon">🌙</span><span>Dark mode</span>
       </button>
-      <div class="nav-item" data-page="profile" style="margin:4px 8px;border-radius:6px;">
-        <span class="nav-icon">👤</span><span>Profile</span>
-      </div>
+      <button class="theme-toggle" onclick="navigateTo('profile')" title="My Profile">
+        <span>👤</span><span>My Profile</span>
+      </button>
       <button class="theme-toggle" onclick="signOut()" style="margin-top:4px;opacity:0.7" title="Sign out">
         <span>&#x23FB;</span><span>Sign out</span>
       </button>
