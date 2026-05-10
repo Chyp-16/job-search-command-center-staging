@@ -19,6 +19,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ── DESIGN TOKENS ─────────────────────────────────────────────────── */
 :root {
@@ -793,6 +794,40 @@ a { color: var(--burgundy); text-decoration: none; }
 </head>
 <body>
 
+<!-- ── AUTH SCREEN ───────────────────────────────────────────────── -->
+<div id="auth-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg)">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column">
+    <div style="background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:48px 40px;max-width:420px;width:90%;text-align:center">
+      <div style="width:60px;height:60px;background:var(--burgundy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px">&#127919;</div>
+      <h2 style="font-family:var(--font-display);font-size:1.6rem;color:var(--burgundy);margin:0 0 6px">Command Center</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 32px">Sign in to access your job search dashboard.</p>
+      <div id="auth-magic-form">
+        <input id="auth-email" type="email" placeholder="your@email.com"
+          style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:0.95rem;font-family:var(--font-body);margin-bottom:12px;background:var(--bg);color:var(--text)">
+        <button onclick="sendMagicLink()"
+          style="width:100%;padding:12px;background:var(--burgundy);color:#fff;border:none;border-radius:var(--radius);font-size:0.95rem;font-weight:600;cursor:pointer;margin-bottom:16px">
+          Send Magic Link
+        </button>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">or</div>
+        <button onclick="signInWithGoogle()"
+          style="width:100%;padding:11px;background:#fff;color:#333;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:0.95rem;font-weight:500;cursor:pointer">
+          Sign in with Google
+        </button>
+      </div>
+      <div id="auth-magic-sent" style="display:none">
+        <div style="font-size:2.5rem;margin-bottom:16px">&#128236;</div>
+        <p style="color:var(--text);font-size:1rem;font-weight:600;margin:0 0 8px">Check your email</p>
+        <p style="color:var(--text-secondary);font-size:0.88rem;margin:0 0 20px">We sent a sign-in link. Click it and you are in.</p>
+        <button onclick="document.getElementById('auth-magic-sent').style.display='none';document.getElementById('auth-magic-form').style.display='block'"
+          style="background:none;border:none;color:var(--burgundy);cursor:pointer;font-size:0.88rem;text-decoration:underline">
+          Use a different email
+        </button>
+      </div>
+      <p id="auth-error" style="color:#c0444d;font-size:0.85rem;margin-top:12px;display:none"></p>
+    </div>
+  </div>
+</div>
+
 <!-- ── APP SHELL ─────────────────────────────────────────────────── -->
 <div class="app-shell">
 
@@ -861,6 +896,9 @@ a { color: var(--burgundy); text-decoration: none; }
     <div class="sidebar-footer">
       <button class="theme-toggle" onclick="toggleTheme()">
         <span id="theme-icon">🌙</span><span>Dark mode</span>
+      </button>
+      <button class="theme-toggle" onclick="signOut()" style="margin-top:4px;opacity:0.7" title="Sign out">
+        <span>&#x23FB;</span><span>Sign out</span>
       </button>
     </div>
   </nav>
@@ -2727,6 +2765,82 @@ a { color: var(--burgundy); text-decoration: none; }
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────
 const WORKER_URL = 'https://job-search-proxy.jvwadhwa.workers.dev';
+
+// ── SUPABASE AUTH ───────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://qkgnjuluajlfrlprbplt.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ25qdWx1YWpsZnJscHJicGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjA1MzYxMjgwMH0.PLACEHOLDER';
+
+let _supabase = null;
+let currentUser = null;
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  }
+  return _supabase;
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('auth-email').value.trim();
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if (!email) { errEl.textContent = 'Enter your email first.'; errEl.style.display = 'block'; return; }
+  const { error } = await getSupabase().auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: 'https://chyp-16.github.io/job-search-command-center' }
+  });
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  document.getElementById('auth-magic-form').style.display = 'none';
+  document.getElementById('auth-magic-sent').style.display = 'block';
+}
+
+async function signInWithGoogle() {
+  const { error } = await getSupabase().auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: 'https://chyp-16.github.io/job-search-command-center' }
+  });
+  if (error) {
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'block';
+  document.querySelector('.app-shell').style.display = 'none';
+}
+
+function hideAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.querySelector('.app-shell').style.display = 'flex';
+}
+
+async function bootAuth() {
+  const sb = getSupabase();
+  // Handle magic link / OAuth redirect token in URL
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && session.user) {
+    currentUser = session.user;
+    hideAuthScreen();
+  } else {
+    showAuthScreen();
+  }
+  // Listen for future sign-in / sign-out events
+  sb.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      currentUser = session.user;
+      hideAuthScreen();
+    } else {
+      currentUser = null;
+      showAuthScreen();
+    }
+  });
+}
+
+function signOut() {
+  getSupabase().auth.signOut();
+}
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let allApps = [];
@@ -8716,6 +8830,7 @@ async function runJobSearch() {
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────
+bootAuth();
 populateDropdowns();
 refreshDashboard();
 // Auto-seed prompts on first load
