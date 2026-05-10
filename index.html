@@ -5110,7 +5110,7 @@ async function executeGmailCompose() {
   if (!c) return;
   var sel = document.getElementById('email-template-picker');
   var templateId = sel ? sel.value : '';
-  var picker = sel ? sel.closest('div[style]') : null;
+  var sendBtn = document.getElementById('gmail-compose-btn');
   var backdrop = window._gmailBackdrop;
 
   var subject = '', body = '';
@@ -5124,7 +5124,7 @@ async function executeGmailCompose() {
     }
   } else {
     // AI-generate
-    if (picker) picker.querySelector('.btn-primary').textContent = '⏳ Generating...';
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳ Generating...'; }
     try {
       var _oName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
       var _oTitle = (userProfile && userProfile.current_title) ? userProfile.current_title : 'VP-level marketing executive';
@@ -5137,7 +5137,7 @@ async function executeGmailCompose() {
       subject = 'Connecting — ' + _oName;
     } catch(e) {
       toast('Could not generate email: ' + e.message, 'error');
-      if (picker) picker.querySelector('.btn-primary').textContent = 'Open Gmail ↗';
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Open Gmail ↗'; }
       return;
     }
   }
