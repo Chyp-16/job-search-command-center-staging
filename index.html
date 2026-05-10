@@ -5064,7 +5064,11 @@ async function openGmailCompose() {
   sendBtn.id = 'gmail-compose-btn';
   sendBtn.className = 'btn btn-primary';
   sendBtn.textContent = 'Open Gmail ↗';
-  sendBtn.onclick = executeGmailCompose;
+  sendBtn.onclick = function() {
+    window.setTimeout(function() {
+      executeGmailCompose().catch(function(e) { toast('Email error: ' + e.message, 'error'); });
+    }, 100);
+  };
   pickerFooter.appendChild(cancelBtn);
   pickerFooter.appendChild(hsBtn);
   pickerFooter.appendChild(sendBtn);
