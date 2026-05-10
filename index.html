@@ -5120,12 +5120,15 @@ async function executeGmailCompose() {
     // AI-generate
     if (picker) picker.querySelector('.btn-primary').textContent = '⏳ Generating...';
     try {
-      var prompt = 'Write a brief, professional outreach email from Jay Wadhwa to ' + c.name +
+      var _oName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+      var _oTitle = (userProfile && userProfile.current_title) ? userProfile.current_title : 'VP-level marketing executive';
+      var _oCreds = (userProfile && userProfile.key_credentials) ? userProfile.key_credentials.split('\n')[0] : '6 Emmy Awards, grew ESPN Classic revenue to $40M';
+      var prompt = 'Write a brief, professional outreach email from ' + _oName + ' to ' + c.name +
         (c.title ? ', ' + c.title : '') + (c.company ? ' at ' + c.company : '') +
-        '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created "programmable privacy" category). ' +
+        '. ' + _oName + ' is a ' + _oTitle + ' (' + _oCreds + '). ' +
         'Under 100 words. Peer-to-peer tone. One relevant credential. Clear ask for a call. Close with Cheers, Jay. No subject line in body.';
-      body = await callAI([{role:'user', content: prompt}], 'Write concise human outreach emails for Jay Wadhwa. No AI language. Direct and warm.');
-      subject = 'Connecting — Jay Wadhwa';
+      body = await callAI([{role:'user', content: prompt}], 'Write concise human outreach emails for ' + _oName + '. No AI language. Direct and warm.');
+      subject = 'Connecting — ' + _oName;
     } catch(e) {
       toast('Could not generate email: ' + e.message, 'error');
       if (picker) picker.querySelector('.btn-primary').textContent = 'Open Gmail ↗';
@@ -5862,32 +5865,30 @@ async function deleteResource(id) {
 }
 
 // ── AI SYSTEM PROMPT ───────────────────────────────────────────────────
-const JAY_SYSTEM_PROMPT = `You are Jay Wadhwa's personal job search assistant. Jay is a senior marketing executive with 25+ years of experience across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. He runs Rogue Marketing LLC, a boutique fractional CMO firm in the Greater Chicago Area. He targets VP, Director, and CMO-level roles.
+function buildSystemPrompt() {
+  const p = userProfile;
+  const name = (p && p.full_name) ? p.full_name : 'Jay Wadhwa';
+  const title = (p && p.current_title) ? p.current_title : 'Fractional CMO / Founder';
+  const company = (p && p.current_company) ? p.current_company : 'Rogue Marketing LLC';
+  const location = (p && p.location) ? p.location : 'Greater Chicago Area';
+  const years = (p && p.years_experience) ? p.years_experience : 25;
+  const targets = (p && p.target_titles) ? p.target_titles : 'VP Marketing, CMO, Director of Marketing';
+  const industries = (p && p.target_industries) ? p.target_industries : 'Sports Media, Entertainment, SaaS, Web3, FinTech, Nonprofits';
+  const credentials = (p && p.key_credentials) ? p.key_credentials : '4x revenue growth (ESPN Classic, year one)\n- 6 Emmy Awards, 9 Promax/BDA Awards\n- 588% social media audience growth (NBC Sports)\n- $5M VC funding secured\n- 96% revenue growth (Secret Network Foundation, 9 months)\n- 225% revenue growth for a nonprofit client\n- Led internal creative agency of 25 at NBCUniversal';
+  const writing = (p && p.writing_style_notes) ? p.writing_style_notes : "Peer-to-peer, confident, direct. Never deferential. Target 15 words or fewer per sentence. Active voice only. No em dashes. No semicolons. Contractions required. Banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful. Never use I'd love to, I'd welcome, at your convenience. Signs correspondence: Cheers.";
+
+  return `You are ${name}'s personal job search assistant. ${name} is a senior marketing executive with ${years}+ years of experience. ${name} runs ${company} and is based in ${location}. Target roles: ${targets}. Target industries: ${industries}.
 
 Key credentials to reference when relevant:
-- 96% revenue growth (Secret Network Foundation, 9 months)
-- 137% social/audience growth (PHI Labs Global, 6 months)
-- 588% social media audience growth (NBC Sports)
-- 4x revenue growth (ESPN Classic rebrand, year one)
-- $200K incremental sponsorship revenue (NBC Sports)
-- $5M VC funding secured for a blockchain startup
-- 225% revenue growth for a nonprofit client
-- Led internal creative agency of 25 at NBCUniversal
-- 6 Emmy Awards, 9 Promax/BDA Awards
+- ${credentials.split('\n').join('\n- ').replace(/^- - /, '- ')}
 
 Writing rules — apply to ALL output:
-- Peer-to-peer, confident, direct. Never deferential.
-- Target 15 words or fewer per sentence. Mix lengths naturally.
-- Active voice only. Lead with numbers and results.
-- No em dashes (—) anywhere. Use commas or periods instead.
-- No semicolons. Contractions required (I'm, don't, we've, that's).
-- Banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, exploring, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful.
-- Never use "I'd love to", "I'd welcome", "at your convenience".
-- Jay signs all correspondence: Cheers.
+${writing}
 
-For InMail: Subject format is [Role Title] | Jay Wadhwa. One paragraph. Open with a hook or result. Never "I saw your posting." Close with a direct ask.
+For InMail: Subject format is [Role Title] | ${name}. One paragraph. Open with a hook or result. Never "I saw your posting." Close with a direct ask.
 For emails: First name only. Open naturally. Under 150 words. One metric. Clear ask. Close with Cheers.
 For cover letters: Lead with strongest result. Match keywords naturally. Show company research. Clear next step.`;
+}
 
 // ── BASE DOCUMENTS ─────────────────────────────────────────────────────
 let baseResumeText = '';
@@ -5984,12 +5985,14 @@ async function saveBaseDocs() {
 }
 
 function getSystemPromptWithResume() {
-  let prompt = JAY_SYSTEM_PROMPT;
-  if (baseResumeText) {
-    prompt += `\n\n--- JAY'S MASTER RESUME ---\n` + baseResumeText;
+  const name = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  let prompt = buildSystemPrompt();
+  const resumeText = (userProfile && userProfile.base_resume_text) ? userProfile.base_resume_text : baseResumeText;
+  if (resumeText) {
+    prompt += '\n\n--- ' + name.toUpperCase() + '\'S MASTER RESUME ---\n' + resumeText;
   }
   if (baseCoverLetterText) {
-    prompt += `\n\n--- JAY'S COVER LETTER TEMPLATE ---\n` + baseCoverLetterText;
+    prompt += '\n\n--- ' + name.toUpperCase() + '\'S COVER LETTER TEMPLATE ---\n' + baseCoverLetterText;
   }
   return prompt;
 }
@@ -6238,7 +6241,8 @@ async function networkingIntel(mode) {
       loggedContacts.map(c => `- ${c.name}${c.title ? ', ' + c.title : ''}${c.contact_type ? ' (' + c.contact_type + ')' : ''}`).join('\n')
     : `\n\nJay has no existing contacts logged at ${company}.`;
 
-  const prompt = `Jay Wadhwa is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.` +
+  const _rName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  const prompt = `${_rName} is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.` +
     contactSection +
     `\n\nBuild a complete networking strategy for Jay including:\n` +
     `1. Who to connect with at ${company} — specific titles, departments, and why each matters\n` +
@@ -6412,7 +6416,8 @@ async function sendFollowUpReminders() {
 
   // Build email body via Claude
   const itemList = due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('\n');
-  const emailPrompt = 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.\n\nItems:\n' + itemList;
+  const _dName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  const emailPrompt = 'Write a concise daily follow-up digest email for ' + _dName + ' listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, ' + _dName.split(' ')[0] + '.\n\nItems:\n' + itemList;
   const emailBody = await callAI([{ role: 'user', content: emailPrompt }], getSystemPromptWithResume());
 
   // Save as AI output for reference
@@ -6542,7 +6547,8 @@ async function generateDashboardInsights() {
   allApps.forEach(a => { if (a.industry) industries[a.industry] = (industries[a.industry] || 0) + 1; });
   const topIndustries = Object.entries(industries).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([i,c])=>i+': '+c).join(', ');
 
-  const prompt = `Analyze Jay Wadhwa job search data and provide 4-6 specific, actionable insights and recommendations. Be direct and data-driven. No fluff.
+  const _dashName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  const prompt = `Analyze ${_dashName} job search data and provide 4-6 specific, actionable insights and recommendations. Be direct and data-driven. No fluff.
 
 DATA:
 - Total applications: ${total}
@@ -6556,7 +6562,7 @@ DATA:
 - Top sources: ${topSources || 'N/A'}
 - Top industries: ${topIndustries || 'N/A'}
 
-Jay is a senior marketing executive (VP/CMO level) targeting roles in SaaS, Web3, media, and nonprofits in Chicago and remote. Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
+${_dashName} is a senior marketing executive targeting ${(userProfile && userProfile.target_titles) ? userProfile.target_titles : 'VP/CMO'} roles in ${(userProfile && userProfile.target_industries) ? userProfile.target_industries : 'SaaS, Web3, media, nonprofits'} in ${(userProfile && userProfile.location) ? userProfile.location : 'Chicago'} and remote. Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
@@ -6808,7 +6814,11 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
   };
   var p1Sections = call1Docs.map(function(n){ return p1DocSections[n]; }).join('\n\n');
 
-  const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\nJay Wadhwa background: 25 years marketing leadership. ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency). Secret Network Foundation (60% revenue growth, created programmable privacy category). Rogue Marketing LLC (fractional CMO). Multi-industry: media, SaaS, Web3, FinTech, nonprofits.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
+  var _ip1Name = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  var _ip1Years = (userProfile && userProfile.years_experience) ? userProfile.years_experience : 25;
+  var _ip1Creds = (userProfile && userProfile.key_credentials) ? userProfile.key_credentials.replace(/\n/g, '. ') : 'ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth). Secret Network Foundation (60% revenue growth). Rogue Marketing LLC (fractional CMO).';
+  var _ip1Industries = (userProfile && userProfile.target_industries) ? userProfile.target_industries : 'media, SaaS, Web3, FinTech, nonprofits';
+  const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\n' + _ip1Name + ' background: ' + _ip1Years + ' years marketing leadership. Key wins: ' + _ip1Creds + ' Multi-industry: ' + _ip1Industries + '.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
   let result1 = '';
   if (needCall1) {
     try {
@@ -6836,7 +6846,10 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
   };
   var p2Sections = call2Docs.map(function(n){ return p2DocSections[n]; }).join('\n\n');
 
-  const prompt2 = 'You are a senior strategy consultant preparing Jay Wadhwa for a high-stakes marketing executive interview. Generate specific, opinionated documents written entirely in Jay voice. Generic answers get people cut.\n\n' + context + '\n\nJay Wadhwa career: ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency, 588% social growth). Secret Network Foundation (60% revenue growth, created programmable privacy category). PHI Labs ($5M VC secured). Rogue Marketing LLC (fractional CMO). 25 years, multi-industry.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
+  var _ip2Name = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  var _ip2Years = (userProfile && userProfile.years_experience) ? userProfile.years_experience : 25;
+  var _ip2Creds = (userProfile && userProfile.key_credentials) ? userProfile.key_credentials.replace(/\n/g, '. ') : 'ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 588% social growth). Secret Network Foundation (60% revenue growth). PHI Labs ($5M VC secured). Rogue Marketing LLC (fractional CMO).';
+  const prompt2 = 'You are a senior strategy consultant preparing ' + _ip2Name + ' for a high-stakes marketing executive interview. Generate specific, opinionated documents written entirely in ' + _ip2Name + ' voice. Generic answers get people cut.\n\n' + context + '\n\n' + _ip2Name + ' career: ' + _ip2Creds + ' ' + _ip2Years + ' years, multi-industry.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
 
   let result2 = '';
   if (needCall2) {
@@ -7116,7 +7129,8 @@ async function runResumeTailor() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+    const _rtName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+    prompt = 'Use ' + _rtName + ' master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
   }
   prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
                  .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
@@ -7269,7 +7283,8 @@ async function runOutreachBuilder() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Write a complete 4-part outreach sequence for Jay Wadhwa who applied to the {{role}} role at {{company}}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include subject line, word count, and formatted copy. Select the 3-4 most relevant wins from Jay background for this company and role.';
+    const _obName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+    prompt = 'Write a complete 4-part outreach sequence for ' + _obName + ' who applied to the {{role}} role at {{company}}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include subject line, word count, and formatted copy. Select the 3-4 most relevant wins from ' + _obName + ' background for this company and role.';
   }
   prompt = prompt
     .replace(/\{\{company\}\}/g, company)
@@ -8938,7 +8953,13 @@ async function runJobSearch() {
     '\n\nOnly real postings from last 60 days. No fabricated URLs.';
 
   // Use a lean system prompt for job search — full resume causes token rate limit errors
-  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+  const _pName = (userProfile && userProfile.full_name) ? userProfile.full_name : 'Jay Wadhwa';
+  const _pYears = (userProfile && userProfile.years_experience) ? userProfile.years_experience : 25;
+  const _pTargets = (userProfile && userProfile.target_titles) ? userProfile.target_titles : 'VP Marketing, CMO, Director of Marketing';
+  const _pIndustries = (userProfile && userProfile.target_industries) ? userProfile.target_industries : 'Sports Media, SaaS, Entertainment, Web3, FinTech, Nonprofits';
+  const _pLocation = (userProfile && userProfile.location) ? userProfile.location : 'Greater Chicago Area';
+  const _pCreds = (userProfile && userProfile.key_credentials) ? userProfile.key_credentials.split('\n').slice(0,4).join(', ') : '4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys';
+  const jsSystemPrompt = 'You are a job search assistant for ' + _pName + ', a senior marketing executive (' + _pTargets + ' level) with ' + _pYears + '+ years across ' + _pIndustries + '. Key wins: ' + _pCreds + '. Targeting ' + _pTargets + ' roles in the ' + _pLocation + ' area and remote. Search the web for real current job postings and return structured results.';
 
   try {
     // Send use_web_search flag so Worker enables the web search tool
@@ -9028,6 +9049,8 @@ async function saveUserProfile() {
 bootAuth();
 populateDropdowns();
 refreshDashboard();
+// Load user profile silently on init — feeds all AI prompts
+loadUserProfile().catch(function(){});
 // Auto-seed prompts on first load
 setTimeout(seedPrompts, 1500);
 // Load base documents
