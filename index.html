@@ -895,7 +895,7 @@ a { color: var(--burgundy); text-decoration: none; }
     </div>
     <div class="sidebar-footer">
       <button class="theme-toggle" onclick="toggleTheme()">
-        <span id="theme-icon">🌙</span><span>Dark mode</span>
+        <span id="theme-icon">🌙</span><span id="theme-label">Dark Mode</span>
       </button>
       <button class="theme-toggle" onclick="navigateTo('profile')" title="My Profile">
         <span>👤</span><span>My Profile</span>
@@ -3156,11 +3156,13 @@ function toggleTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   document.documentElement.dataset.theme = dark ? '' : 'dark';
   document.getElementById('theme-icon').textContent = dark ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = dark ? 'Dark Mode' : 'Light Mode';
   localStorage.setItem('theme', dark ? 'light' : 'dark');
 }
 if (localStorage.getItem('theme') === 'dark') {
   document.documentElement.dataset.theme = 'dark';
   document.getElementById('theme-icon').textContent = '☀️';
+  document.getElementById('theme-label').textContent = 'Light Mode';
 }
 
 // ── TOAST ──────────────────────────────────────────────────────────────
