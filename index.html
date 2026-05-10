@@ -1570,17 +1570,8 @@ a { color: var(--burgundy); text-decoration: none; }
               <button class="btn btn-primary btn-sm" onclick="saveIPOutput()">Save to App</button>
             </div>
           </div>
-          <div id="ip-progress-wrap" style="display:none;padding:20px 20px 0">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span id="ip-progress-label" style="font-size:12px;font-weight:600;color:var(--burgundy)">Starting...</span>
-              <span id="ip-progress-pct" style="font-size:12px;color:var(--text-secondary)">0%</span>
-            </div>
-            <div class="progress-bar-wrap">
-              <div class="progress-bar" id="ip-progress-bar" style="width:0%;transition:width 0.4s ease"></div>
-            </div>
-          </div>
           <div style="padding:20px;">
-            <div id="ip-output-content" style="font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto;"></div>
+            <div id="ip-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto;"></div>
           </div>
         </div>
       </div>
@@ -1777,15 +1768,6 @@ a { color: var(--burgundy); text-decoration: none; }
             <div style="display:flex;gap:8px">
               <button class="btn btn-secondary btn-sm" onclick="copyOBOutput()">Copy All</button>
               <button class="btn btn-secondary btn-sm" onclick="exportOBDocx()">⬇ Export .docx</button>
-            </div>
-          </div>
-          <div id="ob-progress-wrap" style="display:none;padding:20px 20px 0">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <span id="ob-progress-label" style="font-size:12px;font-weight:600;color:var(--burgundy)">Analyzing role...</span>
-              <span id="ob-progress-pct" style="font-size:12px;color:var(--text-secondary)">0%</span>
-            </div>
-            <div class="progress-bar-wrap">
-              <div class="progress-bar" id="ob-progress-bar" style="width:0%;transition:width 0.4s ease"></div>
             </div>
           </div>
           <div style="padding:20px"><div id="ob-output-content" style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--text);max-height:600px;overflow-y:auto"></div></div>
@@ -2845,7 +2827,7 @@ async function dbDelete(table, id) {
 
 async function callAILong(messages, systemPrompt, useWebSearch) {
   // High token limit for long document generation
-  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 16000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
@@ -2875,8 +2857,7 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   }
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
-  // Keep max_tokens low to stay under rate limits
-  body.max_tokens = 1024;
+  body.max_tokens = 8000;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
@@ -6369,28 +6350,6 @@ function getAvgTimeToResponse() {
 }
 
 // ── INTERVIEW PREP PAGE ─────────────────────────────────────────────────
-function renderIPMarkdown(text) {
-  if (!text) return '';
-  var html = text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Tables: pass through as-is after entity encoding — handled below
-    // ## headings
-    .replace(/^## (.+)$/gm, '<h3 style="font-size:14px;font-weight:700;color:var(--burgundy);margin:18px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px">$1</h3>')
-    // ### subheadings
-    .replace(/^### (.+)$/gm, '<h4 style="font-size:13px;font-weight:700;color:var(--text);margin:12px 0 4px">$1</h4>')
-    // **bold**
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    // *italic*
-    .replace(/(?<!\*)\*(?!\*)([^*\n]+)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-    // bullet lines starting with - or *
-    .replace(/^[-*] (.+)$/gm, '<li style="margin-left:16px;margin-bottom:2px">$1</li>')
-    // wrap consecutive <li> in <ul>
-    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, function(m){ return '<ul style="margin:6px 0 10px;padding:0">' + m + '</ul>'; })
-    // line breaks
-    .replace(/\n/g, '<br>');
-  return html;
-}
-
 let ipOutput = '';
 let ipSections = {};
 let ipAbortController = null;
@@ -6405,8 +6364,6 @@ function stopInterviewPrep() {
     if (genBtn) genBtn.disabled = false;
     var contentEl = document.getElementById('ip-output-content');
     if (contentEl && !ipOutput) contentEl.textContent = 'Generation cancelled.';
-    var ipWrap = document.getElementById('ip-progress-wrap');
-    if (ipWrap) ipWrap.style.display = 'none';
     toast('Generation stopped.', '');
   }
 } // stores each of the 8 sections separately
@@ -6551,27 +6508,9 @@ async function runInterviewPrep() {
   var call2Names = call2Docs.map(function(d){ return docNames[d]; }).join(', ');
   var totalSteps = (needCall1 ? 1 : 0) + (needCall2 ? 1 : 0);
   var currentStep = 1;
-  contentEl.innerHTML = '';
-
-  // Start progress bar
-  var ipProgressWrap = document.getElementById('ip-progress-wrap');
-  var ipProgressBar = document.getElementById('ip-progress-bar');
-  var ipProgressLabel = document.getElementById('ip-progress-label');
-  var ipProgressPct = document.getElementById('ip-progress-pct');
-  ipProgressWrap.style.display = 'block';
-  ipProgressBar.style.width = '0%';
-  ipProgressLabel.textContent = needCall1 ? ('Generating: ' + call1Names + '...') : ('Generating: ' + call2Names + '...');
-  ipProgressPct.textContent = '0%';
-  var ipStepTarget = needCall1 && needCall2 ? 50 : 88;
-  var ipStepIdx = 0;
-  var ipStepPcts = needCall1 && needCall2 ? [15,30,45,50] : [20,45,70,88];
-  var ipTimer = window.setInterval(function() {
-    if (ipStepIdx < ipStepPcts.length) {
-      var p = ipStepPcts[ipStepIdx++];
-      ipProgressBar.style.width = p + '%';
-      ipProgressPct.textContent = p + '%';
-    }
-  }, 8000);
+  contentEl.textContent = needCall1
+    ? 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating: ' + call1Names + '...'
+    : 'Generating: ' + call2Names + '...';
 
   // Build prompt 1 dynamically based on selected docs 1-4
   var p1DocSections = {
@@ -6623,24 +6562,16 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
     try {
       result1 = await callAILong([{ role: 'user', content: prompt1 }], sysPrompt, false);
     } catch(e) {
-      window.clearInterval(ipTimer);
-      ipProgressWrap.style.display = 'none';
       contentEl.textContent = 'Error on Step 1: ' + e.message;
       toast('Generation failed: ' + e.message, 'error');
       return;
     }
     if (needCall2) {
       currentStep++;
-      ipProgressBar.style.width = '50%';
-      ipProgressPct.textContent = '50%';
-      ipProgressLabel.textContent = 'Generating: ' + call2Names + '...';
-      ipStepIdx = 0;
-      ipStepPcts = [60, 70, 80, 88];
+      contentEl.textContent = 'Step ' + currentStep + ' of ' + totalSteps + ' — Generating: ' + call2Names + '...';
     }
   } else {
-    ipProgressLabel.textContent = 'Generating: ' + call2Names + '...';
-    ipProgressBar.style.width = '0%';
-    ipProgressPct.textContent = '0%';
+    contentEl.textContent = 'Generating docs 5-8...';
   }
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
@@ -6660,8 +6591,6 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
     try {
       result2 = await callAILong([{ role: 'user', content: prompt2 }], sysPrompt);
     } catch(e) {
-      window.clearInterval(ipTimer);
-      ipProgressWrap.style.display = 'none';
       contentEl.textContent = result1 + '\n\n[Error on Step 2: ' + e.message + ']';
       toast('Step 2 failed: ' + e.message, 'error');
       return;
@@ -6670,12 +6599,7 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
 
   // Combine both results
   ipOutput = result1 + '\n\n' + result2;
-  window.clearInterval(ipTimer);
-  ipProgressBar.style.width = '100%';
-  ipProgressLabel.textContent = 'Prep pack complete.';
-  ipProgressPct.textContent = '100%';
-  window.setTimeout(function() { ipProgressWrap.style.display = 'none'; }, 1200);
-  contentEl.innerHTML = renderIPMarkdown(ipOutput);
+  contentEl.textContent = ipOutput;
   ipSections = parseIPSections(ipOutput, company, role);
 
   const sectionCount = Object.keys(ipSections).length;
@@ -7086,32 +7010,8 @@ async function runOutreachBuilder() {
   const panel = document.getElementById('ob-output-panel');
   const contentEl = document.getElementById('ob-output-content');
   panel.style.display = 'block';
-  contentEl.textContent = '';
+  contentEl.textContent = 'Building your outreach sequence...';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  const obSteps = [
-    { pct: 20, label: 'Analyzing role and company...' },
-    { pct: 45, label: 'Drafting Day 1 InMail / Email...' },
-    { pct: 70, label: 'Writing Day 3\u20135 follow-ups...' },
-    { pct: 88, label: 'Composing Day 7 CEO/HM email...' }
-  ];
-  let obStepIdx = 0;
-  const obProgressWrap = document.getElementById('ob-progress-wrap');
-  const obProgressBar = document.getElementById('ob-progress-bar');
-  const obProgressLabel = document.getElementById('ob-progress-label');
-  const obProgressPct = document.getElementById('ob-progress-pct');
-  obProgressWrap.style.display = 'block';
-  obProgressBar.style.width = '0%';
-  obProgressLabel.textContent = obSteps[0].label;
-  obProgressPct.textContent = '0%';
-  const obTimer = window.setInterval(function() {
-    if (obStepIdx < obSteps.length) {
-      var s = obSteps[obStepIdx++];
-      obProgressBar.style.width = s.pct + '%';
-      obProgressLabel.textContent = s.label;
-      obProgressPct.textContent = s.pct + '%';
-    }
-  }, 6000);
 
   const promptsData = await dbGet('prompts', 'select=*&name=eq.Outreach Sequence (4-Part)');
   const rows = Array.isArray(promptsData) ? promptsData : [];
@@ -7129,7 +7029,7 @@ async function runOutreachBuilder() {
     .replace(/\{\{company_context\}\}/g, context);
 
   try {
-    const result = await callAILong([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
     obOutput = result;
     contentEl.textContent = result;
     const linkedId = document.getElementById('ob-link-app').value || null;
@@ -7144,24 +7044,12 @@ async function runOutreachBuilder() {
       }
     }
     toast('Outreach sequence generated.', 'success');
-    window.clearInterval(obTimer);
-    obProgressBar.style.width = '100%';
-    obProgressLabel.textContent = 'Sequence complete.';
-    obProgressPct.textContent = '100%';
-    window.setTimeout(function() { obProgressWrap.style.display = 'none'; }, 1200);
-  } catch(e) {
-    window.clearInterval(obTimer);
-    obProgressWrap.style.display = 'none';
-    contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
 }
 
 function clearOB() {
   ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
-  const obWrap = document.getElementById('ob-progress-wrap');
-  if (obWrap) obWrap.style.display = 'none';
-  const obBar = document.getElementById('ob-progress-bar');
-  if (obBar) obBar.style.width = '0%';
 }
 function copyOBOutput() { if(obOutput) navigator.clipboard.writeText(obOutput).then(function(){ toast('Copied.','success'); }); }
 function exportOBDocx() { exportGenericDocx(obOutput, 'Outreach_Sequence_' + (document.getElementById('ob-company').value||'').trim().replace(/\s+/g,'_')); }
