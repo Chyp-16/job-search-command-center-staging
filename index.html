@@ -2827,7 +2827,7 @@ async function dbDelete(table, id) {
 
 async function callAILong(messages, systemPrompt, useWebSearch) {
   // High token limit for long document generation
-  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 16000, messages };
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
@@ -2857,7 +2857,8 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   }
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
-  body.max_tokens = 8000;
+  // Keep max_tokens low to stay under rate limits
+  body.max_tokens = 1024;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
@@ -8172,25 +8173,34 @@ function pushTaskUpdateToHubSpot() {
   });
 }
 
-async function completeTask(taskId, btnEl) {
+function completeTask(taskId, btnEl) {
   if (!confirm('Mark this task as completed in HubSpot?')) return;
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
-  try {
-    const r = await fetch(WORKER_URL + '/hubspot/task/' + taskId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body: JSON.stringify({ properties: { hs_task_status: 'COMPLETED' } })
-    });
-    if (!r.ok) throw new Error('Status ' + r.status);
-    // Remove from local array and re-render
+  window._pendingCompleteTaskId = taskId;
+  window._pendingCompleteBtn = btnEl;
+  window.setTimeout(pushTaskComplete, 100);
+}
+
+function pushTaskComplete() {
+  var taskId = window._pendingCompleteTaskId;
+  var btnEl = window._pendingCompleteBtn;
+  window._pendingCompleteTaskId = null;
+  window._pendingCompleteBtn = null;
+  if (!taskId) return;
+  fetch(WORKER_URL + '/hubspot/task/' + taskId, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ properties: { hs_task_status: 'COMPLETED' } })
+  }).then(function(r) {
+    if (!r.ok) throw new Error('status ' + r.status);
     hubspotTasks = hubspotTasks.filter(function(t) { return t.id !== taskId; });
     renderTasksList();
     renderTaskReminders();
     toast('Task completed and synced to HubSpot.', 'success');
-  } catch(e) {
+  }).catch(function(e) {
     toast('Could not complete task: ' + e.message, 'error');
     if (btnEl) { btnEl.disabled = false; btnEl.textContent = '✓ Done'; }
-  }
+  });
 }
 
 function renderTasksList() {
