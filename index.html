@@ -2906,35 +2906,52 @@ const INDUSTRIES = [
 ];
 
 // ── API HELPERS ────────────────────────────────────────────────────────
+async function getJWT() {
+  try {
+    const { data: { session } } = await getSupabase().auth.getSession();
+    return session ? session.access_token : null;
+  } catch(e) { return null; }
+}
+
 async function dbGet(table, params = '') {
-  const r = await fetch(`${WORKER_URL}/db/${table}${params ? '?' + params : ''}`, {
-    headers: { 'Origin': location.origin }
-  });
+  const jwt = await getJWT();
+  const headers = { 'Origin': location.origin };
+  if (jwt) headers['X-User-Token'] = jwt;
+  const r = await fetch(`${WORKER_URL}/db/${table}${params ? '?' + params : ''}`, { headers });
   return r.json();
 }
 
 async function dbPost(table, body) {
+  const jwt = await getJWT();
+  const headers = { 'Content-Type': 'application/json', 'Origin': location.origin };
+  if (jwt) headers['X-User-Token'] = jwt;
   const r = await fetch(`${WORKER_URL}/db/${table}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers,
     body: JSON.stringify(body)
   });
   return r.json();
 }
 
 async function dbPatch(table, id, body) {
+  const jwt = await getJWT();
+  const headers = { 'Content-Type': 'application/json', 'Origin': location.origin };
+  if (jwt) headers['X-User-Token'] = jwt;
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+    headers,
     body: JSON.stringify(body)
   });
   return r.json();
 }
 
 async function dbDelete(table, id) {
+  const jwt = await getJWT();
+  const headers = { 'Origin': location.origin };
+  if (jwt) headers['X-User-Token'] = jwt;
   const r = await fetch(`${WORKER_URL}/db/${table}?id=eq.${id}`, {
     method: 'DELETE',
-    headers: { 'Origin': location.origin }
+    headers
   });
   return r.ok;
 }
