@@ -2880,7 +2880,7 @@ a { color: var(--burgundy); text-decoration: none; }
 
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────
-const WORKER_URL = 'https://job-search-proxy.jvwadhwa.workers.dev';
+const WORKER_URL = 'https://solitary-haze-5e6cjob-search-proxy-staging.jvwadhwa.workers.dev';
 
 // ── SUPABASE AUTH ───────────────────────────────────────────────────────
 const SUPABASE_URL  = 'https://qkgnjuluajlfrlprbplt.supabase.co';
@@ -3077,7 +3077,7 @@ async function dbDelete(table, id) {
 
 async function callAILong(messages, systemPrompt, useWebSearch) {
   // High token limit for long document generation
-  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages };
+  const body = { model: 'claude-sonnet-4-20250514', max_tokens: 16000, messages };
   if (systemPrompt) body.system = systemPrompt;
   if (useWebSearch) body.use_web_search = true;
   var fetchOpts = {
@@ -3107,8 +3107,7 @@ async function callAI(messages, systemPrompt = '', useWebSearch = false) {
   }
   const body = { messages };
   if (systemPrompt) body.system = systemPrompt;
-  // Keep max_tokens low to stay under rate limits
-  body.max_tokens = 1024;
+  body.max_tokens = 8000;
   const r = await fetch(`${WORKER_URL}/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
