@@ -7829,7 +7829,13 @@ function textToHtmlWithTables(text) {
     });
     return html + '</table>';
   });
-  return textToHtmlLines(text);
+  // Convert remaining text — bold, headers, line breaks
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/^## (.+)$/gm, '<h3 style="color:var(--burgundy);margin:12px 0 4px;font-size:14px">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2 style="color:var(--burgundy);margin:14px 0 4px;font-size:16px">$1</h2>')
+    .replace(/\n/g, '<br>');
 }
 
 // exportFromTemplate — cover letter template injection
