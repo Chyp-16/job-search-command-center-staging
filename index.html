@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <script>
-  if (window.location.pathname !== '/job-search-command-center/' &&
-      window.location.hash.indexOf('access_token') !== -1) {
+  if (window.location.hash.indexOf('access_token') !== -1 &&
+      window.location.pathname.slice(-1) !== '/') {
     window.location.replace(
-      'https://chyp-16.github.io/job-search-command-center/' + window.location.hash
+      window.location.origin + window.location.pathname + '/' + window.location.hash
     );
   }
 </script>
