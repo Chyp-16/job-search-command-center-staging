@@ -1241,7 +1241,7 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary btn-sm" onclick="sendFollowUpReminders()">📧 Email Reminders</button>
-          <button class="btn btn-secondary btn-sm" onclick="runSupabaseBackup()" title="Download backup of all data">💾 Backup</button>
+          <button class="btn btn-secondary btn-sm admin-only" onclick="runSupabaseBackup()" title="Download backup of all data" style="display:none">💾 Backup</button>
           <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">↻ Refresh</button>
         </div>
       </div>
@@ -3491,6 +3491,11 @@ function applyProfileToUI() {
   if (provEl) provEl.value = currentProfile.ai_provider || 'claude';
   var keyEl = document.getElementById('prof-ai-api-key');
   if (keyEl && currentProfile.ai_api_key) keyEl.value = currentProfile.ai_api_key;
+  // Show admin-only UI elements for the admin user only
+  var isAdmin = (currentProfile.email === 'jvwadhwa@gmail.com');
+  document.querySelectorAll('.admin-only').forEach(function(el) {
+    el.style.display = isAdmin ? '' : 'none';
+  });
 }
 
 
@@ -5532,6 +5537,9 @@ var BACKUP_KEY = 'jsc_last_backup';
 var BACKUP_INTERVAL_DAYS = 7;
 
 function checkBackupReminder() {
+  // Admin-only feature
+  var userEmail = (currentProfile && currentProfile.email) || '';
+  if (userEmail !== 'jvwadhwa@gmail.com') return;
   var last = localStorage.getItem(BACKUP_KEY);
   var now = Date.now();
   var due = !last || (now - parseInt(last)) > BACKUP_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
@@ -5566,6 +5574,9 @@ function snoozeBackup() {
 }
 
 async function runSupabaseBackup() {
+  // Admin-only feature
+  var userEmail = (currentProfile && currentProfile.email) || '';
+  if (userEmail !== 'jvwadhwa@gmail.com') { toast('Not authorized.', 'error'); return; }
   var banner = document.getElementById('backup-banner');
   if (banner) {
     var btn = banner.querySelector('.btn-primary');
