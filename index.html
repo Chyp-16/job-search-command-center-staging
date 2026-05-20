@@ -856,6 +856,145 @@ a { color: var(--burgundy); text-decoration: none; }
   text-align: left;
 }
 .logout-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+
+/* ── ONBOARDING WIZARD ───────────────────────────────────────────── */
+#onboarding-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg-main);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#onboarding-overlay.hidden { display: none; }
+.ob-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 40px 40px 32px;
+  width: 100%; max-width: 600px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  display: flex; flex-direction: column; gap: 0;
+}
+.ob-progress-track {
+  height: 5px; background: var(--border);
+  border-radius: 99px; margin-bottom: 32px; overflow: hidden;
+}
+.ob-progress-fill {
+  height: 100%; background: var(--burgundy);
+  border-radius: 99px;
+  transition: width 0.35s ease;
+}
+.ob-step-label {
+  font-size: 0.78rem; color: var(--text-muted);
+  margin-bottom: 6px; font-weight: 500; letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ob-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.45rem; color: var(--text-primary);
+  margin: 0 0 6px;
+}
+.ob-subtitle {
+  font-size: 0.88rem; color: var(--text-secondary);
+  margin: 0 0 24px; line-height: 1.5;
+}
+.ob-field { margin-bottom: 16px; }
+.ob-field label {
+  display: block; font-size: 0.83rem; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 5px;
+}
+.ob-field input, .ob-field textarea {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg-main); color: var(--text-primary);
+  font-size: 0.9rem; box-sizing: border-box; font-family: inherit;
+}
+.ob-field input:focus, .ob-field textarea:focus {
+  outline: 2px solid var(--burgundy); border-color: transparent;
+}
+.ob-field textarea { resize: vertical; min-height: 72px; }
+.ob-provider-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 18px;
+}
+.ob-provider-card {
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 16px 12px; text-align: center; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--bg-main);
+}
+.ob-provider-card:hover { border-color: var(--burgundy); }
+.ob-provider-card.selected {
+  border-color: var(--burgundy);
+  background: rgba(151,43,50,0.08);
+}
+.ob-provider-card .ob-prov-name {
+  font-weight: 700; font-size: 0.9rem;
+  color: var(--text-primary); margin-bottom: 3px;
+}
+.ob-provider-card .ob-prov-model {
+  font-size: 0.73rem; color: var(--text-muted); margin-bottom: 6px;
+}
+.ob-provider-card .ob-prov-link {
+  font-size: 0.75rem; color: var(--burgundy);
+  text-decoration: none;
+}
+.ob-provider-card .ob-prov-link:hover { text-decoration: underline; }
+.ob-api-row {
+  display: none; margin-bottom: 18px;
+}
+.ob-api-row.visible { display: block; }
+.ob-resume-options {
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;
+}
+.ob-resume-opt {
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 13px 16px; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-main); font-size: 0.9rem;
+  color: var(--text-primary); transition: border-color 0.15s;
+}
+.ob-resume-opt:hover { border-color: var(--burgundy); }
+.ob-resume-opt.selected { border-color: var(--burgundy); background: rgba(151,43,50,0.06); }
+.ob-resume-upload-area, .ob-resume-paste-area { display: none; margin-top: 10px; }
+.ob-resume-upload-area.visible, .ob-resume-paste-area.visible { display: block; }
+.ob-upload-zone {
+  border: 2px dashed var(--border); border-radius: 8px;
+  padding: 24px; text-align: center; cursor: pointer;
+  font-size: 0.85rem; color: var(--text-muted);
+  transition: border-color 0.15s;
+}
+.ob-upload-zone:hover { border-color: var(--burgundy); color: var(--text-primary); }
+.ob-upload-zone.has-file { border-color: var(--burgundy); color: var(--text-primary); }
+.ob-hs-opts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.ob-hs-connect-area { display: none; }
+.ob-hs-connect-area.visible { display: block; }
+.ob-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 28px; padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.ob-btn-back {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 7px; padding: 9px 20px;
+  color: var(--text-secondary); font-size: 0.9rem; cursor: pointer;
+}
+.ob-btn-back:hover { border-color: var(--text-primary); color: var(--text-primary); }
+.ob-btn-next {
+  background: var(--burgundy); color: #fff;
+  border: none; border-radius: 7px;
+  padding: 9px 28px; font-size: 0.9rem;
+  font-weight: 600; cursor: pointer;
+}
+.ob-btn-next:hover { opacity: 0.88; }
+.ob-btn-skip {
+  background: transparent; border: none;
+  color: var(--text-muted); font-size: 0.85rem;
+  cursor: pointer; text-decoration: underline; padding: 0;
+}
+.ob-btn-skip:hover { color: var(--text-primary); }
+.ob-complete-icon {
+  font-size: 2.4rem; text-align: center; margin-bottom: 12px;
+}
 </style>
 </head>
 <body>
@@ -868,6 +1007,145 @@ a { color: var(--burgundy); text-decoration: none; }
     <input type="email" id="login-email" placeholder="you@example.com" />
     <button class="login-btn" onclick="sendMagicLink()">Send Magic Link</button>
     <div class="login-msg" id="login-msg"></div>
+  </div>
+</div>
+
+<!-- ── ONBOARDING WIZARD ─────────────────────────────────────────── -->
+<div id="onboarding-overlay" class="hidden">
+  <div class="ob-card">
+    <div class="ob-progress-track">
+      <div class="ob-progress-fill" id="ob-progress-fill" style="width:20%"></div>
+    </div>
+    <div class="ob-step-label" id="ob-step-label">Step 1 of 5</div>
+
+    <!-- STEP 1: Welcome + Profile -->
+    <div id="ob-step-1">
+      <h2 class="ob-title">Let's set up your Job Search Command Center</h2>
+      <p class="ob-subtitle">This takes about 2 minutes. You can update everything later.</p>
+      <div class="ob-field"><label>Full Name</label><input type="text" id="ob-full-name" placeholder="Jay Wadhwa" /></div>
+      <div class="ob-field"><label>Current Title</label><input type="text" id="ob-current-title" placeholder="VP of Marketing" /></div>
+      <div class="ob-field"><label>Target Role</label><input type="text" id="ob-target-role" placeholder="CMO, VP Marketing, Director of Marketing" /></div>
+      <div class="ob-field"><label>Target Location</label><input type="text" id="ob-target-location" placeholder="Chicago, IL" /></div>
+      <div class="ob-footer">
+        <span></span>
+        <button class="ob-btn-next" onclick="obNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Career Wins -->
+    <div id="ob-step-2" style="display:none">
+      <h2 class="ob-title">What are your top 3 career wins?</h2>
+      <p class="ob-subtitle">These power every AI output. Be specific. Include metrics.</p>
+      <div class="ob-field"><label>Career Win 1</label><input type="text" id="ob-win-1" placeholder="Grew revenue 40% in 18 months" /></div>
+      <div class="ob-field"><label>Career Win 2</label><input type="text" id="ob-win-2" placeholder="Built and led a 25-person creative team" /></div>
+      <div class="ob-field"><label>Career Win 3</label><input type="text" id="ob-win-3" placeholder="Launched brand that won 6 Emmy Awards" /></div>
+      <div class="ob-footer">
+        <button class="ob-btn-back" onclick="obBack()">← Back</button>
+        <button class="ob-btn-next" onclick="obNext()">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Base Resume (skippable) -->
+    <div id="ob-step-3" style="display:none">
+      <h2 class="ob-title">Upload your base resume</h2>
+      <p class="ob-subtitle">This becomes the foundation for every tailored version.</p>
+      <div class="ob-resume-options">
+        <div class="ob-resume-opt" id="ob-res-opt-upload" onclick="obSelectResumeOpt('upload')">
+          <span>&#128196;</span> Upload .docx or .pdf
+        </div>
+        <div class="ob-resume-opt" id="ob-res-opt-paste" onclick="obSelectResumeOpt('paste')">
+          <span>&#128203;</span> Paste as plain text
+        </div>
+      </div>
+      <div class="ob-resume-upload-area" id="ob-res-upload-area">
+        <div class="ob-upload-zone" id="ob-upload-zone" onclick="document.getElementById('ob-res-file-input').click()"
+             ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
+             ondragleave="this.style.borderColor=''"
+             ondrop="obHandleResumeDrop(event)">
+          <div id="ob-upload-zone-label">Click to browse or drag your resume here</div>
+        </div>
+        <input type="file" id="ob-res-file-input" accept=".docx,.pdf" style="display:none" onchange="obHandleResumeFile(this.files[0])" />
+      </div>
+      <div class="ob-resume-paste-area" id="ob-res-paste-area">
+        <div class="ob-field" style="margin-bottom:0">
+          <label>Paste resume text</label>
+          <textarea id="ob-res-paste-text" placeholder="Paste the full text of your resume here..." style="min-height:140px"></textarea>
+        </div>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-back" onclick="obBack()">&#8592; Back</button>
+        <div style="display:flex;gap:14px;align-items:center">
+          <button class="ob-btn-skip" onclick="obSkip()">Skip for now</button>
+          <button class="ob-btn-next" onclick="obNext()">Next &#8594;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: AI Provider (required) -->
+    <div id="ob-step-4" style="display:none">
+      <h2 class="ob-title">Choose your AI assistant</h2>
+      <p class="ob-subtitle">You need an API key to power the AI features. Your key is stored securely. We never see your usage or costs.</p>
+      <div class="ob-provider-grid">
+        <div class="ob-provider-card selected" id="ob-prov-claude" onclick="obSelectProvider('claude')">
+          <div class="ob-prov-name">Claude</div>
+          <div class="ob-prov-model">claude-sonnet-4-20250514</div>
+          <a class="ob-prov-link" href="https://console.anthropic.com/settings/keys" target="_blank" onclick="event.stopPropagation()">Get API key &#8594;</a>
+        </div>
+        <div class="ob-provider-card" id="ob-prov-openai" onclick="obSelectProvider('openai')">
+          <div class="ob-prov-name">ChatGPT</div>
+          <div class="ob-prov-model">gpt-4o</div>
+          <a class="ob-prov-link" href="https://platform.openai.com/api-keys" target="_blank" onclick="event.stopPropagation()">Get API key &#8594;</a>
+        </div>
+        <div class="ob-provider-card" id="ob-prov-gemini" onclick="obSelectProvider('gemini')">
+          <div class="ob-prov-name">Gemini</div>
+          <div class="ob-prov-model">gemini-1.5-pro</div>
+          <a class="ob-prov-link" href="https://aistudio.google.com/app/apikey" target="_blank" onclick="event.stopPropagation()">Get API key &#8594;</a>
+        </div>
+      </div>
+      <div class="ob-api-row visible" id="ob-api-row">
+        <div class="ob-field" style="margin-bottom:4px">
+          <label>Your API Key</label>
+          <input type="password" id="ob-api-key" placeholder="Paste your API key here" />
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted)">You can also add this later in Settings.</div>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-back" onclick="obBack()">&#8592; Back</button>
+        <button class="ob-btn-next" onclick="obNext()">Confirm &#8594;</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: HubSpot (optional) -->
+    <div id="ob-step-5" style="display:none">
+      <h2 class="ob-title">Connect HubSpot for task and contact sync</h2>
+      <p class="ob-subtitle"><strong>Optional.</strong> You can connect anytime from Settings.</p>
+      <div class="ob-hs-opts">
+        <div class="ob-resume-opt" id="ob-hs-opt-connect" onclick="obSelectHubSpot('connect')">
+          <span>&#128279;</span> Connect HubSpot
+        </div>
+        <div class="ob-resume-opt selected" id="ob-hs-opt-skip" onclick="obSelectHubSpot('skip')">
+          <span>&#8594;</span> <strong>Skip for now</strong> &mdash; connect anytime from Settings
+        </div>
+      </div>
+      <div class="ob-hs-connect-area" id="ob-hs-connect-area">
+        <div class="ob-field"><label>HubSpot API Key</label><input type="password" id="ob-hs-api-key" placeholder="Your HubSpot private app token" /></div>
+        <div class="ob-field"><label>Portal ID</label><input type="text" id="ob-hs-portal-id" placeholder="e.g. 242599414" /></div>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-back" onclick="obBack()">&#8592; Back</button>
+        <div style="display:flex;gap:14px;align-items:center">
+          <button class="ob-btn-skip" onclick="obSkip()">Skip for now</button>
+          <button class="ob-btn-next" onclick="obFinish()">Finish Setup &#8594;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLETION screen -->
+    <div id="ob-complete" style="display:none;text-align:center;padding:20px 0">
+      <div class="ob-complete-icon">&#127919;</div>
+      <h2 class="ob-title" style="text-align:center;margin-bottom:8px">You're all set.</h2>
+      <p class="ob-subtitle" style="text-align:center">Let's find your next role.</p>
+    </div>
   </div>
 </div>
 
@@ -3035,23 +3313,9 @@ _supa.auth.onAuthStateChange(function(event, session) {
   if (session && session.access_token) {
     window._cachedJWT = session.access_token;
     document.getElementById('login-overlay').classList.add('hidden');
-    document.querySelector('.app-shell').style.visibility = 'visible';
     loadBaseDocs();
+    // loadAISettings will check onboarding_complete and route accordingly
     loadAISettings();
-    // Load core data now that token is available
-    dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(appData) {
-      allApps = Array.isArray(appData) ? appData : [];
-      loadContacts().then(function() {
-        refreshDashboard();
-        var activePage = document.querySelector('.page.active');
-        if (activePage) {
-          var pageId = activePage.id.replace('page-', '');
-          navigateTo(pageId);
-        } else {
-          navigateTo('dashboard');
-        }
-      });
-    });
   } else {
     window._cachedJWT = null;
     document.getElementById('login-overlay').classList.remove('hidden');
@@ -3177,15 +3441,36 @@ async function loadAISettings() {
       aiApiKey   = currentProfile.ai_api_key  || '';
       updateProviderLabel();
       applyProfileToUI();
+      if (!currentProfile.onboarding_complete) {
+        // Returning user who hasn't finished onboarding — show wizard at their last step
+        obShow();
+      } else {
+        // Onboarding done — load app normally
+        document.querySelector('.app-shell').style.visibility = 'visible';
+        dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(appData) {
+          allApps = Array.isArray(appData) ? appData : [];
+          loadContacts().then(function() {
+            refreshDashboard();
+            var activePage = document.querySelector('.page.active');
+            if (activePage) {
+              var pageId = activePage.id.replace('page-', '');
+              navigateTo(pageId);
+            } else {
+              navigateTo('dashboard');
+            }
+          });
+        });
+      }
     } else {
-      // First login — create a default profile row
-      const defaults = { id: userId, ai_provider: 'claude', ai_api_key: '', onboarding_complete: false };
+      // First login — create a default profile row and show wizard
+      const defaults = { id: userId, ai_provider: 'claude', ai_api_key: '', onboarding_complete: false, onboarding_step: '1' };
       await fetch(WORKER_URL + '/db/profiles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
         body: JSON.stringify(defaults)
       });
       currentProfile = defaults;
+      obShow();
     }
   } catch(e) { /* silent fail — defaults remain */ }
 }
@@ -10956,6 +11241,277 @@ function addSelectedToApps() {
     }
   }
 })();
+
+// ── ONBOARDING WIZARD ──────────────────────────────────────────────────────
+var _obStep = 1;
+var _obResumeFile = null;
+var _obResumeMode = null; // 'upload' | 'paste' | null
+var _obProvider = 'claude';
+var _obHsChoice = 'skip';
+
+function obShow() {
+  var stepStr = currentProfile.onboarding_step;
+  _obStep = (stepStr && parseInt(stepStr) >= 1 && parseInt(stepStr) <= 5) ? parseInt(stepStr) : 1;
+  obRenderStep(_obStep);
+  document.getElementById('onboarding-overlay').classList.remove('hidden');
+}
+
+function obHide() {
+  document.getElementById('onboarding-overlay').classList.add('hidden');
+}
+
+function obRenderStep(step) {
+  for (var i = 1; i <= 5; i++) {
+    var el = document.getElementById('ob-step-' + i);
+    if (el) el.style.display = (i === step) ? '' : 'none';
+  }
+  var completEl = document.getElementById('ob-complete');
+  if (completEl) completEl.style.display = 'none';
+  document.getElementById('ob-step-label').textContent = 'Step ' + step + ' of 5';
+  document.getElementById('ob-progress-fill').style.width = (step * 20) + '%';
+  _obStep = step;
+}
+
+function obNext() {
+  if (_obStep === 1) {
+    obSaveStep1Progress();
+    obRenderStep(2);
+  } else if (_obStep === 2) {
+    obSaveStep2Progress();
+    obRenderStep(3);
+  } else if (_obStep === 3) {
+    obHandleStep3Next();
+  } else if (_obStep === 4) {
+    obSaveStep4Progress();
+    obRenderStep(5);
+  }
+}
+
+function obBack() {
+  if (_obStep > 1) obRenderStep(_obStep - 1);
+}
+
+function obSkip() {
+  if (_obStep === 3) {
+    obSaveStepToDB(4, {});
+    obRenderStep(4);
+  } else if (_obStep === 5) {
+    obFinish();
+  }
+}
+
+function obSaveStep1Progress() {
+  var payload = {
+    full_name: document.getElementById('ob-full-name').value.trim(),
+    current_title: document.getElementById('ob-current-title').value.trim(),
+    target_role: document.getElementById('ob-target-role').value.trim(),
+    target_location: document.getElementById('ob-target-location').value.trim(),
+    onboarding_step: '2'
+  };
+  Object.assign(currentProfile, payload);
+  obSaveStepToDB(1, payload);
+}
+
+function obSaveStep2Progress() {
+  var payload = {
+    career_win_1: document.getElementById('ob-win-1').value.trim(),
+    career_win_2: document.getElementById('ob-win-2').value.trim(),
+    career_win_3: document.getElementById('ob-win-3').value.trim(),
+    onboarding_step: '3'
+  };
+  Object.assign(currentProfile, payload);
+  obSaveStepToDB(2, payload);
+}
+
+function obHandleStep3Next() {
+  if (_obResumeMode === 'upload' && _obResumeFile) {
+    obUploadResume(_obResumeFile, function() {
+      obSaveStepToDB(3, { onboarding_step: '4' });
+      obRenderStep(4);
+    });
+  } else if (_obResumeMode === 'paste') {
+    var text = document.getElementById('ob-res-paste-text').value.trim();
+    if (text) {
+      obSavePastedResume(text, function() {
+        obSaveStepToDB(3, { onboarding_step: '4' });
+        obRenderStep(4);
+      });
+    } else {
+      obSaveStepToDB(3, { onboarding_step: '4' });
+      obRenderStep(4);
+    }
+  } else {
+    obSaveStepToDB(3, { onboarding_step: '4' });
+    obRenderStep(4);
+  }
+}
+
+function obSaveStep4Progress() {
+  var key = document.getElementById('ob-api-key').value.trim();
+  var payload = {
+    ai_provider: _obProvider,
+    ai_api_key: key,
+    onboarding_step: '5'
+  };
+  Object.assign(currentProfile, payload);
+  aiProvider = _obProvider;
+  aiApiKey = key;
+  updateProviderLabel();
+  obSaveStepToDB(4, payload);
+}
+
+function obSaveStepToDB(step, extra) {
+  _supa.auth.getSession().then(function(s) {
+    var userId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+    if (!userId) return;
+    var payload = Object.assign({ onboarding_step: String(step + 1) }, extra);
+    fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(payload)
+    });
+  });
+}
+
+function obSelectProvider(p) {
+  _obProvider = p;
+  ['claude','openai','gemini'].forEach(function(id) {
+    var card = document.getElementById('ob-prov-' + id);
+    if (card) card.classList.toggle('selected', id === p);
+  });
+  var apiRow = document.getElementById('ob-api-row');
+  if (apiRow) apiRow.classList.add('visible');
+}
+
+function obSelectResumeOpt(mode) {
+  _obResumeMode = mode;
+  document.getElementById('ob-res-opt-upload').classList.toggle('selected', mode === 'upload');
+  document.getElementById('ob-res-opt-paste').classList.toggle('selected', mode === 'paste');
+  var uploadArea = document.getElementById('ob-res-upload-area');
+  var pasteArea = document.getElementById('ob-res-paste-area');
+  if (uploadArea) uploadArea.classList.toggle('visible', mode === 'upload');
+  if (pasteArea) pasteArea.classList.toggle('visible', mode === 'paste');
+}
+
+function obHandleResumeFile(file) {
+  if (!file) return;
+  _obResumeFile = file;
+  var zone = document.getElementById('ob-upload-zone');
+  var label = document.getElementById('ob-upload-zone-label');
+  if (zone) zone.classList.add('has-file');
+  if (label) label.textContent = file.name;
+}
+
+function obHandleResumeDrop(event) {
+  event.preventDefault();
+  var zone = document.getElementById('ob-upload-zone');
+  if (zone) zone.style.borderColor = '';
+  var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+  if (file) obHandleResumeFile(file);
+}
+
+function obUploadResume(file, cb) {
+  var timestamp = Date.now();
+  var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  var storagePath = 'resumes/base_' + timestamp + '_' + safeName;
+  fetch(WORKER_URL + '/storage/upload/' + encodeURIComponent(storagePath), {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-User-Token': window._cachedJWT || '' },
+    body: file
+  }).then(function(r) {
+    if (!r.ok) { if (cb) cb(); return; }
+    var record = {
+      version_name: 'Base Resume',
+      is_base_version: true,
+      storage_path: storagePath,
+      date_created: new Date().toISOString().slice(0,10)
+    };
+    return fetch(WORKER_URL + '/db/resumes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(record)
+    });
+  }).then(function() { if (cb) cb(); }).catch(function() { if (cb) cb(); });
+}
+
+function obSavePastedResume(text, cb) {
+  var record = {
+    version_name: 'Base Resume',
+    is_base_version: true,
+    notes: text,
+    date_created: new Date().toISOString().slice(0,10)
+  };
+  fetch(WORKER_URL + '/db/resumes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+    body: JSON.stringify(record)
+  }).then(function() { if (cb) cb(); }).catch(function() { if (cb) cb(); });
+}
+
+function obSelectHubSpot(choice) {
+  _obHsChoice = choice;
+  document.getElementById('ob-hs-opt-connect').classList.toggle('selected', choice === 'connect');
+  document.getElementById('ob-hs-opt-skip').classList.toggle('selected', choice === 'skip');
+  var area = document.getElementById('ob-hs-connect-area');
+  if (area) area.classList.toggle('visible', choice === 'connect');
+}
+
+function obFinish() {
+  var hsKey = '';
+  var hsPortal = '';
+  if (_obHsChoice === 'connect') {
+    hsKey = document.getElementById('ob-hs-api-key').value.trim();
+    hsPortal = document.getElementById('ob-hs-portal-id').value.trim();
+  }
+  _supa.auth.getSession().then(function(s) {
+    var userId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+    if (!userId) { obLaunchApp(); return; }
+    var payload = {
+      onboarding_complete: true,
+      onboarding_step: '5'
+    };
+    if (hsKey) payload.hubspot_api_key = hsKey;
+    if (hsPortal) payload.hubspot_portal_id = hsPortal;
+    if (hsPortal) currentProfile.hubspot_portal_id = hsPortal;
+    Object.assign(currentProfile, payload);
+    fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(payload)
+    }).then(function() {
+      obShowComplete();
+    }).catch(function() {
+      obShowComplete();
+    });
+  });
+}
+
+function obShowComplete() {
+  for (var i = 1; i <= 5; i++) {
+    var el = document.getElementById('ob-step-' + i);
+    if (el) el.style.display = 'none';
+  }
+  document.getElementById('ob-step-label').textContent = 'All done!';
+  document.getElementById('ob-progress-fill').style.width = '100%';
+  var completEl = document.getElementById('ob-complete');
+  if (completEl) completEl.style.display = '';
+  window.setTimeout(function() {
+    obHide();
+    obLaunchApp();
+  }, 1800);
+}
+
+function obLaunchApp() {
+  document.querySelector('.app-shell').style.visibility = 'visible';
+  dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(appData) {
+    allApps = Array.isArray(appData) ? appData : [];
+    loadContacts().then(function() {
+      refreshDashboard();
+      navigateTo('dashboard');
+    });
+  });
+}
+// ── END ONBOARDING WIZARD ─────────────────────────────────────────────────
 </script>
 <!-- AI Settings Modal -->
 <div id="modal-ai-settings" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-ai-settings')">
