@@ -3783,8 +3783,9 @@ async function refreshDashboard() {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
-  // Auto-sync HubSpot tasks and activity on dashboard load
-  if (!window._hubspotAutoSynced) {
+  // Auto-sync HubSpot tasks and activity on dashboard load — only if HubSpot is connected
+  var _hsPortal = (currentProfile && currentProfile.hubspot_portal_id) || window._hubspotPortalId || '';
+  if (!window._hubspotAutoSynced && _hsPortal) {
     window._hubspotAutoSynced = true;
     syncHubSpotTasks();
     syncHubSpotActivity();
