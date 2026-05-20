@@ -944,6 +944,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="theme-toggle" onclick="toggleTheme()">
         <span id="theme-icon">🌙</span><span id="theme-label">Dark Mode</span>
       </button>
+      <button class="logout-btn" onclick="openMyProfile()">👤 My Profile</button>
       <button class="logout-btn" onclick="openAISettings()">⚙ AI Settings</button>
       <div id="ai-provider-label" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:-4px;">Using: Claude</div>
       <button class="logout-btn" onclick="signOut()">⎋ Sign out</button>
@@ -1977,6 +1978,13 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="ob-hm" placeholder="First name">
               </div>
               <div class="form-group full">
+                <label class="form-label">Job Description <span style="font-weight:400;color:var(--text-secondary)">(paste or drag a file)</span></label>
+                <textarea class="form-textarea" id="ob-jd" rows="5" placeholder="Paste the job description here — or drag and drop a .txt or .docx file..."
+                  ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
+                  ondragleave="this.style.borderColor=''"
+                  ondrop="event.preventDefault();this.style.borderColor='';(function(f){if(!f)return;extractFileText(f).then(function(txt){document.getElementById('ob-jd').value=txt;}).catch(function(err){toast('Could not read file: '+err.message,'error');});})(event.dataTransfer.files[0])"></textarea>
+              </div>
+              <div class="form-group full">
                 <label class="form-label">Company URL</label>
                 <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
               </div>
@@ -2385,7 +2393,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="form-grid">
         <div class="form-group full">
           <label class="form-label">Version Name *</label>
-          <input class="form-input" type="text" id="rf-name" placeholder="Jay Wadhwa_CMO_CompanyName">
+          <input class="form-input" type="text" id="rf-name" placeholder="YourName_CMO_CompanyName">
         </div>
         <div class="form-group">
           <label class="form-label">Target Role</label>
@@ -2748,7 +2756,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <div class="form-group" style="margin-bottom:20px">
         <label class="form-label" style="font-size:13px;font-weight:700;color:var(--text)">Master Resume</label>
         <p style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Paste your full resume as plain text. Copy from Word using Ctrl+A → Ctrl+C, then paste here.</p>
-        <textarea class="form-textarea" id="base-resume-text" rows="14" placeholder="Paste your full resume text here...&#10;&#10;Jay Wadhwa&#10;847-910-9377 | jvwadhwa@gmail.com&#10;..."></textarea>
+        <textarea class="form-textarea" id="base-resume-text" rows="14" placeholder="Paste your full resume text here...&#10;&#10;Your Name&#10;phone | email&#10;..."></textarea>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
           <span style="font-size:11px;color:var(--text-light)" id="resume-char-count">0 characters</span>
           <span style="font-size:11px;color:var(--text-secondary)" id="resume-saved-indicator"></span>
@@ -2876,12 +2884,12 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
         <div class="form-group">
           <label class="form-label">Subject Line</label>
-          <input class="form-input" type="text" id="tmpl-subject" placeholder="e.g. VP Marketing — Jay Wadhwa | 6x Emmy Award Winner">
+          <input class="form-input" type="text" id="tmpl-subject" placeholder="e.g. VP Marketing — Your Name | Key Credential">
         </div>
         <div class="form-group">
           <label class="form-label">Body *</label>
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Use {{name}}, {{company}}, {{role}} as merge fields</div>
-          <textarea class="form-textarea" id="tmpl-body" rows="8" placeholder="Hi {{name}},&#10;&#10;...&#10;&#10;Cheers,&#10;Jay"></textarea>
+          <textarea class="form-textarea" id="tmpl-body" rows="8" placeholder="Hi {{name}},&#10;&#10;...&#10;&#10;Cheers,&#10;{{your_name}}"></textarea>
         </div>
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
@@ -3030,6 +3038,20 @@ _supa.auth.onAuthStateChange(function(event, session) {
     document.querySelector('.app-shell').style.visibility = 'visible';
     loadBaseDocs();
     loadAISettings();
+    // Load core data now that token is available
+    dbGet('applications', 'select=*&order=date_applied.desc&limit=5000').then(function(appData) {
+      allApps = Array.isArray(appData) ? appData : [];
+      loadContacts().then(function() {
+        refreshDashboard();
+        var activePage = document.querySelector('.page.active');
+        if (activePage) {
+          var pageId = activePage.id.replace('page-', '');
+          navigateTo(pageId);
+        } else {
+          navigateTo('dashboard');
+        }
+      });
+    });
   } else {
     window._cachedJWT = null;
     document.getElementById('login-overlay').classList.remove('hidden');
@@ -3085,12 +3107,59 @@ async function saveAISettings() {
     });
     aiProvider = provider;
     aiApiKey   = key;
+    currentProfile.ai_provider = provider;
+    currentProfile.ai_api_key  = key;
     updateProviderLabel();
     closeModal('modal-ai-settings');
     toast('AI settings saved.', 'success');
   } catch(e) {
     toast('Failed to save AI settings.', 'error');
   }
+}
+
+async function saveProfile() {
+  try {
+    const session = await _supa.auth.getSession();
+    const userId  = session?.data?.session?.user?.id;
+    if (!userId) { toast('Not logged in.', 'error'); return; }
+    var payload = {
+      full_name:           (document.getElementById('prof-full_name') || {}).value || '',
+      current_title:       (document.getElementById('prof-current_title') || {}).value || '',
+      target_role:         (document.getElementById('prof-target_role') || {}).value || '',
+      target_location:     (document.getElementById('prof-target_location') || {}).value || '',
+      email:               (document.getElementById('prof-email') || {}).value || '',
+      phone:               (document.getElementById('prof-phone') || {}).value || '',
+      linkedin_url:        (document.getElementById('prof-linkedin_url') || {}).value || '',
+      hubspot_portal_id:   (document.getElementById('prof-hubspot_portal_id') || {}).value || '',
+      career_win_1:        (document.getElementById('prof-career_win_1') || {}).value || '',
+      career_win_2:        (document.getElementById('prof-career_win_2') || {}).value || '',
+      career_win_3:        (document.getElementById('prof-career_win_3') || {}).value || '',
+      company_name:        (document.getElementById('prof-company_name') || {}).value || '',
+      industry_background: (document.getElementById('prof-industry_background') || {}).value || '',
+      years_experience:    parseInt((document.getElementById('prof-years_experience') || {}).value) || null,
+      ai_provider:         (document.getElementById('prof-ai-provider') || {}).value || 'claude',
+      ai_api_key:          (document.getElementById('prof-ai-api-key') || {}).value || '',
+      updated_at:          new Date().toISOString()
+    };
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(payload)
+    });
+    Object.assign(currentProfile, payload);
+    aiProvider = payload.ai_provider;
+    aiApiKey   = payload.ai_api_key;
+    updateProviderLabel();
+    closeModal('modal-my-profile');
+    toast('Profile saved.', 'success');
+  } catch(e) {
+    toast('Failed to save profile.', 'error');
+  }
+}
+
+function openMyProfile() {
+  applyProfileToUI();
+  openModal('modal-my-profile');
 }
 
 async function loadAISettings() {
@@ -3103,17 +3172,37 @@ async function loadAISettings() {
     });
     const rows = await res.json();
     if (rows && rows.length > 0) {
-      aiProvider = rows[0].ai_provider || 'claude';
-      aiApiKey   = rows[0].ai_api_key  || '';
+      currentProfile = rows[0];
+      aiProvider = currentProfile.ai_provider || 'claude';
+      aiApiKey   = currentProfile.ai_api_key  || '';
       updateProviderLabel();
+      applyProfileToUI();
     } else {
+      // First login — create a default profile row
+      const defaults = { id: userId, ai_provider: 'claude', ai_api_key: '', onboarding_complete: false };
       await fetch(WORKER_URL + '/db/profiles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
-        body: JSON.stringify({ id: userId, ai_provider: 'claude', ai_api_key: '' })
+        body: JSON.stringify(defaults)
       });
+      currentProfile = defaults;
     }
   } catch(e) { /* silent fail — defaults remain */ }
+}
+
+function applyProfileToUI() {
+  // Populate My Profile modal fields if open
+  var fields = ['full_name','current_title','target_role','target_location','email','phone','linkedin_url','hubspot_portal_id',
+                'career_win_1','career_win_2','career_win_3','company_name',
+                'industry_background','years_experience'];
+  fields.forEach(function(f) {
+    var el = document.getElementById('prof-' + f);
+    if (el && currentProfile[f] != null) el.value = currentProfile[f];
+  });
+  var provEl = document.getElementById('prof-ai-provider');
+  if (provEl) provEl.value = currentProfile.ai_provider || 'claude';
+  var keyEl = document.getElementById('prof-ai-api-key');
+  if (keyEl && currentProfile.ai_api_key) keyEl.value = currentProfile.ai_api_key;
 }
 
 
@@ -3131,6 +3220,7 @@ let lastAIOutput = '';
 let lastAIOutputType = '';
 let aiProvider = 'claude';
 let aiApiKey = '';
+let currentProfile = {};
 
 // ── STATUS CONFIG ──────────────────────────────────────────────────────
 const STATUSES = [
@@ -4437,7 +4527,7 @@ function buildContactDetailHTML(c) {
         '<div class="detail-section-title" style="margin:0">HubSpot Activity</div>' +
         '<div style="display:flex;gap:8px">' +
           '<button class="btn btn-secondary btn-sm" data-cid="' + c.id + '" data-hsid="' + c.hubspot_contact_id + '" onclick="loadContactHubSpotActivity(this.dataset.cid,this.dataset.hsid)">⟳ Load</button>' +
-          '<a href="https://app.hubspot.com/contacts/242599414/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' +
+          (((currentProfile && currentProfile.hubspot_portal_id) || window._hubspotPortalId) ? '<a href="https://app.hubspot.com/contacts/' + ((currentProfile && currentProfile.hubspot_portal_id) || window._hubspotPortalId) + '/record/0-1/' + c.hubspot_contact_id + '" target="_blank" class="btn btn-secondary btn-sm">Open in HubSpot ↗</a>' : '') +
         '</div>' +
       '</div>' +
       '<div id="hs-activity-' + c.id + '" style="font-size:12px;color:var(--text-secondary)">Click Load to fetch latest HubSpot activity.</div>' +
@@ -5261,9 +5351,55 @@ let templateSortDir = 'asc';
 async function loadTemplates() {
   const data = await dbGet('email_templates', 'select=*&order=name.asc');
   allTemplates = Array.isArray(data) ? data : [];
+  if (allTemplates.length === 0) await seedDefaultTemplates();
   filteredTemplates = allTemplates;
   renderTemplatesTable();
   updateTemplateCount();
+}
+
+async function seedDefaultTemplates() {
+  var p = currentProfile || {};
+  var name = p.full_name || 'Your Name';
+  var title = p.current_title || 'Senior Marketing Executive';
+  var win = p.career_win_1 || 'a record of measurable revenue growth';
+  var defaults = [
+    {
+      name: 'Day 1 — Recruiter Outreach',
+      type: 'Email',
+      subject: name + ' — ' + title,
+      body: 'Hi {{recruiter_name}},\n\nI applied for the {{role}} role at {{company}} and wanted to connect directly.\n\nI bring ' + win + '. Happy to share more if this role is still active.\n\nCheers,\n' + name,
+      notes: 'Send same day as application. Personalize the win line to the role.'
+    },
+    {
+      name: 'Day 3 — LinkedIn Connection Request',
+      type: 'LinkedIn',
+      subject: '',
+      body: 'Hi {{recruiter_name}} — I applied for the {{role}} role at {{company}}. Would love to connect.',
+      notes: 'Under 200 characters. No subject line needed for LinkedIn.'
+    },
+    {
+      name: 'Day 5 — Follow-Up Email',
+      type: 'Email',
+      subject: 'Following up — {{role}} at {{company}}',
+      body: 'Hi {{recruiter_name}},\n\nJust following up on my application for the {{role}} role. I\'m genuinely interested in what {{company}} is building.\n\nHappy to jump on a quick call.\n\nCheers,\n' + name,
+      notes: 'Keep it short. One sentence on why you\'re interested.'
+    },
+    {
+      name: 'Day 7 — Hiring Manager / CEO',
+      type: 'Email',
+      subject: '{{role}} — ' + name,
+      body: 'Hi {{hiring_manager}},\n\nI\'ll keep this short. I\'m a ' + title + ' with ' + win + '. I applied for the {{role}} role and believe I can move the needle fast.\n\nWorth a 15-minute call?\n\nCheers,\n' + name,
+      notes: 'Peer-to-peer tone. Lead with a result. Direct ask only.'
+    }
+  ];
+  for (var i = 0; i < defaults.length; i++) {
+    var saved = await dbPost('email_templates', defaults[i]);
+    if (saved) {
+      // dbPost returns array from Supabase — unwrap it
+      var row = Array.isArray(saved) ? saved[0] : saved;
+      if (row) allTemplates.push(row);
+    }
+  }
 }
 
 function updateTemplateCount() {
@@ -5301,7 +5437,9 @@ function renderTemplatesTable() {
     tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><h3>No templates yet</h3><p>Add your first email template to get started.</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = filteredTemplates.map(function(t) {
+  tbody.innerHTML = filteredTemplates.filter(function(t) {
+    return (t.name||'').trim() || (t.subject||'').trim() || (t.body||'').trim();
+  }).map(function(t) {
     var preview = (t.body || '').replace(/\n/g, ' ').slice(0, 80);
     return '<tr>' +
       '<td><strong>' + (t.name||'—') + '</strong>' + (t.notes ? '<div style="font-size:11px;color:var(--text-secondary)">' + t.notes + '</div>' : '') + '</td>' +
@@ -5547,7 +5685,7 @@ function closeEmailPicker() {
 function openHubSpotCompose() {
   var c = window._detailContact;
   if (!c) return;
-  var portalId = window._hubspotPortalId || '242599414';
+  var portalId = (currentProfile && currentProfile.hubspot_portal_id) || window._hubspotPortalId || '';
   var hsBase = 'https://app-na2.hubspot.com';
   var hsUrl = c.hubspot_contact_id
     ? hsBase + '/contacts/' + portalId + '/record/0-1/' + c.hubspot_contact_id
@@ -5579,12 +5717,12 @@ async function executeGmailCompose() {
     // AI-generate
     if (picker) picker.querySelector('.btn-primary').textContent = '⏳ Generating...';
     try {
-      var prompt = 'Write a brief, professional outreach email from Jay Wadhwa to ' + c.name +
+      var prompt = 'Write a brief, professional outreach email from ' + ((currentProfile && currentProfile.full_name) || 'the candidate') + ' to ' + c.name +
         (c.title ? ', ' + c.title : '') + (c.company ? ' at ' + c.company : '') +
-        '. Jay is a VP-level marketing executive (6 Emmy Awards, grew ESPN Classic revenue to $40M, created "programmable privacy" category). ' +
-        'Under 100 words. Peer-to-peer tone. One relevant credential. Clear ask for a call. Close with Cheers, Jay. No subject line in body.';
-      body = await callAI([{role:'user', content: prompt}], 'Write concise human outreach emails for Jay Wadhwa. No AI language. Direct and warm.');
-      subject = 'Connecting — Jay Wadhwa';
+        '. ' + ((currentProfile && currentProfile.career_win_1) ? 'Key credential: ' + currentProfile.career_win_1 + '. ' : '') + '' +
+        'Under 100 words. Peer-to-peer tone. One relevant credential. Clear ask for a call. Close with Cheers. No subject line in body.';
+      body = await callAI([{role:'user', content: prompt}], getSystemPromptWithResume());
+      subject = 'Connecting — ' + ((currentProfile && currentProfile.full_name) || '');
     } catch(e) {
       toast('Could not generate email: ' + e.message, 'error');
       if (picker) picker.querySelector('.btn-primary').textContent = 'Open Gmail ↗';
@@ -5945,7 +6083,7 @@ const SEED_PROMPTS = [
   {
     "name": "Interview Prep Pack",
     "category": "Interview Prep",
-    "system_prompt": "You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and resume provided.\n\n---\n\n## DELIVERABLES\n\nCreate 8 professional documents. Label each with its number and title exactly as shown. Separate each with ---.\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- Products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: company needs vs. Jay experience\n- Highlight overlaps and strengths\n- Explain how multi-industry background is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\n- Company snapshot as BULLET POINTS ONLY (no table)\n- Key strengths and risks\n- Primary growth paths\n- Role fit\n- Bottom-line takeaway\n\nIMPORTANT: Doc 01 and Doc 06 are intentionally separate. Doc 01 is a dense research reference. Doc 06 is a one-page pre-interview brief. Do NOT combine them. Doc 06 must use bullet points only, no table.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER\n- Pure questions only (no answers)\n- Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused, easy to memorize\n\n---\n\n## FORMATTING REQUIREMENTS\n- Use ## DOC 0N: TITLE format for each document header exactly\n- Use markdown tables for SWOT and competitor grids\n- Use bullet points for all lists\n- **Bold** all statistics and key metrics\n- Peer-to-peer, direct, confident tone\n- Sentences 15 words or fewer. Active voice. No em dashes.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description:\n{{job_description}}",
+    "system_prompt": "You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and resume provided.\n\n---\n\n## DELIVERABLES\n\nCreate 8 professional documents. Label each with its number and title exactly as shown. Separate each with ---.\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- Products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: company needs vs. candidate experience\n- Highlight overlaps and strengths\n- Explain how multi-industry background is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\n- Company snapshot as BULLET POINTS ONLY (no table)\n- Key strengths and risks\n- Primary growth paths\n- Role fit\n- Bottom-line takeaway\n\nIMPORTANT: Doc 01 and Doc 06 are intentionally separate. Doc 01 is a dense research reference. Doc 06 is a one-page pre-interview brief. Do NOT combine them. Doc 06 must use bullet points only, no table.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER\n- Pure questions only (no answers)\n- Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused, easy to memorize\n\n---\n\n## FORMATTING REQUIREMENTS\n- Use ## DOC 0N: TITLE format for each document header exactly\n- Use markdown tables for SWOT and competitor grids\n- Use bullet points for all lists\n- **Bold** all statistics and key metrics\n- Peer-to-peer, direct, confident tone\n- Sentences 15 words or fewer. Active voice. No em dashes.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description:\n{{job_description}}",
 
     "variable_fields": [
       "company",
@@ -5956,7 +6094,7 @@ const SEED_PROMPTS = [
   {
     "name": "Resume Tailoring",
     "category": "Resume",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use the candidate's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "keywords_required",
       "keywords_nice",
@@ -5966,7 +6104,7 @@ const SEED_PROMPTS = [
   {
     "name": "Cover Letter",
     "category": "Cover Letter",
-    "system_prompt": "Use Jay Wadhwa's resume and the job description below to write a concise cover letter for a senior marketing executive role.\n\nREQUIREMENTS:\n- Write in Jay's voice \u2014 human, specific, peer-to-peer, never deferential\n- Lead with the strongest relevant result or metric\n- Highlight key skills and proof points that align directly with the role\n- Use bullets only when they improve flow\n- Show evidence of company research \u2014 reference something specific about the company\n- Address the hiring manager by name if provided. If unknown, say so. Do not guess.\n- End with a clear, direct next step\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful, I'd love to, I'd welcome, at your convenience).\n\nCompany: {{company}}\nRole: {{role}}\nHiring Manager: {{hiring_manager}}\nJob Description: {{job_description}}",
+    "system_prompt": "Use the candidate's resume and the job description below to write a concise cover letter for a senior marketing executive role.\n\nREQUIREMENTS:\n- Write in the candidate's voice \u2014 human, specific, peer-to-peer, never deferential\n- Lead with the strongest relevant result or metric\n- Highlight key skills and proof points that align directly with the role\n- Use bullets only when they improve flow\n- Show evidence of company research \u2014 reference something specific about the company\n- Address the hiring manager by name if provided. If unknown, say so. Do not guess.\n- End with a clear, direct next step\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful, I'd love to, I'd welcome, at your convenience).\n\nCompany: {{company}}\nRole: {{role}}\nHiring Manager: {{hiring_manager}}\nJob Description: {{job_description}}",
     "variable_fields": [
       "company",
       "role",
@@ -5977,7 +6115,7 @@ const SEED_PROMPTS = [
   {
     "name": "Outreach Sequence (4-Part)",
     "category": "Networking",
-    "system_prompt": "Use Jay Wadhwa's resume and the details below to create a 4-part outreach sequence for a role Jay already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let us talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from Jay's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
+    "system_prompt": "Use the candidate's resume and the details below to create a 4-part outreach sequence for a role the candidate already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let us talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from the candidate's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
     "variable_fields": [
       "company",
       "company_url",
@@ -6444,32 +6582,6 @@ async function deleteResource(id) {
 }
 
 // ── AI SYSTEM PROMPT ───────────────────────────────────────────────────
-const JAY_SYSTEM_PROMPT = `You are Jay Wadhwa's personal job search assistant. Jay is a senior marketing executive with 25+ years of experience across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. He runs Rogue Marketing LLC, a boutique fractional CMO firm in the Greater Chicago Area. He targets VP, Director, and CMO-level roles.
-
-Key credentials to reference when relevant:
-- 96% revenue growth (Secret Network Foundation, 9 months)
-- 137% social/audience growth (PHI Labs Global, 6 months)
-- 588% social media audience growth (NBC Sports)
-- 4x revenue growth (ESPN Classic rebrand, year one)
-- $200K incremental sponsorship revenue (NBC Sports)
-- $5M VC funding secured for a blockchain startup
-- 225% revenue growth for a nonprofit client
-- Led internal creative agency of 25 at NBCUniversal
-- 6 Emmy Awards, 9 Promax/BDA Awards
-
-Writing rules — apply to ALL output:
-- Peer-to-peer, confident, direct. Never deferential.
-- Target 15 words or fewer per sentence. Mix lengths naturally.
-- Active voice only. Lead with numbers and results.
-- No em dashes (—) anywhere. Use commas or periods instead.
-- No semicolons. Contractions required (I'm, don't, we've, that's).
-- Banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, exploring, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful.
-- Never use "I'd love to", "I'd welcome", "at your convenience".
-- Jay signs all correspondence: Cheers.
-
-For InMail: Subject format is [Role Title] | Jay Wadhwa. One paragraph. Open with a hook or result. Never "I saw your posting." Close with a direct ask.
-For emails: First name only. Open naturally. Under 150 words. One metric. Clear ask. Close with Cheers.
-For cover letters: Lead with strongest result. Match keywords naturally. Show company research. Clear next step.`;
 
 // ── BASE DOCUMENTS ─────────────────────────────────────────────────────
 let baseResumeText = '';
@@ -6566,12 +6678,25 @@ async function saveBaseDocs() {
 }
 
 function getSystemPromptWithResume() {
-  let prompt = JAY_SYSTEM_PROMPT;
+  var p = currentProfile || {};
+  var name       = p.full_name || 'the user';
+  var title      = p.current_title || 'senior marketing executive';
+  var targetRole = p.target_role || 'VP, Director, and CMO-level roles';
+  var location   = p.target_location || '';
+  var company    = p.company_name || 'their own consulting firm';
+  var industry   = p.industry_background || 'media, SaaS, Web3, FinTech, and nonprofits';
+  var years      = p.years_experience ? p.years_experience + '+' : '25+';
+  var win1       = p.career_win_1 || '';
+  var win2       = p.career_win_2 || '';
+  var win3       = p.career_win_3 || '';
+
+  var prompt = 'You are ' + name + '\u2019s personal job search assistant. ' + name + ' is a ' + title + ' with ' + years + ' years of experience across ' + industry + '. They run ' + company + '. They target ' + targetRole + ' in the ' + location + '.\n\nKey credentials to reference when relevant:\n- ' + win1 + '\n- ' + win2 + '\n- ' + win3 + '\n\nWriting rules \u2014 apply to ALL output:\n- Peer-to-peer, confident, direct. Never deferential.\n- Target 15 words or fewer per sentence. Mix lengths naturally.\n- Active voice only. Lead with numbers and results.\n- No em dashes (\u2014) anywhere. Use commas or periods instead.\n- No semicolons. Contractions required (I\u2019m, don\u2019t, we\u2019ve, that\u2019s).\n- Banned words: delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, fast-paced, resonates, exploring, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful.\n- Never use \u201cI\u2019d love to\u201d, \u201cI\u2019d welcome\u201d, \u201cat your convenience\u201d.\n- ' + name + ' signs all correspondence: Cheers.\n\nFor InMail: Subject format is [Role Title] | ' + name + '. One paragraph. Open with a hook or result. Never \u201cI saw your posting.\u201d Close with a direct ask.\nFor emails: First name only. Open naturally. Under 150 words. One metric. Clear ask. Close with Cheers.\nFor cover letters: Lead with strongest result. Match keywords naturally. Show company research. Clear next step.';
+
   if (baseResumeText) {
-    prompt += `\n\n--- JAY'S MASTER RESUME ---\n` + baseResumeText;
+    prompt += '\n\n--- ' + name.toUpperCase() + '\u2019S MASTER RESUME ---\n' + baseResumeText;
   }
   if (baseCoverLetterText) {
-    prompt += `\n\n--- JAY'S COVER LETTER TEMPLATE ---\n` + baseCoverLetterText;
+    prompt += '\n\n--- ' + name.toUpperCase() + '\u2019S COVER LETTER TEMPLATE ---\n' + baseCoverLetterText;
   }
   return prompt;
 }
@@ -6652,7 +6777,7 @@ function _exportToDocxGeneric() {
     </head>
     <body>
       <h1>${title}</h1>
-      <p style="font-size:9pt;color:#666;margin-bottom:16px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Jay Wadhwa Job Search Command Center</p>
+      <p style="font-size:9pt;color:#666;margin-bottom:16px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Job Search Command Center</p>
       ${html}
     </body>
     </html>`;
@@ -6664,7 +6789,7 @@ function _exportToDocxGeneric() {
 
   // Name the file based on output type
   const dateStr = new Date().toISOString().split('T')[0];
-  a.download = `Jay_Wadhwa_${title.replace(/\s+/g, '_')}_${dateStr}.doc`;
+  a.download = `${(currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_')+'_' : ''}${title.replace(/\s+/g, '_')}_${dateStr}.doc`;
   a.click();
   URL.revokeObjectURL(url);
   toast('Document downloaded. Open in Word to review and edit.', 'success');
@@ -6745,7 +6870,7 @@ async function tailorResume() {
   try {
     const result = await callAI([{
       role: 'user',
-      content: `Analyze this job description and suggest specific edits to Jay Wadhwa's resume to align it with the role. 
+      content: `Analyze this job description and suggest specific edits to the candidate's resume to align it with the role. 
 
 Job Description:
 ${jd}
@@ -6755,9 +6880,9 @@ Nice-to-Have Keywords: ${niceKw || 'Extract from job description'}
 
 Instructions:
 1. List all required keywords found in the JD that should appear in the resume
-2. List which of those keywords are already strong in Jay's background vs. which need to be added
-3. Suggest specific bullet rewrites for Jay's existing experience that organically integrate missing keywords
-4. Flag any keywords Jay cannot honestly claim and should NOT add
+2. List which of those keywords are already strong in the candidate's background vs. which need to be added
+3. Suggest specific bullet rewrites for the candidate's existing experience that organically integrate missing keywords
+4. Flag any keywords the candidate cannot honestly claim and should NOT add
 5. Recommend the best Core Expertise categories and order for this specific role
 
 Format clearly with sections: KEYWORDS ANALYSIS | SUGGESTED BULLET REWRITES | CORE EXPERTISE RECOMMENDATIONS | KEYWORDS TO SKIP`
@@ -6783,14 +6908,14 @@ async function generateDoc() {
   const recipientStr = contact ? (' Recipient: ' + contact + '.') : '';
 
   const prompts = {
-    cover_letter: `Write a cover letter for Jay Wadhwa applying to the ${role} role at ${company}.${contact ? ' Address it to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with the strongest relevant result. Show company research. Match role keywords naturally. End with a clear next step.`,
-    inmail: `Write a LinkedIn InMail for Jay Wadhwa to the hiring manager at ${company} about the ${role} role.${contact ? ' Recipient first name: ' + contact + '.' : ''}\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with a hook or strong result. Never "I saw your posting." Direct ask to close. No calendar links.${jd ? '\n\nRole context:\n' + jd : ''}`,
-    linkedin_connect: `Write a LinkedIn connection request note from Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific about their role or company. Peer-to-peer, no generic phrases.`,
-    email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 100-120 words. Subject line includes the role and a standout credential.${jd ? '\n\n' + jd : ''}`,
-    email_followup: `Write a Day 5 follow-up email for Jay Wadhwa checking in on his application for the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
-    email_ceo: `Write a Day 7 peer-to-peer email for Jay Wadhwa to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''}\n\nLength: 90-100 words. Executive-to-executive tone. Lead with a business result relevant to their company. Use a direct closing ask. No soft language.`,
-    rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} role at ${company}.${contact ? ' Send to: ' + contact + '.' : ''}\n\nLength: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind for future roles. Close with Cheers.`,
-    outreach_sequence: `Write a complete 4-part outreach sequence for Jay Wadhwa who applied to the ${role} role at ${company}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include: subject line, word count, formatted copy.\nSelect the 3-4 most relevant wins from Jay's background for this company and role.${contact ? '\n\nPrimary contact: ' + contact : ''}${jd ? '\n\nRole context:\n' + jd : ''}`,
+    cover_letter: `Write a cover letter for ${(currentProfile && currentProfile.full_name) || 'the candidate'} applying to the ${role} role at ${company}.${contact ? ' Address it to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with the strongest relevant result. Show company research. Match role keywords naturally. End with a clear next step.`,
+    inmail: `Write a LinkedIn InMail for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to the hiring manager at ${company} about the ${role} role.${contact ? ' Recipient first name: ' + contact + '.' : ''}\n\nSubject: ${role} | ${(currentProfile && currentProfile.full_name) || 'the candidate'}\nLength: 100-120 words. One paragraph. Open with a hook or strong result. Never "I saw your posting." Direct ask to close. No calendar links.${jd ? '\n\nRole context:\n' + jd : ''}`,
+    linkedin_connect: `Write a LinkedIn connection request note from ${(currentProfile && currentProfile.full_name) || 'the candidate'} to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific about their role or company. Peer-to-peer, no generic phrases.`,
+    email_day1: `Write a Day 1 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} who just applied to the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 100-120 words. Subject line includes the role and a standout credential.${jd ? '\n\n' + jd : ''}`,
+    email_followup: `Write a Day 5 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} checking in on their application for the ${role} role at ${company}. Send to: ${contact || 'the recruiter'}.\n\nLength: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
+    email_ceo: `Write a Day 7 peer-to-peer email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''}\n\nLength: 90-100 words. Executive-to-executive tone. Lead with a business result relevant to their company. Use a direct closing ask. No soft language.`,
+    rejection_followup: `Write a post-rejection follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} after being turned down for the ${role} role at ${company}.${contact ? ' Send to: ' + contact + '.' : ''}\n\nLength: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind for future roles. Close with Cheers.`,
+    outreach_sequence: `Write a complete 4-part outreach sequence for ${(currentProfile && currentProfile.full_name) || 'the candidate'} who applied to the ${role} role at ${company}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include: subject line, word count, formatted copy.\nSelect the 3-4 most relevant wins from the candidate's background for this company and role.${contact ? '\n\nPrimary contact: ' + contact : ''}${jd ? '\n\nRole context:\n' + jd : ''}`,
   };
 
     const prompt = prompts[outputType] || prompts.cover_letter;
@@ -6816,21 +6941,21 @@ async function networkingIntel(mode) {
   );
 
   const contactSection = loggedContacts.length > 0
-    ? `\n\nJay already has these contacts logged at ${company}:\n` +
+    ? `\n\nThe candidate already has these contacts logged at ${company}:\n` +
       loggedContacts.map(c => `- ${c.name}${c.title ? ', ' + c.title : ''}${c.contact_type ? ' (' + c.contact_type + ')' : ''}`).join('\n')
-    : `\n\nJay has no existing contacts logged at ${company}.`;
+    : `\n\nThe candidate has no existing contacts logged at ${company}.`;
 
-  const prompt = `Jay Wadhwa is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.` +
+  const prompt = `${(currentProfile && currentProfile.full_name) || 'The candidate'} is targeting the ${role || 'VP/CMO Marketing'} role at ${company}, a ${size}-person ${type} company.` +
     contactSection +
-    `\n\nBuild a complete networking strategy for Jay including:\n` +
+    `\n\nBuild a complete networking strategy for ${(currentProfile && currentProfile.full_name) || 'the candidate'} including:\n` +
     `1. Who to connect with at ${company} — specific titles, departments, and why each matters\n` +
     `2. Best outreach approach for a ${type} company of this size\n` +
-    `3. Talking points that connect Jay's background to ${company}'s likely priorities\n` +
+    `3. Talking points that connect the candidate's background to ${company}'s likely priorities\n` +
     `4. A draft LinkedIn InMail subject line and opening paragraph for the hiring manager\n` +
     `5. A draft connection request note (under 300 characters)\n` +
-    (loggedContacts.length > 0 ? `6. How Jay should leverage his existing contacts at ${company}\n` : '') +
+    (loggedContacts.length > 0 ? `6. How the candidate should leverage their existing contacts at ${company}\n` : '') +
     (mode === 'web' ? `7. Specific LinkedIn search queries to find the right people at ${company}\n` : '') +
-    `\nWrite everything in Jay's voice. Confident, peer-to-peer, results-first. No banned words.`;
+    `\nWrite everything in the candidate's voice. Confident, peer-to-peer, results-first. No banned words.`;
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
@@ -6999,7 +7124,7 @@ async function sendFollowUpReminders() {
 
   // Build email body via Claude
   const itemList = due.map(d => '- ' + d.company + ': ' + d.action + ' (due ' + d.date + ')').join('\n');
-  const emailPrompt = 'Write a concise daily follow-up digest email for Jay Wadhwa listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers, Jay.\n\nItems:\n' + itemList;
+  const emailPrompt = 'Write a concise daily follow-up digest email for ' + ((currentProfile && currentProfile.full_name) || 'the user') + ' listing these action items due today. Use a clean, scannable format with the company/contact, action needed, and due date. Sign off with Cheers.\n\nItems:\n' + itemList;
   const emailBody = await callAI([{ role: 'user', content: emailPrompt }], getSystemPromptWithResume());
 
   // Save as AI output for reference
@@ -7011,7 +7136,8 @@ async function sendFollowUpReminders() {
   // Show in a modal with mailto link for direct email sending
   const subject = 'Job Search Follow-Ups — ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const mailtoBody = encodeURIComponent(emailBody);
-  const mailtoLink = 'mailto:jvwadhwa@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + mailtoBody;
+  const profileEmail = (currentProfile && currentProfile.email) ? currentProfile.email : '';
+  const mailtoLink = 'mailto:' + profileEmail + '?subject=' + encodeURIComponent(subject) + '&body=' + mailtoBody;
 
   // Store email body globally so copy button can access it
   window._reminderEmailBody = emailBody;
@@ -7129,7 +7255,7 @@ async function generateDashboardInsights() {
   allApps.forEach(a => { if (a.industry) industries[a.industry] = (industries[a.industry] || 0) + 1; });
   const topIndustries = Object.entries(industries).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([i,c])=>i+': '+c).join(', ');
 
-  const prompt = `Analyze Jay Wadhwa job search data and provide 4-6 specific, actionable insights and recommendations. Be direct and data-driven. No fluff.
+  const prompt = `Analyze job search data and provide 4-6 specific, actionable insights and recommendations. Be direct and data-driven. No fluff.
 
 DATA:
 - Total applications: ${total}
@@ -7143,7 +7269,7 @@ DATA:
 - Top sources: ${topSources || 'N/A'}
 - Top industries: ${topIndustries || 'N/A'}
 
-Jay is a senior marketing executive (VP/CMO level) targeting roles in SaaS, Web3, media, and nonprofits in Chicago and remote. Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
+ Focus your insights on: response rate benchmarks for executive roles, which sources are performing best, ghosting vs rejection patterns, and specific next steps to improve results.`
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
@@ -7365,7 +7491,7 @@ Write this as a dense research brief, not a summary. Include:
 - Market position: exact competitive claim they make, how they back it up
 - Top 3-5 named competitors with one-line differentiation for each
 - 3-4 specific opportunities tied to market conditions right now
-- 3-4 specific risks Jay needs to know walking in
+- 3-4 specific risks the candidate needs to know walking in
 - Recent news or developments worth knowing`,
     2: `## DOC 02: SWOT + COMPETITIVE ANALYSIS
 
@@ -7385,19 +7511,19 @@ After the SWOT table:
 - Named customer segments with specific examples
 - What each segment actually cares about (specific to this company)
 - Unmet needs this company is positioned to solve
-- Where Jay's marketing experience maps to their client acquisition challenges
+- Where the candidate's marketing experience maps to their client acquisition challenges
 - 2-3 high-growth micro-segments worth prioritizing in first 90 days`,
     4: `## DOC 04: 30-60-90 DAY PLAN
-Write as Jay's actual plan — not a generic template. Use the company name throughout.
+Write as the candidate's actual plan — not a generic template. Use the company name throughout.
 - Days 0-30: Listen and Learn — specific people to meet, systems to audit, deliverable at day 30
 - Days 31-60: Test and Build — specific campaigns, brand decisions, infrastructure to build
 - Days 61-90: Scale and Optimize — what's launching, what's measured, what success looks like
 - Each phase covers: brand, content, partnerships, demand generation, team/vendor relationships
-- End with "Key 90-Day Commitment" — one paragraph on what Jay commits to delivering`
+- End with "Key 90-Day Commitment" — one paragraph on what the candidate commits to delivering`
   };
   var p1Sections = call1Docs.map(function(n){ return p1DocSections[n]; }).join('\n\n');
 
-  const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\nJay Wadhwa background: 25 years marketing leadership. ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency). Secret Network Foundation (60% revenue growth, created programmable privacy category). Rogue Marketing LLC (fractional CMO). Multi-industry: media, SaaS, Web3, FinTech, nonprofits.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
+  const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\nCandidate background: ' + (currentProfile.years_experience || '25') + ' years of marketing leadership. ' + (currentProfile.career_win_1 || '') + (currentProfile.career_win_2 ? '. ' + currentProfile.career_win_2 : '') + (currentProfile.career_win_3 ? '. ' + currentProfile.career_win_3 : '') + '. Industry background: ' + (currentProfile.industry_background || 'media, SaaS, Web3, FinTech, nonprofits') + '.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
   let result1 = '';
   if (needCall1) {
     try {
@@ -7418,14 +7544,14 @@ Write as Jay's actual plan — not a generic template. Use the company name thro
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
   // Build prompt 2 dynamically based on selected docs 5-8
   var p2DocSections = {
-    5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Jay Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from Jay career\n- Section Key Overlaps: 4-5 paragraphs mapping Jay background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background (media, Web3, SaaS, nonprofits) is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
-    6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges Jay will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how Jay drives it\n- Jay Top 3 Talking Points: 3 things he must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why Jay is the right person right now.',
+    5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Candidate Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from the candidate career\n- Section Key Overlaps: 4-5 paragraphs mapping candidate background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
+    6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges the candidate will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how the candidate drives it\n- Top 3 Talking Points: 3 things the candidate must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why this candidate is the right person right now.',
     7: '## DOC 07: STRATEGIC QUESTIONS' + (intName ? ' FOR ' + intName.toUpperCase() : '') + '\nPure questions only — no answers. Demonstrate real research, not generic prep.\nMinimum 4 questions per category:\n**Team Dynamics** | **Strategic Priorities** | **Measurement and Success** | **Budget and Resources** | **Culture**' + (intName ? '\n**Questions Specifically for ' + intName + '**: 4 questions that only make sense given their background and role' : ''),
-    8: '## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in Jay voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us'
+    8: '## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in the candidate voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us'
   };
   var p2Sections = call2Docs.map(function(n){ return p2DocSections[n]; }).join('\n\n');
 
-  const prompt2 = 'You are a senior strategy consultant preparing Jay Wadhwa for a high-stakes marketing executive interview. Generate specific, opinionated documents written entirely in Jay voice. Generic answers get people cut.\n\n' + context + '\n\nJay Wadhwa career: ESPN Classic (quadrupled revenue to $40M, 6 Emmy Awards). NBC Sports Chicago (130% advertiser revenue growth, 25-person internal agency, 588% social growth). Secret Network Foundation (60% revenue growth, created programmable privacy category). PHI Labs ($5M VC secured). Rogue Marketing LLC (fractional CMO). 25 years, multi-industry.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
+  const prompt2 = 'You are a senior strategy consultant preparing a senior marketing executive for a high-stakes interview. Generate specific, opinionated documents written entirely in the candidate voice. Generic answers get people cut.\n\n' + context + '\n\nCandidate career: ' + (currentProfile.career_win_1 || '') + (currentProfile.career_win_2 ? '. ' + currentProfile.career_win_2 : '') + (currentProfile.career_win_3 ? '. ' + currentProfile.career_win_3 : '') + '. ' + (currentProfile.years_experience || '25') + ' years, multi-industry background: ' + (currentProfile.industry_background || 'media, SaaS, Web3, FinTech, nonprofits') + '.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
 
   let result2 = '';
   if (needCall2) {
@@ -7638,7 +7764,8 @@ async function exportIPZip() {
     try {
       const docBlob = await makeDocxBlob(sectionText, docTitle);
       const docArray = await docBlob.arrayBuffer();
-      outerZip.file(paddedIdx + '_Jay_Wadhwa_' + safeName + '_' + company.replace(/\s+/g,'_') + '.docx', docArray);
+      var dlName = ((currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') + '_' : '') + safeName + '_' + company.replace(/\s+/g,'_');
+      outerZip.file(paddedIdx + '_' + dlName + '.docx', docArray);
     } catch(e) {
       console.error('Failed to build doc for ' + name + ':', e);
     }
@@ -7648,7 +7775,8 @@ async function exportIPZip() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'Jay_Wadhwa_InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + dateStr + '.zip';
+  var zipName = ((currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') + '_' : '') + 'InterviewPrep_' + company.replace(/\s+/g,'_') + '_' + dateStr + '.zip';
+  a.download = zipName;
   a.click();
   URL.revokeObjectURL(url);
   toast(sectionCount + ' documents downloaded as zip.', 'success');
@@ -7747,7 +7875,7 @@ async function runResumeTailor() {
   const rows = Array.isArray(promptsData) ? promptsData : [];
   let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
   if (!prompt) {
-    prompt = 'Use Jay Wadhwa master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
+    prompt = 'Use the candidate master resume and tailor it for the role below. Run all 7 steps: keyword integration, core expertise review, redundancy audit, keyword preservation, final review, final redundancy pass, then export. Highlight all changes. Bold all stats.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}';
   }
   prompt = prompt.replace(/\{\{keywords_required\}\}/g, req || 'Extract from JD')
                  .replace(/\{\{keywords_nice\}\}/g, nice || 'Extract from JD')
@@ -7767,7 +7895,7 @@ async function runResumeTailor() {
     // Display clean version — strip [YLW] markers and AI preamble for readability
     var displayText = result
       .replace(/\[YLW\]/g, '').replace(/\[\/YLW\]/g, '')  // strip highlight markers
-      .replace(/^\s*[\s\S]*?(?=(?:Jay Wadhwa|VP,|SUMMARY|PROFESSIONAL|SELECT CLIENT|Building ))/i, '') // strip AI preamble before resume content
+      .replace(/^\s*[\s\S]*?(?=(?:VP,|SUMMARY|PROFESSIONAL|SELECT CLIENT|Building |EXPERIENCE|EDUCATION))/i, '') // strip AI preamble before resume content
       .trim();
     // Render **bold** as actual bold, preserve line breaks
     var htmlText = (displayText || result)
@@ -8052,22 +8180,31 @@ function buildResumeDocx(text, filename, markedUp) {
   var HDR_NAME_RPR  = rpr(GH, '44', BG, null, null);
   var HDR_CONT_RPR  = rpr(CL, '18', null, null, null);
 
+  var _p = currentProfile || {};
+  var _hdrName     = _p.full_name || '';
+  var _hdrPhone    = _p.phone || '';
+  var _hdrEmail    = _p.email || '';
+  var _hdrLocation = _p.target_location || '';
+  var _hdrLinkedIn = _p.linkedin_url || '';
+  var _hdrContact1 = [_hdrPhone, _hdrEmail].filter(Boolean).join(' | ');
+  var _hdrContact2 = [_hdrLocation, _hdrLinkedIn].filter(Boolean).join(' | ');
+
   var hdrXml =
     P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>',
-      '<w:r>'+HDR_NAME_RPR+'<w:t>Jay Wadhwa</w:t></w:r>'+
+      (_hdrName ? '<w:r>'+HDR_NAME_RPR+'<w:t>'+esc(_hdrName)+'</w:t></w:r>' : '')+
       '<w:r>'+HDR_NAME_RPR+'<w:tab/></w:r>'+
-      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">847-910-9377 | jvwadhwa@gmail.com</w:t></w:r>')+
+      (_hdrContact1 ? '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">'+esc(_hdrContact1)+'</w:t></w:r>' : ''))+
     P('<w:pPr><w:tabs><w:tab w:val="right" w:pos="11088"/></w:tabs><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr>',
       '<w:r>'+HDR_CONT_RPR+'<w:tab/></w:r>'+
-      '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">Greater Chicago Area | linkedin.com/in/jwadhwa</w:t></w:r>')+
+      (_hdrContact2 ? '<w:r>'+HDR_CONT_RPR+'<w:t xml:space="preserve">'+esc(_hdrContact2)+'</w:t></w:r>' : ''))+
     P('<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/></w:pBdr><w:spacing w:before="0" w:after="0"/></w:pPr>','');
 
   // ── Parse AI output into body paragraphs ─────────────────────────────────
   var lines = (text||'').split('\n');
   var bodyXml = '';
 
-  // Filter header lines that belong to Jay's contact info (already in hdrXml)
-  var headerPhrases = ['847-910-9377','jvwadhwa@gmail.com','linkedin.com/in/jwadhwa','Greater Chicago Area','Jay Wadhwa'];
+  // Filter header lines that belong to the user's contact info (already in hdrXml)
+  var headerPhrases = [_hdrPhone, _hdrEmail, _hdrLinkedIn, _hdrLocation, _hdrName].filter(Boolean);
   var filteredLines = lines.filter(function(line) {
     var cl = line.trim().replace(/<mark>/gi,'').replace(/<\/mark>/gi,'');
     if (!cl) return true;
@@ -8117,7 +8254,7 @@ function buildResumeDocx(text, filename, markedUp) {
 
   // Bold red phrases in Select Client Wins (case-insensitive match)
   var BOLD_PHRASES = [
-    '6 Emmy Awards and 9 Promax/BDA honors',
+    
     'Drove 4x revenue growth',
     '+96% revenue growth',
     '+588% digital audience growth'
@@ -8422,7 +8559,7 @@ function buildResumeDocx(text, filename, markedUp) {
     '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' +
     '</Types>';
 
-  var safe = (filename||'JayWadhwa_Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
+  var safe = (filename||((currentProfile && currentProfile.full_name ? currentProfile.full_name.replace(/\s+/g,'_') : '')+'_Resume')||'Resume').replace(/[^a-zA-Z0-9_\-]/g,'_');
 
   // Apply yellow highlights post-assembly — does not touch any formatting
   if (markedUp && baseResumeText) {
@@ -8458,8 +8595,8 @@ function exportRTDocx(markedUp) {
   var co = cleanForFilename(coRaw) || 'Company';
   var ro = cleanForFilename(roRaw) || 'Role';
   var fname = markedUp
-    ? 'JayWadhwa_' + co + '_' + ro + '_Resume_Markup'
-    : 'JayWadhwa_' + co + '_' + ro + '_Resume';
+    ? ((currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') : 'Resume') + '_' + co + '_' + ro + '_Resume_Markup'
+    : ((currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') : 'Resume') + '_' + co + '_' + ro + '_Resume';
   if (markedUp && !baseResumeText) {
     toast('Master Resume not loaded. Open Base Documents and save your resume first.', 'error');
     return;
@@ -8497,13 +8634,13 @@ async function runCLGenerator() {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const typePrompts = {
-    cover_letter: `Write a cover letter for Jay Wadhwa applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
-    inmail: `Write a LinkedIn InMail for Jay Wadhwa to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | Jay Wadhwa\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
-    linkedin_connect: `Write a LinkedIn connection request note for Jay Wadhwa to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
-    email_day1: `Write a Day 1 follow-up email for Jay Wadhwa who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
-    email_followup: `Write a Day 5 follow-up email for Jay Wadhwa on his application for ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
-    email_ceo: `Write a Day 7 peer-to-peer email for Jay Wadhwa to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''} Length: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.`,
-    rejection_followup: `Write a post-rejection follow-up email for Jay Wadhwa after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
+    cover_letter: `Write a cover letter for ${(currentProfile && currentProfile.full_name) || 'the candidate'} applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
+    inmail: `Write a LinkedIn InMail for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | ${(currentProfile && currentProfile.full_name) || 'the candidate'}\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
+    linkedin_connect: `Write a LinkedIn connection request note for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
+    email_day1: `Write a Day 1 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
+    email_followup: `Write a Day 5 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} on their application for ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
+    email_ceo: `Write a Day 7 peer-to-peer email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''} Length: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.`,
+    rejection_followup: `Write a post-rejection follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
   };
 
   const prompt = typePrompts[type] || typePrompts.cover_letter;
@@ -8571,7 +8708,7 @@ function runHunterSearch() {
       // If JD provided, use AI to rank — otherwise sort by confidence
       if (jd && relevant.length > 0) {
         var contactList = relevant.map(function(e, i) { return i+1 + '. ' + (e.first_name||'') + ' ' + (e.last_name||'') + ' — ' + (e.position||'Unknown') + ' (' + (e.confidence||0) + '% confidence)'; }).join('\n');
-        var rankPrompt = 'Jay Wadhwa is a senior marketing executive targeting VP/CMO/Director roles. He needs to find the best recruiter or hiring manager to contact at ' + company + '.\n\nJob Description:\n' + jd.slice(0,800) + '\n\nContacts found:\n' + contactList + '\n\nRank these contacts from most to least relevant for Jay to reach out to. Return ONLY a JSON array of the contact numbers in ranked order, e.g. [2,1,3]. No explanation.';
+        var rankPrompt = ((currentProfile && currentProfile.full_name) || 'The candidate') + ' is a senior marketing executive targeting VP/CMO/Director roles. They need to find the best recruiter or hiring manager to contact at ' + company + '.\n\nJob Description:\n' + jd.slice(0,800) + '\n\nContacts found:\n' + contactList + '\n\nRank these contacts from most to least relevant for the candidate to reach out to. Return ONLY a JSON array of the contact numbers in ranked order, e.g. [2,1,3]. No explanation.';
         callAI([{ role: 'user', content: rankPrompt }], '')
           .then(function(ranked) {
             try {
@@ -8687,7 +8824,14 @@ async function runOutreachBuilder() {
   const hm = (document.getElementById('ob-hm').value||'').trim();
   const url = (document.getElementById('ob-url').value||'').trim();
   const context = (document.getElementById('ob-context').value||'').trim();
+  const jd = (document.getElementById('ob-jd') ? document.getElementById('ob-jd').value||'' : '').trim();
+  if (!company) { toast('Company name is required.', 'error'); return; }
   if (!role) { toast('Role title is required.', 'error'); return; }
+
+  // Determine primary contact — use whoever is provided
+  const primaryContact = recruiter || hm || '';
+  const primaryContactLabel = recruiter ? 'Recruiter' : (hm ? 'Hiring Manager' : 'the appropriate contact');
+  const primaryEmail = email || '';
 
   const panel = document.getElementById('ob-output-panel');
   const contentEl = document.getElementById('ob-output-content');
@@ -8695,20 +8839,25 @@ async function runOutreachBuilder() {
   contentEl.textContent = 'Building your outreach sequence...';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const promptsData = await dbGet('prompts', 'select=*&name=eq.Outreach Sequence (4-Part)');
-  const rows = Array.isArray(promptsData) ? promptsData : [];
-  let prompt = rows.length > 0 ? (rows[0].system_prompt || '') : '';
-  if (!prompt) {
-    prompt = 'Write a complete 4-part outreach sequence for Jay Wadhwa who applied to the {{role}} role at {{company}}.\n\n1) Day 1: Email or InMail to recruiter or hiring manager (100-120 words)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to recruiter (75-85 words)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words)\n\nFor each include subject line, word count, and formatted copy. Select the 3-4 most relevant wins from Jay background for this company and role.';
-  }
-  prompt = prompt
-    .replace(/\{\{company\}\}/g, company)
-    .replace(/\{\{role\}\}/g, role)
-    .replace(/\{\{recruiter_name\}\}/g, recruiter)
-    .replace(/\{\{recruiter_email\}\}/g, email)
-    .replace(/\{\{hiring_manager\}\}/g, hm)
-    .replace(/\{\{company_url\}\}/g, url)
-    .replace(/\{\{company_context\}\}/g, context);
+  // Build a focused prompt directly — don't rely on stored template for contact logic
+  const candidateName = (currentProfile && currentProfile.full_name) || 'the candidate';
+  const wins = [
+    currentProfile && currentProfile.career_win_1,
+    currentProfile && currentProfile.career_win_2,
+    currentProfile && currentProfile.career_win_3
+  ].filter(Boolean);
+  const winsText = wins.length ? wins.map(function(w,i){ return (i+1)+'. '+w; }).join('\n') : 'Use the most relevant wins from the resume.';
+
+  let prompt = 'Write a 4-part outreach sequence for ' + candidateName + ' targeting the ' + role + ' role at ' + company + '.';
+  if (primaryContact) prompt += '\n\nPrimary contact: ' + primaryContact + ' (' + primaryContactLabel + ')' + (primaryEmail ? ', ' + primaryEmail : '') + '.';
+  if (hm && recruiter) prompt += '\nHiring Manager: ' + hm + '.';
+  prompt += '\n\nUse the primary contact\'s name in Day 1 and Day 5 touches. Use the hiring manager or CEO (real or generic) for Day 7.';
+  prompt += '\n\nThe outreach must reference ' + company + ' and the ' + role + ' role specifically — not generic placeholders.';
+  if (jd) prompt += '\n\nJob Description (use key responsibilities and requirements to personalize the outreach):\n' + jd;
+  if (url) prompt += '\n\nCompany URL: ' + url;
+  if (context) prompt += '\n\nRecent company context: ' + context;
+  prompt += '\n\nCandidate\'s top wins to reference:\n' + winsText;
+  prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
@@ -8730,7 +8879,7 @@ async function runOutreachBuilder() {
 }
 
 function clearOB() {
-  ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-jd','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   var recSel=document.getElementById('ob-recruiter-contact'); if(recSel) recSel.value='';
   var hmSel=document.getElementById('ob-hm-contact'); if(hmSel) hmSel.value='';
   const p=document.getElementById('ob-output-panel'); if(p) p.style.display='none'; obOutput='';
@@ -9016,7 +9165,7 @@ async function makeDocxBlob(text, title) {
       _ppr({ spacing_before: 0, spacing_after: 40, border_bottom: true })
     ) +
     _para(
-      _run('Jay Wadhwa  \u00b7  ' + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }), { color: '999999', sz: 18, font: 'Calibri' }),
+      _run(((currentProfile && currentProfile.full_name) ? currentProfile.full_name + '  \u00b7  ' : '') + new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }), { color: '999999', sz: 18, font: 'Calibri' }),
       _ppr({ spacing_before: 0, spacing_after: 200 })
     );
 
@@ -9148,7 +9297,8 @@ async function exportGenericDocx(text, filename) {
     const a = document.createElement('a');
     a.href = url;
     // If filename already starts with JayWadhwa, use as-is; otherwise prefix
-    var finalName = filename.startsWith('JayWadhwa') ? filename : 'JayWadhwa_' + filename;
+    var _namePrefix = (currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') : '';
+    var finalName = (_namePrefix && filename.startsWith(_namePrefix)) ? filename : (_namePrefix ? _namePrefix + '_' + filename : filename);
     a.download = finalName + '.docx';
     a.click();
     URL.revokeObjectURL(url);
@@ -9162,11 +9312,12 @@ function cleanForFilename(s) {
   return (s || '').trim().replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '');
 }
 
-// Naming convention: JayWadhwa_[Role]_[Company]_Resume
+// Naming convention: [FullName]_[Role]_[Company]_Resume
 async function exportCoverLetterDocx(text, company, role, contactName) {
   const role_clean    = cleanForFilename(role)    || 'Role';
   const company_clean = cleanForFilename(company) || 'Company';
-  const downloadName  = 'JayWadhwa_' + role_clean + '_' + company_clean + '_Cover Letter';
+  const _clNamePrefix = (currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') + '_' : '';
+  const downloadName  = _clNamePrefix + role_clean + '_' + company_clean + '_Cover Letter';
   try {
     toast('Preparing cover letter...', '');
     const response = await fetch(BASE_URL + '/base-coverletter.docx');
@@ -10418,7 +10569,8 @@ function copyJobSearchOutput() {
 function exportJobSearchDocx() {
   if (!jsOutput) { toast('Run a search first.', 'error'); return; }
   var dateStr = new Date().toISOString().split('T')[0];
-  exportGenericDocx(jsOutput, 'JayWadhwa_JobSearch_Results_' + dateStr);
+  var _jsNamePrefix = (currentProfile && currentProfile.full_name) ? currentProfile.full_name.replace(/\s+/g,'_') + '_' : '';
+  exportGenericDocx(jsOutput, _jsNamePrefix + 'JobSearch_Results_' + dateStr);
 }
 
 async function runInlineCompanyIntel(company, role, industry, btnEl) {
@@ -10446,16 +10598,16 @@ async function runInlineCompanyIntel(company, role, industry, btnEl) {
     ? '\n\nLogged contacts at ' + company + ':\n' + matched.map(function(c){ return '- ' + (c.name||'') + (c.title ? ', ' + c.title : ''); }).join('\n')
     : '';
 
-  var prompt = 'Jay Wadhwa is targeting the ' + role + ' role at ' + company + (industry ? ' (' + industry + ')' : '') + '.' + contactSection +
+  var prompt = ((currentProfile && currentProfile.full_name) || 'The candidate') + ' is targeting the ' + role + ' role at ' + company + (industry ? ' (' + industry + ')' : '') + '.' + contactSection +
     '\n\nProvide:\n' +
     '1. Who to contact — specific titles and why\n' +
-    '2. Top 3 talking points connecting Jay to this company\n' +
+    '2. Top 3 talking points connecting the candidate to this company\n' +
     '3. Suggested InMail subject line\n' +
     '4. One-sentence email opener specific to this company\n' +
     '5. Any recent news or leadership changes worth referencing\n' +
     '\nBe specific. Peer-to-peer CMO voice. No generic advice. Under 250 words.';
 
-  var jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a senior marketing executive (VP/CMO level) with 25+ years across ESPN, NBCUniversal, Web3, SaaS, FinTech, and nonprofits. Key wins: 4x revenue growth (ESPN Classic), 96% revenue growth in 9 months, 588% social growth, $5M VC secured, 6 Emmys. He targets VP/Director/CMO roles in the Greater Chicago area and remote. Search the web for real current job postings and return structured results.';
+  var jsSystemPrompt = getSystemPromptWithResume() + ' Search the web for real current job postings and return structured results.';
 
   try {
     var r = await fetch(WORKER_URL + '/ai', {
@@ -10521,7 +10673,7 @@ function jsBuildPrompt(params, seenJobs) {
   var excludeBlock = seenJobs.length > 0
     ? '\nDo NOT return any of these already-shown postings:\n' + seenJobs.map(function(j){ return '- ' + j.title + ' at ' + j.company; }).join('\n') + '\n'
     : '';
-  return 'Search for 10 marketing leadership job postings for Jay Wadhwa matching these criteria:\n' +
+  return 'Search for 10 marketing leadership job postings for ' + ((currentProfile && currentProfile.full_name) || 'the candidate') + ' matching these criteria:\n' +
     'Roles: ' + params.roles.split(',').slice(0,4).join(',') + '\n' +
     'Location: ' + params.location + ' (' + params.workTypes + ')\n' +
     'Industries: ' + params.selectedIndustries.slice(0,6).join(', ') + '\n' +
@@ -10549,7 +10701,7 @@ function jsBuildPrompt(params, seenJobs) {
     'company = company name (required)\n' +
     'url = best URL found — job board link is fine, empty string if none\n' +
     'salary = salary range if listed, empty string if unknown\n' +
-    'fit = one sentence why this fits Jay Wadhwa\n' +
+    'fit = one sentence why this fits the candidate\n' +
     'flags = any red flags, empty string if none\n' +
     'verified = "yes", "unconfirmed", or "no"\n' +
     'source = name of the site this posting was found on\n' +
@@ -10561,7 +10713,7 @@ async function jsRunSearchBatch(contentEl, isLoadMore) {
   var params = window._jsSearchParams;
   var seenJobs = window._jsSeenJobs || [];
 
-  const jsSystemPrompt = 'You are a job search assistant for Jay Wadhwa, a VP/CMO-level marketing executive with 25+ years experience at ESPN, NBC Sports, Web3 and SaaS companies in the Chicago area. Search the web and return job postings as a JSON array. CRITICAL: Your response must start with [ and end with ]. No prose before or after the array. No markdown. No code fences. No preamble. No explanation. Just the raw JSON array. If a field is unknown use empty string — never skip a result.';
+  const jsSystemPrompt = getSystemPromptWithResume() + ' Search the web and return job postings as a JSON array. CRITICAL: Your response must start with [ and end with ]. No prose before or after the array. No markdown. No code fences. No preamble. No explanation. Just the raw JSON array. If a field is unknown use empty string — never skip a result.';
   const prompt = jsBuildPrompt(params, seenJobs);
 
   // Show loading indicator
@@ -10774,6 +10926,8 @@ function addSelectedToApps() {
 // ── INIT ───────────────────────────────────────────────────────────────
 (async function initApp() {
   populateDropdowns();
+  // Wait for auth token before fetching any data
+  if (!window._cachedJWT) return;
   // Load applications first, then contacts, then render dashboard — in order
   const appData = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
   allApps = Array.isArray(appData) ? appData : [];
@@ -10844,6 +10998,98 @@ function addSelectedToApps() {
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button class="btn btn-secondary" onclick="closeModal('modal-ai-settings')">Cancel</button>
         <button class="btn btn-primary" onclick="saveAISettings()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MY PROFILE MODAL -->
+<div id="modal-my-profile" class="modal-overlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h2 class="modal-title">My Profile</h2>
+      <button class="modal-close" onclick="closeModal('modal-my-profile')">×</button>
+    </div>
+    <div class="modal-body" style="padding:24px;max-height:70vh;overflow-y:auto">
+      <div style="background:var(--bg-hover);border-left:3px solid var(--burgundy);padding:10px 14px;border-radius:4px;margin-bottom:16px;font-size:13px;color:var(--text-primary)">
+        Fill this out before using any other feature. It personalizes everything.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Full Name</label>
+          <input class="form-input" id="prof-full_name" placeholder="Jane Smith" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Current Title</label>
+          <input class="form-input" id="prof-current_title" placeholder="VP of Marketing" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Target Role</label>
+          <input class="form-input" id="prof-target_role" placeholder="VP / CMO / Director" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Target Location</label>
+          <input class="form-input" id="prof-target_location" placeholder="Chicago metro" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Email</label>
+          <input class="form-input" id="prof-email" type="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Phone</label>
+          <input class="form-input" id="prof-phone" type="tel" placeholder="555-555-5555" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">LinkedIn URL</label>
+          <input class="form-input" id="prof-linkedin_url" placeholder="linkedin.com/in/yourname" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Company / Firm</label>
+          <input class="form-input" id="prof-company_name" placeholder="Your company or firm" style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Industry Background</label>
+          <input class="form-input" id="prof-industry_background" placeholder="Media, SaaS, Web3, FinTech..." style="width:100%;box-sizing:border-box" />
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Years of Experience</label>
+          <input class="form-input" id="prof-years_experience" type="number" placeholder="25" style="width:100%;box-sizing:border-box" />
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Career Win #1</label>
+        <input class="form-input" id="prof-career_win_1" placeholder="Provide stats, accomplishments, career highlights, etc." style="width:100%;box-sizing:border-box" />
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Career Win #2</label>
+        <input class="form-input" id="prof-career_win_2" placeholder="Provide stats, accomplishments, career highlights, etc." style="width:100%;box-sizing:border-box" />
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">Career Win #3</label>
+        <input class="form-input" id="prof-career_win_3" placeholder="Provide stats, accomplishments, career highlights, etc." style="width:100%;box-sizing:border-box" />
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:18px" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">AI Provider</label>
+          <select id="prof-ai-provider" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);box-sizing:border-box">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">ChatGPT (OpenAI)</option>
+            <option value="gemini">Gemini (Google)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">API Key</label>
+          <input type="password" id="prof-ai-api-key" placeholder="Paste your API key (optional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);box-sizing:border-box" />
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">HubSpot Portal ID <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label>
+        <input class="form-input" id="prof-hubspot_portal_id" placeholder="e.g. 242599414 — found in your HubSpot account URL" style="width:100%;box-sizing:border-box" />
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-my-profile')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
       </div>
     </div>
   </div>
