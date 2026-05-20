@@ -3064,7 +3064,7 @@ function sendMagicLink() {
   const msg   = document.getElementById('login-msg');
   if (!email) { msg.textContent = 'Please enter your email.'; return; }
   msg.textContent = 'Sending...';
-  _supa.auth.signInWithOtp({ email: email, options: { emailRedirectTo: 'https://chyp-16.github.io/job-search-command-center' } }).then(function(res) {
+  _supa.auth.signInWithOtp({ email: email, options: { emailRedirectTo: window.location.origin + window.location.pathname } }).then(function(res) {
     if (res.error) {
       msg.textContent = 'Error: ' + res.error.message;
     } else {
