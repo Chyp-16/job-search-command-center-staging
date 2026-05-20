@@ -3427,6 +3427,9 @@ function openMyProfile() {
 }
 
 async function loadAISettings() {
+  // Don't re-run if wizard is already showing (tab switch fires auth state again)
+  var obOverlay = document.getElementById('onboarding-overlay');
+  if (obOverlay && !obOverlay.classList.contains('hidden')) return;
   try {
     const session = await _supa.auth.getSession();
     const userId = session?.data?.session?.user?.id;
@@ -3780,9 +3783,8 @@ async function refreshDashboard() {
     const data = await dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
     allApps = Array.isArray(data) ? data : [];
   }
-  // Auto-sync HubSpot tasks and activity on dashboard load — only if HubSpot is connected
-  var _hsPortal = (currentProfile && currentProfile.hubspot_portal_id) || window._hubspotPortalId || '';
-  if (!window._hubspotAutoSynced && _hsPortal) {
+  // Auto-sync HubSpot tasks and activity on dashboard load
+  if (!window._hubspotAutoSynced) {
     window._hubspotAutoSynced = true;
     syncHubSpotTasks();
     syncHubSpotActivity();
@@ -11251,10 +11253,13 @@ var _obProvider = 'claude';
 var _obHsChoice = 'skip';
 
 function obShow() {
+  // If wizard is already visible, don't reset it (e.g. tab switch triggers auth re-fire)
+  var overlay = document.getElementById('onboarding-overlay');
+  if (overlay && !overlay.classList.contains('hidden')) return;
   var stepStr = currentProfile.onboarding_step;
   _obStep = (stepStr && parseInt(stepStr) >= 1 && parseInt(stepStr) <= 5) ? parseInt(stepStr) : 1;
   obRenderStep(_obStep);
-  document.getElementById('onboarding-overlay').classList.remove('hidden');
+  overlay.classList.remove('hidden');
 }
 
 function obHide() {
