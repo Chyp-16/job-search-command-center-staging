@@ -1219,6 +1219,9 @@ a { color: var(--burgundy); text-decoration: none; }
       </div>
     </div>
     <div class="sidebar-footer">
+      <div class="nav-item admin-only" data-page="admin" style="display:none">
+        <span class="nav-icon">🛡</span><span>Admin</span>
+      </div>
       <button class="theme-toggle" onclick="toggleTheme()">
         <span id="theme-icon">🌙</span><span id="theme-label">Dark Mode</span>
       </button>
@@ -2382,6 +2385,35 @@ a { color: var(--burgundy); text-decoration: none; }
           </thead>
           <tbody id="docs-tbody">
             <tr><td colspan="8"><div class="loading-overlay"><div class="loading-spinner" style="border-color:rgba(0,0,0,.15);border-top-color:var(--burgundy)"></div> Loading...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ADMIN ─────────────────────────────────────────────────── -->
+    <div class="page" id="page-admin">
+      <div class="page-header">
+        <h1 class="page-title">🛡 Admin — User Overview</h1>
+        <button class="btn btn-secondary btn-sm" onclick="loadAdminPanel()">⟳ Refresh</button>
+      </div>
+      <div style="overflow-x:auto;margin-top:16px">
+        <table class="data-table" id="admin-user-table" style="min-width:900px;font-size:13px">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Signup Date</th>
+              <th>Last Login</th>
+              <th>Apps</th>
+              <th>Contacts</th>
+              <th>AI Provider</th>
+              <th>HubSpot</th>
+              <th>Onboarding</th>
+            </tr>
+          </thead>
+          <tbody id="admin-user-tbody">
+            <tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">Click Refresh to load users.</td></tr>
           </tbody>
         </table>
       </div>
@@ -3759,6 +3791,7 @@ function navigateTo(page) {
   if (page === 'coverlettergenerator') loadCLGPage();
   if (page === 'outreachbuilder') loadOBPage();
   if (page === 'uploads') loadDocsPage();
+  if (page === 'admin') loadAdminPanel();
 }
 
 // Use event delegation on the sidebar so all nav items work regardless of when they were added
@@ -5653,6 +5686,42 @@ function snoozeBackup() {
   var banner = document.getElementById('backup-banner');
   if (banner) banner.remove();
   toast('Backup reminder snoozed for 2 days.');
+}
+
+async function loadAdminPanel() {
+  var userEmail = (currentProfile && currentProfile.email) || '';
+  if (userEmail !== 'jvwadhwa@gmail.com') { toast('Not authorized.', 'error'); return; }
+  var tbody = document.getElementById('admin-user-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading...</td></tr>';
+  try {
+    const r = await fetch(WORKER_URL + '/admin/users', {
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' }
+    });
+    if (!r.ok) { toast('Admin data load failed.', 'error'); return; }
+    const users = await r.json();
+    if (!Array.isArray(users) || users.length === 0) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">No users found.</td></tr>';
+      return;
+    }
+    if (tbody) tbody.innerHTML = users.map(function(u) {
+      var signup = u.created_at ? new Date(u.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+      var lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+      return '<tr>' +
+        '<td>' + (u.full_name || '—') + '</td>' +
+        '<td>' + (u.email || '—') + '</td>' +
+        '<td>' + (u.target_role || '—') + '</td>' +
+        '<td>' + signup + '</td>' +
+        '<td>' + lastLogin + '</td>' +
+        '<td style="text-align:center">' + (u.app_count || 0) + '</td>' +
+        '<td style="text-align:center">' + (u.contact_count || 0) + '</td>' +
+        '<td>' + (u.ai_provider || 'claude') + '</td>' +
+        '<td style="text-align:center">' + (u.hubspot_connected ? '✅' : '—') + '</td>' +
+        '<td style="text-align:center">' + (u.onboarding_complete ? '✅' : '—') + '</td>' +
+      '</tr>';
+    }).join('');
+  } catch(e) {
+    toast('Failed to load admin data.', 'error');
+  }
 }
 
 async function runSupabaseBackup() {
