@@ -5485,15 +5485,14 @@ async function saveContact() {
         }
       }
     } else {
-      const result = await dbPost('contacts', payload);
-      const saved = Array.isArray(result) ? result[0] : result;
+      await dbPost('contacts', payload);
+      const fresh = await dbGet('contacts', 'select=*&order=created_at.desc&limit=1');
+      const saved = Array.isArray(fresh) && fresh[0] ? fresh[0] : null;
       if (saved) allContacts.unshift(saved);
       toast('Contact added.', 'success');
-      // Save touchpoints for new contact
       if (saved && saved.id) await ctSaveTouchpoints(saved.id);
       closeModal('modal-contact');
       filterContacts();
-      // Push to HubSpot now that we have the saved contact with its DB id
       if (saved) await pushContactToHubSpot(saved);
       return;
     }
