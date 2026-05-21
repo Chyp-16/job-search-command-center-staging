@@ -2240,35 +2240,31 @@ a { color: var(--burgundy); text-decoration: none; }
                 </select>
               </div>
               <div class="form-group">
+                <label class="form-label">Company URL</label>
+                <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
+              </div>
+              <div class="form-group">
                 <label class="form-label">Recruiter / Primary Contact</label>
                 <select class="form-select" id="ob-recruiter-contact" onchange="(function(){ var sel=document.getElementById('ob-recruiter-contact'); var opt=sel.options[sel.selectedIndex]; if(opt&&opt.dataset.name){ document.getElementById('ob-recruiter').value=opt.dataset.name; document.getElementById('ob-email').value=opt.dataset.email||''; } else { document.getElementById('ob-recruiter').value=''; document.getElementById('ob-email').value=''; } })()"><option value="">— Select from contacts —</option></select>
               </div>
               <div class="form-group">
-                <label class="form-label">Or type a name</label>
+                <label class="form-label">Or type name (Recruiter / Primary Contact)</label>
                 <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
               </div>
               <div class="form-group">
-                <label class="form-label">Recruiter Email</label>
-                <input class="form-input" type="email" id="ob-email" placeholder="recruiter@company.com">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Hiring Manager / CEO</label>
+                <label class="form-label">Hiring Manager</label>
                 <select class="form-select" id="ob-hm-contact" onchange="(function(){ var sel=document.getElementById('ob-hm-contact'); var opt=sel.options[sel.selectedIndex]; if(opt&&opt.dataset.name){ document.getElementById('ob-hm').value=opt.dataset.name; } else { document.getElementById('ob-hm').value=''; } })()"><option value="">— Select from contacts —</option></select>
               </div>
               <div class="form-group">
-                <label class="form-label">Or type a name</label>
+                <label class="form-label">Or type name (Hiring Manager)</label>
                 <input class="form-input" type="text" id="ob-hm" placeholder="First name">
               </div>
               <div class="form-group full">
                 <label class="form-label">Job Description <span style="font-weight:400;color:var(--text-secondary)">(paste or drag a file)</span></label>
-                <textarea class="form-textarea" id="ob-jd" rows="5" placeholder="Paste the job description here — or drag and drop a .txt or .docx file..."
+                <textarea class="form-textarea" id="ob-jd" rows="5" placeholder="Paste the job description here — or drag and drop a .txt or .docx file..." style="text-align:justify"
                   ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)'"
                   ondragleave="this.style.borderColor=''"
                   ondrop="event.preventDefault();this.style.borderColor='';(function(f){if(!f)return;extractFileText(f).then(function(txt){document.getElementById('ob-jd').value=txt;}).catch(function(err){toast('Could not read file: '+err.message,'error');});})(event.dataTransfer.files[0])"></textarea>
-              </div>
-              <div class="form-group full">
-                <label class="form-label">Company URL</label>
-                <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
               </div>
               <div class="form-group full">
                 <label class="form-label">Recent Company News or Context</label>
