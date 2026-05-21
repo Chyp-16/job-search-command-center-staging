@@ -1972,6 +1972,16 @@ a { color: var(--burgundy); text-decoration: none; }
         </div>
 
         <!-- Output Panel -->
+        <div id="ip-progress-panel" style="display:none;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:24px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px" id="ip-progress-label">Building your prep pack...</div>
+          <div style="background:var(--hover);border-radius:4px;height:10px;overflow:hidden">
+            <div id="ip-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
+            <span>Step <span id="ip-progress-step">0</span> of 5</span>
+            <span id="ip-progress-pct">0%</span>
+          </div>
+        </div>
         <div class="dash-card" id="ip-output-panel" style="display:none;">
           <div class="dash-card-header">
             ✦ Interview Prep Pack
@@ -2175,6 +2185,16 @@ a { color: var(--burgundy); text-decoration: none; }
             </div>
           </div>
         </div>
+        <div id="clg-progress-panel" style="display:none;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:24px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px" id="clg-progress-label">Generating your document...</div>
+          <div style="background:var(--hover);border-radius:4px;height:10px;overflow:hidden">
+            <div id="clg-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
+            <span>Step <span id="clg-progress-step">0</span> of 4</span>
+            <span id="clg-progress-pct">0%</span>
+          </div>
+        </div>
         <div class="dash-card" id="clg-output-panel" style="display:none">
           <div class="dash-card-header">✦ Generated Document
             <div style="display:flex;gap:8px">
@@ -2281,6 +2301,16 @@ a { color: var(--burgundy); text-decoration: none; }
               <button class="btn btn-primary" style="flex:1;padding:12px" onclick="runOutreachBuilder()">✦ Build Outreach Sequence</button>
               <button class="btn btn-secondary" onclick="clearOB()">Clear</button>
             </div>
+          </div>
+        </div>
+        <div id="ob-progress-panel" style="display:none;padding:20px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:24px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px" id="ob-progress-label">Building your outreach sequence...</div>
+          <div style="background:var(--hover);border-radius:4px;height:10px;overflow:hidden">
+            <div id="ob-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
+            <span>Step <span id="ob-progress-step">0</span> of 4</span>
+            <span id="ob-progress-pct">0%</span>
           </div>
         </div>
         <div class="dash-card" id="ob-output-panel" style="display:none">
@@ -7889,6 +7919,7 @@ function stopInterviewPrep() {
     var genBtn = document.getElementById('ip-gen-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     if (genBtn) genBtn.disabled = false;
+    var pp = document.getElementById('ip-progress-panel'); if (pp) pp.style.display = 'none';
     var contentEl = document.getElementById('ip-output-content');
     if (contentEl && !ipOutput) contentEl.textContent = 'Generation cancelled.';
     toast('Generation stopped.', '');
@@ -8011,11 +8042,34 @@ async function runInterviewPrep() {
 
   const panel = document.getElementById('ip-output-panel');
   const contentEl = document.getElementById('ip-output-content');
-  panel.style.display = 'block';
+  var ipProgPanel = document.getElementById('ip-progress-panel');
+  var ipProgBar   = document.getElementById('ip-progress-bar');
+  var ipProgLabel = document.getElementById('ip-progress-label');
+  var ipProgStep  = document.getElementById('ip-progress-step');
+  var ipProgPct   = document.getElementById('ip-progress-pct');
+  panel.style.display = 'none';
+  ipProgPanel.style.display = 'block';
+  ipProgPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var ipStepLabels = [
+    'Step 1 of 5 — Analyzing company and role...',
+    'Step 2 of 5 — Building SWOT analysis...',
+    'Step 3 of 5 — Generating interview questions...',
+    'Step 4 of 5 — Writing executive brief...',
+    'Step 5 of 5 — Finalizing prep pack...'
+  ];
+  var ipStepIndex = 0;
+  var ipProgressInterval = setInterval(function() {
+    if (ipStepIndex >= ipStepLabels.length) return;
+    ipProgLabel.textContent = ipStepLabels[ipStepIndex];
+    ipProgStep.textContent = ipStepIndex + 1;
+    var pct = Math.round(((ipStepIndex + 1) / 5) * 90);
+    ipProgBar.style.width = pct + '%';
+    ipProgPct.textContent = pct + '%';
+    ipStepIndex++;
+  }, 8000);
   contentEl.style.maxHeight = '600px';
   contentEl.style.background = '';
   contentEl.style.padding = '';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   var genBtn = document.getElementById('ip-gen-btn');
   var stopBtn = document.getElementById('ip-stop-btn');
   if (genBtn) genBtn.disabled = true;
@@ -8136,7 +8190,14 @@ Write as the candidate's actual plan — not a generic template. Use the company
     .replace(/^[-•]\s+/gm, '')
     .replace(/`{1,3}/g, '')
     .trim();
+  clearInterval(ipProgressInterval);
+  ipProgBar.style.width = '100%';
+  ipProgPct.textContent = '100%';
+  ipProgStep.textContent = '5';
+  ipProgLabel.textContent = 'Complete — prep pack ready.';
+  setTimeout(function() { ipProgPanel.style.display = 'none'; }, 1200);
   ipOutput = ipCleaned;
+  panel.style.display = 'block';
   contentEl.textContent = ipCleaned;
   ipSections = parseIPSections(ipCleaned, company, role);
 
@@ -8286,6 +8347,7 @@ function clearInterviewPrep() {
   });
   const panel = document.getElementById('ip-output-panel');
   if (panel) panel.style.display = 'none';
+  var pp = document.getElementById('ip-progress-panel'); if (pp) pp.style.display = 'none';
   ipOutput = ''; ipSections = {};
 }
 
@@ -9207,9 +9269,30 @@ async function runCLGenerator() {
 
   const panel = document.getElementById('clg-output-panel');
   const contentEl = document.getElementById('clg-output-content');
-  panel.style.display = 'block';
-  contentEl.textContent = 'Generating...';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var clgProgPanel = document.getElementById('clg-progress-panel');
+  var clgProgBar   = document.getElementById('clg-progress-bar');
+  var clgProgLabel = document.getElementById('clg-progress-label');
+  var clgProgStep  = document.getElementById('clg-progress-step');
+  var clgProgPct   = document.getElementById('clg-progress-pct');
+  panel.style.display = 'none';
+  clgProgPanel.style.display = 'block';
+  clgProgPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var clgStepLabels = [
+    'Step 1 of 4 — Reviewing job description...',
+    'Step 2 of 4 — Matching your experience...',
+    'Step 3 of 4 — Shaping your voice...',
+    'Step 4 of 4 — Finalizing document...'
+  ];
+  var clgStepIndex = 0;
+  var clgProgressInterval = setInterval(function() {
+    if (clgStepIndex >= clgStepLabels.length) return;
+    clgProgLabel.textContent = clgStepLabels[clgStepIndex];
+    clgProgStep.textContent = clgStepIndex + 1;
+    var pct = Math.round(((clgStepIndex + 1) / 4) * 90);
+    clgProgBar.style.width = pct + '%';
+    clgProgPct.textContent = pct + '%';
+    clgStepIndex++;
+  }, 4000);
 
   const typePrompts = {
     cover_letter: `Write a cover letter for ${(currentProfile && currentProfile.full_name) || 'the candidate'} applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
@@ -9225,6 +9308,12 @@ async function runCLGenerator() {
 
   try {
     const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+    clearInterval(clgProgressInterval);
+    clgProgBar.style.width = '100%';
+    clgProgPct.textContent = '100%';
+    clgProgStep.textContent = '4';
+    clgProgLabel.textContent = 'Complete — document ready.';
+    setTimeout(function() { clgProgPanel.style.display = 'none'; }, 1200);
     var clgCleaned = result
       .replace(/^#{1,6}\s*/gm, '')
       .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -9233,17 +9322,25 @@ async function runCLGenerator() {
       .replace(/`{1,3}/g, '')
       .trim();
     clgOutput = clgCleaned;
+    panel.style.display = 'block';
     contentEl.textContent = clgCleaned;
     const linkedId = document.getElementById('clg-link-app').value || null;
     await dbPost('ai_outputs', { output_type: type, linked_application_id: linkedId, content: clgCleaned });
     toast('Document generated.', 'success');
-  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
+  } catch(e) {
+    clearInterval(clgProgressInterval);
+    clgProgPanel.style.display = 'none';
+    panel.style.display = 'block';
+    contentEl.textContent = 'Error: ' + e.message;
+    toast('Failed: ' + e.message, 'error');
+  }
 }
 
 function clearCLG() {
   ['clg-company','clg-role','clg-contact','clg-jd'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
   var cd=document.getElementById('clg-contact-dropdown'); if(cd) cd.value='';
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
+  var pp=document.getElementById('clg-progress-panel'); if(pp) pp.style.display='none';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
 function exportCLGDocx() { var co=(document.getElementById('clg-company').value||'').trim(); var ro=(document.getElementById('clg-role').value||'').trim(); var ct=(document.getElementById('clg-contact').value||'').trim(); exportCoverLetterDocx(clgOutput, co, ro, ct); }
@@ -9419,9 +9516,14 @@ function runOutreachBuilder() {
   };
   var panel = document.getElementById('ob-output-panel');
   var contentEl = document.getElementById('ob-output-content');
-  panel.style.display = 'block';
-  contentEl.textContent = 'Building your outreach sequence...';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var obProgPanel = document.getElementById('ob-progress-panel');
+  var obProgBar   = document.getElementById('ob-progress-bar');
+  var obProgLabel = document.getElementById('ob-progress-label');
+  var obProgStep  = document.getElementById('ob-progress-step');
+  var obProgPct   = document.getElementById('ob-progress-pct');
+  panel.style.display = 'none';
+  obProgPanel.style.display = 'block';
+  obProgPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   window.setTimeout(function() {
     document.dispatchEvent(new CustomEvent('ob-run-ready'));
   }, 100);
@@ -9430,6 +9532,27 @@ function runOutreachBuilder() {
 document.addEventListener('ob-run-ready', function() {
   var d = window._pendingOB;
   if (!d) return;
+  var obProgPanel = document.getElementById('ob-progress-panel');
+  var obProgBar   = document.getElementById('ob-progress-bar');
+  var obProgLabel = document.getElementById('ob-progress-label');
+  var obProgStep  = document.getElementById('ob-progress-step');
+  var obProgPct   = document.getElementById('ob-progress-pct');
+  var obStepLabels = [
+    'Step 1 of 4 — Analyzing company and role...',
+    'Step 2 of 4 — Building Day 1 outreach...',
+    'Step 3 of 4 — Building Days 3 and 5...',
+    'Step 4 of 4 — Writing Day 7 executive email...'
+  ];
+  var obStepIndex = 0;
+  var obProgressInterval = setInterval(function() {
+    if (obStepIndex >= obStepLabels.length) return;
+    obProgLabel.textContent = obStepLabels[obStepIndex];
+    obProgStep.textContent = obStepIndex + 1;
+    var pct = Math.round(((obStepIndex + 1) / 4) * 90);
+    obProgBar.style.width = pct + '%';
+    obProgPct.textContent = pct + '%';
+    obStepIndex++;
+  }, 5000);
   var primaryContact = d.recruiter || d.hm || '';
   var primaryContactLabel = d.recruiter ? 'Recruiter' : (d.hm ? 'Hiring Manager' : 'the appropriate contact');
   var candidateName = (currentProfile && currentProfile.full_name) || 'the candidate';
@@ -9450,7 +9573,14 @@ document.addEventListener('ob-run-ready', function() {
   prompt += '\n\nCandidate\'s top wins to reference:\n' + winsText;
   prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
   var contentEl = document.getElementById('ob-output-content');
+  var panel = document.getElementById('ob-output-panel');
   callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume()).then(function(result) {
+    clearInterval(obProgressInterval);
+    obProgBar.style.width = '100%';
+    obProgPct.textContent = '100%';
+    obProgStep.textContent = '4';
+    obProgLabel.textContent = 'Complete — outreach sequence ready.';
+    setTimeout(function() { obProgPanel.style.display = 'none'; }, 1200);
     var cleaned = result
       .replace(/^#{1,6}\s*/gm, '')
       .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -9459,6 +9589,7 @@ document.addEventListener('ob-run-ready', function() {
       .replace(/`{1,3}/g, '')
       .trim();
     obOutput = cleaned;
+    panel.style.display = 'block';
     contentEl.textContent = cleaned;
     dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: d.linkedId, content: result });
     if (d.linkedId) {
@@ -9471,7 +9602,13 @@ document.addEventListener('ob-run-ready', function() {
       }
     }
     toast('Outreach sequence generated.', 'success');
-  }).catch(function(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); });
+  }).catch(function(e) {
+    clearInterval(obProgressInterval);
+    obProgPanel.style.display = 'none';
+    panel.style.display = 'block';
+    contentEl.textContent = 'Error: ' + e.message;
+    toast('Failed: ' + e.message, 'error');
+  });
 });
 
 function clearOB() {
