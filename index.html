@@ -4483,6 +4483,7 @@ function saveApp() {
     rejection_followup_status: getVal('f-rf-status'),
     rejection_followup_date: getVal('f-rf-date'),
     rejection_followup_notes: getVal('f-rf-notes'),
+    user_id: currentProfile.id || null,
   };
 
   const currentEditingId = editingId;
@@ -5469,6 +5470,7 @@ async function saveContact() {
     outreach_1_type: null, outreach_1_status: null, outreach_1_date: null, outreach_1_notes: null,
     outreach_2_type: null, outreach_2_status: null, outreach_2_date: null, outreach_2_notes: null,
     outreach_3_type: null, outreach_3_status: null, outreach_3_date: null, outreach_3_notes: null,
+    user_id: currentProfile.id || null,
   };
   try {
     if (editingId) {
