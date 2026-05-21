@@ -1256,7 +1256,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <div class="dash-card-header">
               📋 Tasks
               <div style="display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>
+                <span id="tasks-hs-btn-wrap"></span>
                 <button class="btn btn-primary btn-sm" onclick="openAddTask()">+ Add</button>
               </div>
             </div>
@@ -1267,7 +1267,7 @@ a { color: var(--burgundy); text-decoration: none; }
           <div class="dash-card">
             <div class="dash-card-header">
               🕐 Activity Feed
-              <button class="btn btn-secondary btn-sm" onclick="syncHubSpotActivity()" id="activity-sync-btn">⟳ Sync HubSpot</button>
+              <span id="activity-hs-btn-wrap"></span>
             </div>
             <div class="dash-card-body" id="activity-feed">
               <div style="padding:20px;font-size:13px;color:var(--text-secondary)">Click ⟳ Sync HubSpot to load recent activity.</div>
@@ -1386,7 +1386,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <option value="Networking">Networking</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="openModal('modal-recruiter-import')">⬆ Import Recruiters</button>
-          <button class="btn btn-secondary btn-sm" onclick="syncHubSpot()" id="hs-sync-btn">⟳ Sync HubSpot</button>
+          <span id="contacts-hs-btn-wrap"></span>
           <button class="btn btn-primary" onclick="openAddContact()">+ Add Contact</button>
         </div>
       </div>
@@ -3421,6 +3421,50 @@ async function saveProfile() {
   }
 }
 
+async function connectHubSpot() {
+  try {
+    var apiKey   = (document.getElementById('prof-hubspot_api_key') || {}).value || '';
+    var portalId = (document.getElementById('prof-hubspot_portal_id') || {}).value || '';
+    if (!apiKey) { toast('Paste your HubSpot API key first.', 'error'); return; }
+    const session = await _supa.auth.getSession();
+    const userId  = session?.data?.session?.user?.id;
+    if (!userId) { toast('Not logged in.', 'error'); return; }
+    var payload = { hubspot_api_key: apiKey, hubspot_portal_id: portalId, hubspot_connected: true };
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(payload)
+    });
+    Object.assign(currentProfile, payload);
+    applyHubSpotUI();
+    toast('HubSpot connected.', 'success');
+  } catch(e) {
+    toast('Failed to connect HubSpot.', 'error');
+  }
+}
+
+async function disconnectHubSpot() {
+  if (!confirm('Disconnect HubSpot? This clears your API key and hides HubSpot features.')) return;
+  try {
+    const session = await _supa.auth.getSession();
+    const userId  = session?.data?.session?.user?.id;
+    if (!userId) { toast('Not logged in.', 'error'); return; }
+    var payload = { hubspot_api_key: '', hubspot_portal_id: '', hubspot_connected: false };
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify(payload)
+    });
+    Object.assign(currentProfile, payload);
+    var keyEl = document.getElementById('prof-hubspot_api_key');
+    if (keyEl) keyEl.value = '';
+    applyHubSpotUI();
+    toast('HubSpot disconnected.', 'success');
+  } catch(e) {
+    toast('Failed to disconnect HubSpot.', 'error');
+  }
+}
+
 function openMyProfile() {
   applyProfileToUI();
   openModal('modal-my-profile');
@@ -3496,6 +3540,44 @@ function applyProfileToUI() {
   document.querySelectorAll('.admin-only').forEach(function(el) {
     el.style.display = isAdmin ? '' : 'none';
   });
+  applyHubSpotUI();
+}
+
+function applyHubSpotUI() {
+  var connected = !!(currentProfile && currentProfile.hubspot_connected);
+  var connectPrompt = '<span style="font-size:12px;color:var(--text-secondary)"><a href="#" onclick="openMyProfile();return false;" style="color:var(--text-secondary);text-decoration:underline">Connect HubSpot</a></span>';
+
+  // Dashboard — Tasks sync button
+  var tasksWrap = document.getElementById('tasks-hs-btn-wrap');
+  if (tasksWrap) {
+    tasksWrap.innerHTML = connected
+      ? '<button class="btn btn-secondary btn-sm" onclick="syncHubSpotTasks()" id="tasks-sync-btn">⟳ Sync HubSpot</button>'
+      : connectPrompt;
+  }
+
+  // Dashboard — Activity sync button
+  var activityWrap = document.getElementById('activity-hs-btn-wrap');
+  if (activityWrap) {
+    activityWrap.innerHTML = connected
+      ? '<button class="btn btn-secondary btn-sm" onclick="syncHubSpotActivity()" id="activity-sync-btn">⟳ Sync HubSpot</button>'
+      : connectPrompt;
+  }
+
+  // Contacts — Sync HubSpot button
+  var contactsWrap = document.getElementById('contacts-hs-btn-wrap');
+  if (contactsWrap) {
+    contactsWrap.innerHTML = connected
+      ? '<button class="btn btn-secondary btn-sm" onclick="syncHubSpot()" id="hs-sync-btn">⟳ Sync HubSpot</button>'
+      : connectPrompt;
+  }
+
+  // Settings modal — show connect vs disconnect state
+  var hsConnectBtn = document.getElementById('prof-hs-connect-btn');
+  var hsDisconnectBtn = document.getElementById('prof-hs-disconnect-btn');
+  var hsKeyEl = document.getElementById('prof-hubspot_api_key');
+  if (hsConnectBtn) hsConnectBtn.style.display = connected ? 'none' : '';
+  if (hsDisconnectBtn) hsDisconnectBtn.style.display = connected ? '' : 'none';
+  if (hsKeyEl && currentProfile.hubspot_api_key) hsKeyEl.value = currentProfile.hubspot_api_key;
 }
 
 
@@ -4815,7 +4897,7 @@ function buildContactDetailHTML(c) {
       }).join('') +
     '</div>' +
   '</div>' +
-  (c.hubspot_contact_id ? 
+  (c.hubspot_contact_id && (currentProfile && currentProfile.hubspot_connected) ? 
     '<div class="detail-section" id="hs-activity-section-' + c.id + '">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
         '<div class="detail-section-title" style="margin:0">HubSpot Activity</div>' +
@@ -5961,7 +6043,7 @@ async function openGmailCompose() {
   sendBtn.textContent = 'Open Gmail ↗';
   sendBtn.onclick = executeGmailCompose;
   pickerFooter.appendChild(cancelBtn);
-  pickerFooter.appendChild(hsBtn);
+  if (currentProfile && currentProfile.hubspot_connected) pickerFooter.appendChild(hsBtn);
   pickerFooter.appendChild(sendBtn);
   picker.appendChild(pickerInner);
   picker.appendChild(pickerFooter);
@@ -11660,6 +11742,14 @@ function obLaunchApp() {
       <div style="margin-bottom:14px">
         <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">HubSpot Portal ID <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label>
         <input class="form-input" id="prof-hubspot_portal_id" placeholder="e.g. 242599414 — found in your HubSpot account URL" style="width:100%;box-sizing:border-box" />
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:5px;font-weight:600;font-size:13px">HubSpot API Key <span style="font-weight:400;color:var(--text-secondary)">(private app token)</span></label>
+        <input type="password" class="form-input" id="prof-hubspot_api_key" placeholder="Paste your HubSpot private app token" style="width:100%;box-sizing:border-box" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary btn-sm" id="prof-hs-connect-btn" onclick="connectHubSpot()">Connect HubSpot</button>
+          <button class="btn btn-secondary btn-sm" id="prof-hs-disconnect-btn" onclick="disconnectHubSpot()" style="display:none">Disconnect HubSpot</button>
+        </div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
         <button class="btn btn-secondary" onclick="closeModal('modal-my-profile')">Cancel</button>
