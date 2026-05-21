@@ -9372,67 +9372,70 @@ function loadOBPage() {
   }
 }
 
-async function runOutreachBuilder() {
-  const company = (document.getElementById('ob-company').value||'').trim();
-  const role = (document.getElementById('ob-role').value||'').trim();
-  const recruiter = (document.getElementById('ob-recruiter').value||'').trim();
-  const email = (document.getElementById('ob-email').value||'').trim();
-  const hm = (document.getElementById('ob-hm').value||'').trim();
-  const url = (document.getElementById('ob-url').value||'').trim();
-  const context = (document.getElementById('ob-context').value||'').trim();
-  const jd = (document.getElementById('ob-jd') ? document.getElementById('ob-jd').value||'' : '').trim();
+function runOutreachBuilder() {
+  var company = (document.getElementById('ob-company').value||'').trim();
+  var role = (document.getElementById('ob-role').value||'').trim();
   if (!company) { toast('Company name is required.', 'error'); return; }
   if (!role) { toast('Role title is required.', 'error'); return; }
-
-  // Determine primary contact — use whoever is provided
-  const primaryContact = recruiter || hm || '';
-  const primaryContactLabel = recruiter ? 'Recruiter' : (hm ? 'Hiring Manager' : 'the appropriate contact');
-  const primaryEmail = email || '';
-
-  const panel = document.getElementById('ob-output-panel');
-  const contentEl = document.getElementById('ob-output-content');
+  window._pendingOB = {
+    company: company,
+    role: role,
+    recruiter: (document.getElementById('ob-recruiter').value||'').trim(),
+    hm: (document.getElementById('ob-hm').value||'').trim(),
+    url: (document.getElementById('ob-url').value||'').trim(),
+    context: (document.getElementById('ob-context').value||'').trim(),
+    jd: (document.getElementById('ob-jd') ? document.getElementById('ob-jd').value||'' : '').trim(),
+    linkedId: document.getElementById('ob-link-app').value || null
+  };
+  var panel = document.getElementById('ob-output-panel');
+  var contentEl = document.getElementById('ob-output-content');
   panel.style.display = 'block';
   contentEl.textContent = 'Building your outreach sequence...';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.setTimeout(function() {
+    document.dispatchEvent(new CustomEvent('ob-run-ready'));
+  }, 100);
+}
 
-  // Build a focused prompt directly — don't rely on stored template for contact logic
-  const candidateName = (currentProfile && currentProfile.full_name) || 'the candidate';
-  const wins = [
+document.addEventListener('ob-run-ready', function() {
+  var d = window._pendingOB;
+  if (!d) return;
+  var primaryContact = d.recruiter || d.hm || '';
+  var primaryContactLabel = d.recruiter ? 'Recruiter' : (d.hm ? 'Hiring Manager' : 'the appropriate contact');
+  var candidateName = (currentProfile && currentProfile.full_name) || 'the candidate';
+  var wins = [
     currentProfile && currentProfile.career_win_1,
     currentProfile && currentProfile.career_win_2,
     currentProfile && currentProfile.career_win_3
   ].filter(Boolean);
-  const winsText = wins.length ? wins.map(function(w,i){ return (i+1)+'. '+w; }).join('\n') : 'Use the most relevant wins from the resume.';
-
-  let prompt = 'Write a 4-part outreach sequence for ' + candidateName + ' targeting the ' + role + ' role at ' + company + '.';
-  if (primaryContact) prompt += '\n\nPrimary contact: ' + primaryContact + ' (' + primaryContactLabel + ')' + (primaryEmail ? ', ' + primaryEmail : '') + '.';
-  if (hm && recruiter) prompt += '\nHiring Manager: ' + hm + '.';
+  var winsText = wins.length ? wins.map(function(w,i){ return (i+1)+'. '+w; }).join('\n') : 'Use the most relevant wins from the resume.';
+  var prompt = 'Write a 4-part outreach sequence for ' + candidateName + ' targeting the ' + d.role + ' role at ' + d.company + '.';
+  if (primaryContact) prompt += '\n\nPrimary contact: ' + primaryContact + ' (' + primaryContactLabel + ').';
+  if (d.hm && d.recruiter) prompt += '\nHiring Manager: ' + d.hm + '.';
   prompt += '\n\nUse the primary contact\'s name in Day 1 and Day 5 touches. Use the hiring manager or CEO (real or generic) for Day 7.';
-  prompt += '\n\nThe outreach must reference ' + company + ' and the ' + role + ' role specifically — not generic placeholders.';
-  if (jd) prompt += '\n\nJob Description (use key responsibilities and requirements to personalize the outreach):\n' + jd;
-  if (url) prompt += '\n\nCompany URL: ' + url;
-  if (context) prompt += '\n\nRecent company context: ' + context;
+  prompt += '\n\nThe outreach must reference ' + d.company + ' and the ' + d.role + ' role specifically — not generic placeholders.';
+  if (d.jd) prompt += '\n\nJob Description (use key responsibilities and requirements to personalize the outreach):\n' + d.jd;
+  if (d.url) prompt += '\n\nCompany URL: ' + d.url;
+  if (d.context) prompt += '\n\nRecent company context: ' + d.context;
   prompt += '\n\nCandidate\'s top wins to reference:\n' + winsText;
   prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
-
-  try {
-    const result = await callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume());
+  var contentEl = document.getElementById('ob-output-content');
+  callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume()).then(function(result) {
     obOutput = result;
     contentEl.textContent = result;
-    const linkedId = document.getElementById('ob-link-app').value || null;
-    await dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: linkedId, content: result });
-    if (linkedId) {
-      const app = allApps.find(function(a){ return a.id === linkedId; });
+    dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: d.linkedId, content: result });
+    if (d.linkedId) {
+      var app = allApps.find(function(a){ return a.id === d.linkedId; });
       if (app) {
-        const existing = Array.isArray(app.ai_output) ? app.ai_output : [];
-        await dbPatch('applications', linkedId, { ai_output: existing.concat([{ type: 'outreach_sequence', content: result, date: today() }]) });
-        const idx = allApps.findIndex(function(a){ return a.id === linkedId; });
+        var existing = Array.isArray(app.ai_output) ? app.ai_output : [];
+        dbPatch('applications', d.linkedId, { ai_output: existing.concat([{ type: 'outreach_sequence', content: result, date: today() }]) });
+        var idx = allApps.findIndex(function(a){ return a.id === d.linkedId; });
         if (idx >= 0) allApps[idx].ai_output = existing.concat([{ type: 'outreach_sequence', content: result, date: today() }]);
       }
     }
     toast('Outreach sequence generated.', 'success');
-  } catch(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); }
-}
+  }).catch(function(e) { contentEl.textContent = 'Error: ' + e.message; toast('Failed: ' + e.message, 'error'); });
+});
 
 function clearOB() {
   ['ob-company','ob-role','ob-recruiter','ob-email','ob-hm','ob-jd','ob-url','ob-context'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
