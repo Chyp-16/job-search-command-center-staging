@@ -6783,7 +6783,6 @@ async function seedPrompts() {
   }
 
   const existing = await dbGet('prompts', 'select=id,name');
-  console.log('seedPrompts existing:', JSON.stringify(existing));
   const existingMap = {};
   if (Array.isArray(existing)) existing.forEach(p => { existingMap[p.name] = p.id; });
 
@@ -6796,18 +6795,19 @@ async function seedPrompts() {
   }
 
   // Upsert all 17 individual prompts — inserts new ones, updates existing ones
+  const userId = currentProfile && currentProfile.id;
+  if (!userId) { toast('Could not find user ID. Please reload and try again.', 'error'); return; }
   let failed = 0;
   for (const p of SEED_PROMPTS) {
     try {
+      const payload = Object.assign({}, p, { user_id: userId });
       if (existingMap[p.name]) {
-        const pr = await dbPatch('prompts', existingMap[p.name], p);
-        console.log('PATCH', p.name, pr);
+        await dbPatch('prompts', existingMap[p.name], payload);
       } else {
-        const result = await dbPost('prompts', p);
-        console.log('POST', p.name, JSON.stringify(result));
-        if (result === null) failed++;
+        const result = await dbPost('prompts', payload);
+        if (!result || result.code) failed++;
       }
-    } catch(e) { console.error('ERROR', p.name, e); failed++; }
+    } catch(e) { failed++; }
   }
 
   if (failed > 0) {
@@ -6820,7 +6820,6 @@ async function seedPrompts() {
 
 async function loadPrompts() {
   const data = await dbGet('prompts', 'select=*&order=created_at.asc');
-  console.log('loadPrompts raw response:', JSON.stringify(data));
   if (data && !Array.isArray(data) && data.message) {
     console.error('loadPrompts error:', data.message, data);
     toast('Could not load prompts: ' + data.message, 'error');
