@@ -2244,11 +2244,11 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="url" id="ob-url" placeholder="https://company.com">
               </div>
               <div class="form-group">
-                <label class="form-label">Recruiter / Primary Contact</label>
+                <label class="form-label">Recruiter / HR</label>
                 <select class="form-select" id="ob-recruiter-contact" onchange="(function(){ var sel=document.getElementById('ob-recruiter-contact'); var opt=sel.options[sel.selectedIndex]; if(opt&&opt.dataset.name){ document.getElementById('ob-recruiter').value=opt.dataset.name; document.getElementById('ob-email').value=opt.dataset.email||''; } else { document.getElementById('ob-recruiter').value=''; document.getElementById('ob-email').value=''; } })()"><option value="">— Select from contacts —</option></select>
               </div>
               <div class="form-group">
-                <label class="form-label">Or type name (Recruiter / Primary Contact)</label>
+                <label class="form-label">Or type name (Recruiter / HR)</label>
                 <input class="form-input" type="text" id="ob-recruiter" placeholder="First name">
               </div>
               <div class="form-group">
