@@ -8058,6 +8058,13 @@ async function runInterviewPrep() {
   var ipStepIndex = 0;
   var ipProgTotal = document.getElementById('ip-progress-total');
   if (ipProgTotal) ipProgTotal.textContent = ipTotalSteps;
+  // Fire step 1 immediately so the bar shows the correct state from the first frame
+  ipProgLabel.textContent = ipStepLabels[0];
+  ipProgStep.textContent = '1';
+  var pct0 = Math.round((1 / ipTotalSteps) * 85);
+  ipProgBar.style.width = pct0 + '%';
+  ipProgPct.textContent = pct0 + '%';
+  ipStepIndex = 1;
   // Spread evenly across 100s total — each doc gets equal time, bar caps at 85%
   var ipStepInterval = Math.round(100000 / ipTotalSteps);
   var ipProgressInterval = setInterval(function() {
