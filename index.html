@@ -2410,10 +2410,11 @@ a { color: var(--burgundy); text-decoration: none; }
               <th>AI Provider</th>
               <th>HubSpot</th>
               <th>Onboarding</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="admin-user-tbody">
-            <tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">Click Refresh to load users.</td></tr>
+            <tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-secondary)">Click Refresh to load users.</td></tr>
           </tbody>
         </table>
       </div>
@@ -5692,7 +5693,7 @@ async function loadAdminPanel() {
   var userEmail = (currentProfile && currentProfile.email) || '';
   if (userEmail !== 'jvwadhwa@gmail.com') { toast('Not authorized.', 'error'); return; }
   var tbody = document.getElementById('admin-user-tbody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading...</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-secondary)">Loading...</td></tr>';
   try {
     const r = await fetch(WORKER_URL + '/admin/users', {
       headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' }
@@ -5700,12 +5701,16 @@ async function loadAdminPanel() {
     if (!r.ok) { toast('Admin data load failed.', 'error'); return; }
     const users = await r.json();
     if (!Array.isArray(users) || users.length === 0) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-secondary)">No users found.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text-secondary)">No users found.</td></tr>';
       return;
     }
     if (tbody) tbody.innerHTML = users.map(function(u) {
       var signup = u.created_at ? new Date(u.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
       var lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+      var isSelf = (u.email === 'jvwadhwa@gmail.com');
+      var deleteBtn = isSelf
+        ? '<td></td>'
+        : '<td><button class="btn btn-secondary btn-sm" style="color:#dc2626;border-color:#dc2626" data-uid="' + (u.id || '') + '" data-email="' + (u.email || '') + '" onclick="deleteAdminUser(this.dataset.uid, this.dataset.email)">Delete</button></td>';
       return '<tr>' +
         '<td>' + (u.full_name || '—') + '</td>' +
         '<td>' + (u.email || '—') + '</td>' +
@@ -5717,10 +5722,28 @@ async function loadAdminPanel() {
         '<td>' + (u.ai_provider || 'claude') + '</td>' +
         '<td style="text-align:center">' + (u.hubspot_connected ? '✅' : '—') + '</td>' +
         '<td style="text-align:center">' + (u.onboarding_complete ? '✅' : '—') + '</td>' +
+        deleteBtn +
       '</tr>';
     }).join('');
   } catch(e) {
     toast('Failed to load admin data.', 'error');
+  }
+}
+
+async function deleteAdminUser(userId, email) {
+  if (!userId) { toast('No user ID found.', 'error'); return; }
+  if (!confirm('Permanently delete ' + email + '? This removes their account and all access. This cannot be undone.')) return;
+  try {
+    const r = await fetch(WORKER_URL + '/admin/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify({ user_id: userId })
+    });
+    if (!r.ok) { toast('Delete failed.', 'error'); return; }
+    toast(email + ' deleted.', 'success');
+    loadAdminPanel();
+  } catch(e) {
+    toast('Delete failed.', 'error');
   }
 }
 
