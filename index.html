@@ -6817,6 +6817,7 @@ async function seedPrompts() {
 
 async function loadPrompts() {
   const data = await dbGet('prompts', 'select=*&order=created_at.asc');
+  console.log('loadPrompts raw response:', JSON.stringify(data));
   if (data && !Array.isArray(data) && data.message) {
     console.error('loadPrompts error:', data.message, data);
     toast('Could not load prompts: ' + data.message, 'error');
