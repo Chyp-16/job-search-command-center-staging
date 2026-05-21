@@ -2146,10 +2146,13 @@ a { color: var(--burgundy); text-decoration: none; }
                 <input class="form-input" type="text" id="clg-role" placeholder="VP of Marketing">
               </div>
               <div class="form-group">
-                <label class="form-label">Hiring Manager / Contact Name</label>
+                <label class="form-label">Hiring Manager / Contact</label>
+                <select class="form-select" id="clg-contact-dropdown" onchange="(function(){ var sel=document.getElementById('clg-contact-dropdown'); var opt=sel.options[sel.selectedIndex]; if(opt&&opt.dataset.name){ document.getElementById('clg-contact').value=opt.dataset.name; } else { document.getElementById('clg-contact').value=''; } })()"><option value="">— Select from contacts —</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Manually enter Hiring Manager / Contact Name</label>
                 <input class="form-input" type="text" id="clg-contact" placeholder="First name">
               </div>
-              <div class="form-group"></div>
               <div class="form-group full">
                 <label class="form-label">Job Description or Context (optional — paste or upload)</label>
                 <textarea class="form-textarea" id="clg-jd" rows="6" placeholder="Paste the job description or add context about the role... (optional if uploading a file)"
@@ -9181,6 +9184,13 @@ function loadCLGPage() {
     opt.textContent = a.company + (a.job_title ? ' — ' + a.job_title : '');
     sel.appendChild(opt);
   });
+  var contactSel = document.getElementById('clg-contact-dropdown');
+  if (contactSel) {
+    var contacts = allContacts.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+    contactSel.innerHTML = "<option value=''>— Select from contacts —</option>" + contacts.map(function(c) {
+      return '<option value="' + c.id + '" data-name="' + (c.name||'').replace(/"/g,'&quot;') + '">' + (c.name||'') + (c.company ? ' — ' + c.company : '') + '</option>';
+    }).join('');
+  }
 }
 
 async function runCLGenerator() {
@@ -9228,6 +9238,7 @@ async function runCLGenerator() {
 
 function clearCLG() {
   ['clg-company','clg-role','clg-contact','clg-jd'].forEach(function(id){ const e=document.getElementById(id);if(e)e.value=''; });
+  var cd=document.getElementById('clg-contact-dropdown'); if(cd) cd.value='';
   const p=document.getElementById('clg-output-panel'); if(p) p.style.display='none'; clgOutput='';
 }
 function copyCLGOutput() { if(clgOutput) navigator.clipboard.writeText(clgOutput).then(function(){ toast('Copied.','success'); }); }
