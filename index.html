@@ -1228,6 +1228,7 @@ a { color: var(--burgundy); text-decoration: none; }
       <button class="logout-btn" onclick="openMyProfile()">👤 My Profile</button>
       <button class="logout-btn" onclick="openAISettings()">⚙ AI Settings</button>
       <div id="ai-provider-label" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:-4px;">Using: Claude</div>
+      <button class="logout-btn" onclick="openManageAccount()">⚠ Manage Account</button>
       <button class="logout-btn" onclick="signOut()">⎋ Sign out</button>
     </div>
   </nav>
@@ -3374,6 +3375,80 @@ function signOut() {
   _supa.auth.signOut();
 }
 
+function openManageAccount() {
+  document.getElementById('manage-account-confirm').style.display = 'none';
+  document.getElementById('manage-account-main').style.display = 'block';
+  openModal('modal-manage-account');
+}
+
+function showManageAccountConfirm() {
+  document.getElementById('manage-account-main').style.display = 'none';
+  document.getElementById('manage-account-confirm').style.display = 'block';
+}
+
+async function confirmPauseAccount() {
+  try {
+    const session = await _supa.auth.getSession();
+    const userId = session?.data?.session?.user?.id;
+    if (!userId) return;
+    var suspendUntil = new Date();
+    suspendUntil.setDate(suspendUntil.getDate() + 30);
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify({ account_status: 'suspended', suspend_until: suspendUntil.toISOString() })
+    });
+    currentProfile.account_status = 'suspended';
+    closeModal('modal-manage-account');
+    showSuspendedBanner();
+  } catch(e) { toast('Something went wrong. Please try again.', 'error'); }
+}
+
+function showSuspendedBanner() {
+  var existing = document.getElementById('suspended-banner');
+  if (existing) return;
+  var banner = document.createElement('div');
+  banner.id = 'suspended-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#972b32;color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;font-size:14px;';
+  banner.innerHTML = '<span>⚠ Your account is paused. Your data is safe. Reactivate anytime before your 30-day window closes.</span><div style="display:flex;gap:10px"><button onclick="reactivateAccount()" style="background:#fff;color:#972b32;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">Reactivate</button><button onclick="openDeleteConfirm()" style="background:transparent;color:#fff;border:2px solid #fff;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">Delete My Account</button></div>';
+  document.body.prepend(banner);
+}
+
+async function reactivateAccount() {
+  try {
+    const session = await _supa.auth.getSession();
+    const userId = session?.data?.session?.user?.id;
+    if (!userId) return;
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify({ account_status: 'active', suspend_until: null })
+    });
+    currentProfile.account_status = 'active';
+    var banner = document.getElementById('suspended-banner');
+    if (banner) banner.remove();
+    toast('Your account is active again. Welcome back!', 'success');
+  } catch(e) { toast('Something went wrong. Please try again.', 'error'); }
+}
+
+function openDeleteConfirm() {
+  openModal('modal-delete-account');
+}
+
+async function confirmDeleteAccount() {
+  try {
+    const session = await _supa.auth.getSession();
+    const userId = session?.data?.session?.user?.id;
+    if (!userId) return;
+    await fetch(WORKER_URL + '/db/profiles?id=eq.' + userId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-User-Token': window._cachedJWT || '' },
+      body: JSON.stringify({ account_status: 'deleted' })
+    });
+    await _supa.auth.signOut();
+  } catch(e) { toast('Something went wrong. Please try again.', 'error'); }
+}
+
 function getProviderLabel(p) {
   if (p === 'openai') return 'ChatGPT';
   if (p === 'gemini') return 'Gemini';
@@ -3521,6 +3596,17 @@ async function loadAISettings() {
       aiApiKey   = currentProfile.ai_api_key  || '';
       updateProviderLabel();
       applyProfileToUI();
+      // Account status gate
+      var acctStatus = currentProfile.account_status || 'active';
+      if (acctStatus === 'deleted') {
+        await _supa.auth.signOut();
+        return;
+      }
+      if (acctStatus === 'suspended') {
+        document.querySelector('.app-shell').style.visibility = 'visible';
+        showSuspendedBanner();
+        return;
+      }
       if (!currentProfile.onboarding_complete) {
         // Returning user who hasn't finished onboarding — show wizard at their last step
         obShow();
@@ -11846,6 +11932,55 @@ function obLaunchApp() {
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
         <button class="btn btn-secondary" onclick="closeModal('modal-my-profile')">Cancel</button>
         <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE ACCOUNT MODAL -->
+<div id="modal-manage-account" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-manage-account')">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2 class="modal-title">Manage Account</h2>
+      <button class="modal-close" onclick="closeModal('modal-manage-account')">×</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div id="manage-account-main">
+        <div style="background:var(--bg-hover);border-left:3px solid var(--burgundy);padding:12px 16px;border-radius:4px;margin-bottom:20px;font-size:13px;color:var(--text-primary);line-height:1.6">
+          Pausing gives you 30 days to decide. Your data stays safe. You can reactivate anytime before the window closes. After 30 days, your account and all data are permanently deleted.
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeModal('modal-manage-account')">Cancel</button>
+          <button class="btn btn-primary" style="background:#972b32;border-color:#972b32" onclick="showManageAccountConfirm()">Pause My Account</button>
+        </div>
+      </div>
+      <div id="manage-account-confirm" style="display:none">
+        <div style="margin-bottom:20px;font-size:14px;color:var(--text-primary);line-height:1.6">
+          Are you sure you want to pause? You won't be able to use the app until you reactivate. Your 30-day window starts now.
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeModal('modal-manage-account')">Cancel</button>
+          <button class="btn btn-primary" style="background:#972b32;border-color:#972b32" onclick="confirmPauseAccount()">Yes, Pause My Account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE ACCOUNT MODAL -->
+<div id="modal-delete-account" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-delete-account')">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2 class="modal-title">Delete Account</h2>
+      <button class="modal-close" onclick="closeModal('modal-delete-account')">×</button>
+    </div>
+    <div class="modal-body" style="padding:24px">
+      <div style="margin-bottom:20px;font-size:14px;color:var(--text-primary);line-height:1.6">
+        This is permanent. All your data — applications, contacts, documents, and settings — will be deleted immediately. There is no undo.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeModal('modal-delete-account')">Cancel</button>
+        <button class="btn btn-primary" style="background:#972b32;border-color:#972b32" onclick="confirmDeleteAccount()">Yes, Delete Everything</button>
       </div>
     </div>
   </div>
