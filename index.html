@@ -1933,8 +1933,11 @@ a { color: var(--burgundy); text-decoration: none; }
                   <input class="form-input" type="text" id="ip-interviewer-title" placeholder="e.g. Chief Marketing Officer">
                 </div>
                 <div class="form-group full">
-                  <label class="form-label">Job Description (optional — paste or upload)</label>
-                  <textarea class="form-textarea" id="ip-jd" rows="6" placeholder="Paste the full job description here... (optional if uploading a file)"></textarea>
+                  <label class="form-label">Job Description (optional — paste, upload, or drag &amp; drop)</label>
+                  <textarea class="form-textarea" id="ip-jd" rows="6" placeholder="Paste the full job description here — or drag and drop a file (.pdf, .doc, .docx, .txt)"
+                    ondragover="event.preventDefault();this.style.borderColor='var(--burgundy)';this.style.background='var(--hover)';"
+                    ondragleave="this.style.borderColor='';this.style.background='';"
+                    ondrop="event.preventDefault();this.style.borderColor='';this.style.background='';ipHandleDrop(event);"></textarea>
                   <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
                     <input type="file" id="ip-jd-file" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleIPFileUpload(event)">
                     <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ip-jd-file').click()">📎 Upload JD File</button>
@@ -7975,6 +7978,7 @@ async function handleJDFileUpload(event, inputId, labelId) {
 }
 
 function handleIPFileUpload(event)     { handleJDFileUpload(event, 'ip-jd',       'ip-jd-file-name'); }
+function ipHandleDrop(event) { var file = event.dataTransfer && event.dataTransfer.files[0]; if (!file) return; handleJDFileUpload({target:{files:[file]}}, 'ip-jd', 'ip-jd-file-name'); }
 function handleRTFileUploadPage(event) { handleJDFileUpload(event, 'rt-jd',        'rt-jd-file-page-name'); }
 function handleCLGFileUpload(event)    { handleJDFileUpload(event, 'clg-jd',       'clg-jd-file-name'); }
 function clgHandleDrop(event) { var file = event.dataTransfer && event.dataTransfer.files[0]; if (!file) return; handleJDFileUpload({target:{files:[file]}}, 'clg-jd', 'clg-jd-file-name'); }
