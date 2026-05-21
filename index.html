@@ -6817,10 +6817,14 @@ async function seedPrompts() {
 
 async function loadPrompts() {
   const data = await dbGet('prompts', 'select=*&order=created_at.asc');
+  if (data && !Array.isArray(data) && data.message) {
+    console.error('loadPrompts error:', data.message, data);
+    toast('Could not load prompts: ' + data.message, 'error');
+  }
   const prompts = Array.isArray(data) ? data : [];
   const tbody = document.getElementById('prompts-tbody');
   if (prompts.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">💬</div><h3>No prompts yet</h3><p>Your Claude Projects prompts will appear here.</p><button class="btn btn-primary" style="margin-top:12px" onclick="seedPrompts()">Load Default Prompts</button></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">💬</div><h3>No prompts yet</h3><p>Click Load Default Prompts above to get started.</p></div></td></tr>';
     return;
   }
   tbody.innerHTML = prompts.map(p => {
