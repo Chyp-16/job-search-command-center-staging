@@ -1978,7 +1978,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <div id="ip-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
-            <span>Step <span id="ip-progress-step">0</span> of 5</span>
+            <span>Step <span id="ip-progress-step">0</span> of <span id="ip-progress-total">8</span></span>
             <span id="ip-progress-pct">0%</span>
           </div>
         </div>
@@ -8050,23 +8050,24 @@ async function runInterviewPrep() {
   panel.style.display = 'none';
   ipProgPanel.style.display = 'block';
   ipProgPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  var ipStepLabels = [
-    'Step 1 of 5 — Analyzing company and role...',
-    'Step 2 of 5 — Building SWOT analysis...',
-    'Step 3 of 5 — Generating interview questions...',
-    'Step 4 of 5 — Writing executive brief...',
-    'Step 5 of 5 — Finalizing prep pack...'
-  ];
+  var ipDocNames = {1:'Company Overview',2:'SWOT Analysis',3:'Niche Analysis',4:'30-60-90 Day Plan',5:'Resume Fit',6:'Executive Summary',7:'Strategic Questions',8:'Q&A Guide'};
+  var ipStepLabels = selectedDocs.map(function(d, i) {
+    return 'Step ' + (i + 1) + ' of ' + selectedDocs.length + ' — Generating ' + ipDocNames[d] + '...';
+  });
+  var ipTotalSteps = ipStepLabels.length;
   var ipStepIndex = 0;
+  var ipProgTotal = document.getElementById('ip-progress-total');
+  if (ipProgTotal) ipProgTotal.textContent = ipTotalSteps;
+  var ipStepInterval = Math.max(5000, Math.round(55000 / ipTotalSteps));
   var ipProgressInterval = setInterval(function() {
     if (ipStepIndex >= ipStepLabels.length) return;
     ipProgLabel.textContent = ipStepLabels[ipStepIndex];
     ipProgStep.textContent = ipStepIndex + 1;
-    var pct = Math.round(((ipStepIndex + 1) / 5) * 90);
+    var pct = Math.round(((ipStepIndex + 1) / ipTotalSteps) * 90);
     ipProgBar.style.width = pct + '%';
     ipProgPct.textContent = pct + '%';
     ipStepIndex++;
-  }, 8000);
+  }, ipStepInterval);
   contentEl.style.maxHeight = '600px';
   contentEl.style.background = '';
   contentEl.style.padding = '';
@@ -8193,7 +8194,7 @@ Write as the candidate's actual plan — not a generic template. Use the company
   clearInterval(ipProgressInterval);
   ipProgBar.style.width = '100%';
   ipProgPct.textContent = '100%';
-  ipProgStep.textContent = '5';
+  ipProgStep.textContent = ipTotalSteps;
   ipProgLabel.textContent = 'Complete — prep pack ready.';
   setTimeout(function() { ipProgPanel.style.display = 'none'; }, 1200);
   ipOutput = ipCleaned;
