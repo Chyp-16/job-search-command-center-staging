@@ -6673,50 +6673,106 @@ async function deleteJobDescription(id) {
 // Seed prompts — your Claude Projects pre-loaded
 const SEED_PROMPTS = [
   {
-    "name": "Interview Prep Pack",
-    "category": "Interview Prep",
-    "system_prompt": "You are a strategy and career-docs expert. Create a full interview prep pack for a senior marketing exec interviewing for this role. Use the job description and resume provided.\n\n---\n\n## DELIVERABLES\n\nCreate 8 professional documents. Label each with its number and title exactly as shown. Separate each with ---.\n\n## DOC 01: COMPANY OVERVIEW\n- Founded, HQ, employees, revenue estimates, valuation/net worth with sources\n- Products, services, target customers, segments\n- Leadership and ownership structure\n- Key milestones, funding, deals\n- Market position and brand perception\n- Positioning line and core products\n- Top 3-5 competitors\n- 3-4 biggest opportunities and risks\n- Key recent news\n\n## DOC 02: SWOT + COMPETITIVE ANALYSIS\n- SWOT table (Strengths, Weaknesses, Opportunities, Threats)\n- Competitor grid with 3-5 peers\n- Pros/cons vs. target company\n- Market share, growth, key differentiators\n\n## DOC 03: TARGET NICHE ANALYSIS\n- Core customer niches\n- Unmet needs and market gaps\n- Where company can win\n- High-growth micro-segments\n\n## DOC 04: 30-60-90 DAY PLAN\n- Days 0-30: Learn and audit\n- Days 31-60: Test and build\n- Days 61-90: Scale and optimize\n- Cover brand, content, partnerships, demand generation\n- Senior-level, practical, actionable\n\n## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side table: company needs vs. candidate experience\n- Highlight overlaps and strengths\n- Explain how multi-industry background is an advantage\n- Short fit narrative\n\n## DOC 06: ONE-PAGE EXECUTIVE SUMMARY\n- Company snapshot as BULLET POINTS ONLY (no table)\n- Key strengths and risks\n- Primary growth paths\n- Role fit\n- Bottom-line takeaway\n\nIMPORTANT: Doc 01 and Doc 06 are intentionally separate. Doc 01 is a dense research reference. Doc 06 is a one-page pre-interview brief. Do NOT combine them. Doc 06 must use bullet points only, no table.\n\n## DOC 07: STRATEGIC QUESTIONS FOR RECRUITER\n- Pure questions only (no answers)\n- Categories: Team Dynamics | Strategic Priorities | Measurement and Success | Budget and Resources | Culture\n\n## DOC 08: INTERVIEW Q&A GUIDE\n- 12 common interview questions with prepared answers\n- Based on proven experience with specific metrics\n- Concise, impact-focused, easy to memorize\n\n---\n\n## FORMATTING REQUIREMENTS\n- Use ## DOC 0N: TITLE format for each document header exactly\n- Use markdown tables for SWOT and competitor grids\n- Use bullet points for all lists\n- **Bold** all statistics and key metrics\n- Peer-to-peer, direct, confident tone\n- Sentences 15 words or fewer. Active voice. No em dashes.\n\nCompany: {{company}}\nRole: {{role}}\nJob Description:\n{{job_description}}",
-
-    "variable_fields": [
-      "company",
-      "role",
-      "job_description"
-    ]
-  },
-  {
     "name": "Resume Tailoring",
     "category": "Resume",
     "system_prompt": "Use the candidate's resume and the job description below to tailor the resume for the role.\n\nRULES: Add required keywords naturally. Do not invent experience. Max 3 pages. No tables. No em dashes.\n\nSTEP 1 \u2014 KEYWORD INTEGRATION: Add all required keywords and nice-to-have keywords throughout the resume. Highlight every change in yellow. Bold all performance metrics and key stats.\n\nSTEP 2 \u2014 CORE EXPERTISE REVIEW: Remove skills that do not fit the role. Add relevant job description keywords. Put most relevant items first. Do not repeat skill terms across sections.\n\nSTEP 3 \u2014 REDUNDANCY AUDIT: Fix all repetition \u2014 repeated words in the same bullet, repeated phrases across bullets in the same section, back-to-back synonyms, reused transition phrases, repeated descriptors in adjacent roles. Do not just flag. Fix.\n\nSTEP 4 \u2014 KEYWORD PRESERVATION CHECK: After cleanup, confirm all required keywords still appear. If any were removed, add them back with new phrasing and re-highlight in yellow.\n\nSTEP 5 \u2014 FINAL REVIEW: Confirm no new redundancies, all highlights in place, document stays within 3 pages.\n\nSTEP 6 \u2014 FINAL REDUNDANCY PASS: One more full redundancy review before providing output.\n\nSTEP 7 \u2014 EXPORT: Only after all prior steps are done, provide the full revised resume with all changes clearly marked.\n\nMust-Have Keywords: {{keywords_required}}\nNice-to-Have Keywords: {{keywords_nice}}\nJob Description: {{job_description}}",
-    "variable_fields": [
-      "keywords_required",
-      "keywords_nice",
-      "job_description"
-    ]
+    "variable_fields": ["keywords_required", "keywords_nice", "job_description"]
   },
   {
-    "name": "Cover Letter",
+    "name": "IP — Company Overview",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 01: COMPANY OVERVIEW\nWrite this as a dense research brief, not a summary. Include:\n- Company at a Glance: Founded (exact year if known), HQ, team size, revenue estimate with reasoning, ownership structure\n- What They Do: Core services explained specifically, who they serve, what makes them different\n- Named clients or portfolio examples if known\n- Leadership: Named executives and their backgrounds\n- Awards, milestones, recognizable projects or deals\n- Market position: exact competitive claim they make, how they back it up\n- Top 3-5 named competitors with one-line differentiation for each\n- 3-4 specific opportunities tied to market conditions right now\n- 3-4 specific risks the candidate needs to know walking in\n- Recent news or developments worth knowing\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — SWOT + Competitive Analysis",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 02: SWOT + COMPETITIVE ANALYSIS\n\nCRITICAL FORMATTING RULES FOR THE SWOT TABLE:\n- Use a 2x2 markdown table with headers: STRENGTHS | WEAKNESSES (row 1), OPPORTUNITIES | THREATS (row 2)\n- Inside EACH cell, list items as: bullet1. bullet2. bullet3. (separated by periods, NOT line breaks)\n- Each cell must have exactly 5 items written as complete sentences separated by periods\n- Do NOT use <br> tags. Do NOT use newlines inside cells. Use periods between items only.\n- Example cell format: Owner-only model eliminates conflicts. 25M SF portfolio provides scale. Chicago expertise spans decades. Trophy specialization commands premium fees. Institutional relationships with major owners.\n\nAfter the SWOT table:\n- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How We Win — 4-5 named real competitors\n- Pros of joining vs. a larger competitor (bullet list, not table)\n- Cons and honest trade-offs (bullet list)\n- One paragraph: sustainable competitive edge\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — Target Niche Analysis",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 03: TARGET NICHE ANALYSIS\n- Named customer segments with specific examples\n- What each segment actually cares about (specific to this company)\n- Unmet needs this company is positioned to solve\n- Where the candidate's marketing experience maps to their client acquisition challenges\n- 2-3 high-growth micro-segments worth prioritizing in first 90 days\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — 30-60-90 Day Plan",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 04: 30-60-90 DAY PLAN\nWrite as the candidate's actual plan — not a generic template. Use the company name throughout.\n- Days 0-30: Listen and Learn — specific people to meet, systems to audit, deliverable at day 30\n- Days 31-60: Test and Build — specific campaigns, brand decisions, infrastructure to build\n- Days 61-90: Scale and Optimize — what's launching, what's measured, what success looks like\n- Each phase covers: brand, content, partnerships, demand generation, team/vendor relationships\n- End with \"Key 90-Day Commitment\" — one paragraph on what the candidate commits to delivering\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — Resume-to-Role Fit",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Candidate Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from the candidate career\n- Section Key Overlaps: 4-5 paragraphs mapping candidate background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — Executive Summary",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges the candidate will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how the candidate drives it\n- Top 3 Talking Points: 3 things the candidate must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why this candidate is the right person right now.\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "IP — Strategic Questions",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 07: STRATEGIC QUESTIONS{{interviewer_section}}\nPure questions only — no answers. Demonstrate real research, not generic prep.\nMinimum 4 questions per category:\n**Team Dynamics** | **Strategic Priorities** | **Measurement and Success** | **Budget and Resources** | **Culture**{{interviewer_questions}}\n\nCompany: {{company}}\nRole: {{role}}\nInterviewer Name (optional): {{interviewer_name}}",
+    "variable_fields": ["company", "role", "interviewer_name"]
+  },
+  {
+    "name": "IP — Interview Q&A Guide",
+    "category": "Interview Prep",
+    "system_prompt": "## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in the candidate voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us\n\nCompany: {{company}}\nRole: {{role}}",
+    "variable_fields": ["company", "role"]
+  },
+  {
+    "name": "CL — Cover Letter",
     "category": "Cover Letter",
-    "system_prompt": "Use the candidate's resume and the job description below to write a concise cover letter for a senior marketing executive role.\n\nREQUIREMENTS:\n- Write in the candidate's voice \u2014 human, specific, peer-to-peer, never deferential\n- Lead with the strongest relevant result or metric\n- Highlight key skills and proof points that align directly with the role\n- Use bullets only when they improve flow\n- Show evidence of company research \u2014 reference something specific about the company\n- Address the hiring manager by name if provided. If unknown, say so. Do not guess.\n- End with a clear, direct next step\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful, I'd love to, I'd welcome, at your convenience).\n\nCompany: {{company}}\nRole: {{role}}\nHiring Manager: {{hiring_manager}}\nJob Description: {{job_description}}",
-    "variable_fields": [
-      "company",
-      "role",
-      "hiring_manager",
-      "job_description"
-    ]
+    "system_prompt": "Write a cover letter for {{candidate_name}} applying to the {{role}} role at {{company}}.{{contact_line}}\n\nREQUIREMENTS:\n- Write in the candidate's voice — human, specific, peer-to-peer, never deferential\n- Lead with the strongest relevant result or metric\n- Highlight key skills and proof points that align directly with the role\n- Use bullets only when they improve flow\n- Show evidence of company research — reference something specific about the company\n- Address the hiring manager by name if provided. If unknown, say so. Do not guess.\n- End with a clear, direct next step\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, thrive, energized, passionate, thrilled, excited, inspired, eager, compelling, meaningful, I'd love to, I'd welcome, at your convenience).\n\nJob Description: {{job_description}}",
+    "variable_fields": ["candidate_name", "company", "role", "contact_line", "job_description"]
   },
   {
-    "name": "Outreach Sequence (4-Part)",
-    "category": "Networking",
-    "system_prompt": "Use the candidate's resume and the details below to create a 4-part outreach sequence for a role the candidate already applied to.\n\nSTRATEGY: Start with email. Contact recruiter first, then CEO or hiring manager. Keep it tight and easy to scan. Focus on proof, not a resume recap. Peer-to-peer tone for executive outreach.\n\nSEQUENCE:\n1) DAY 1 \u2014 Email or LinkedIn InMail to recruiter or hiring manager. Length: 100-120 words.\n2) DAY 3 \u2014 LinkedIn connection request to recruiter. Length: under 200 characters.\n3) DAY 5 \u2014 Follow-up email to recruiter. Length: 75-85 words.\n4) DAY 7 \u2014 Email to CEO or hiring manager. Peer-to-peer tone. Length: 90-100 words.\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let us talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.\n\nFor each message include: subject line, word count, and clean formatted copy.\n\nSelect the 3-4 most relevant wins from the candidate's resume for this specific company and role.\n\nCompany: {{company}}\nCompany URL: {{company_url}}\nRole: {{role}}\nRecruiter Name: {{recruiter_name}}\nRecruiter Email: {{recruiter_email}}\nHiring Manager: {{hiring_manager}}\nRecent Company News or Context: {{company_context}}",
-    "variable_fields": [
-      "company",
-      "company_url",
-      "role",
-      "recruiter_name",
-      "recruiter_email",
-      "hiring_manager",
-      "company_context"
-    ]
+    "name": "CL — LinkedIn InMail",
+    "category": "Cover Letter",
+    "system_prompt": "Write a LinkedIn InMail for {{candidate_name}} to {{contact}} at {{company}} about the {{role}} role.\n\nSubject: {{role}} | {{candidate_name}}\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never \"I saw your posting.\" Direct ask to close.\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words.\n\nContext: {{job_description}}",
+    "variable_fields": ["candidate_name", "company", "role", "contact", "job_description"]
+  },
+  {
+    "name": "CL — LinkedIn Connection Request",
+    "category": "Cover Letter",
+    "system_prompt": "Write a LinkedIn connection request note for {{candidate_name}} to {{contact}} at {{company}}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.",
+    "variable_fields": ["candidate_name", "company", "contact"]
+  },
+  {
+    "name": "CL — Email Day 1",
+    "category": "Cover Letter",
+    "system_prompt": "Write a Day 1 follow-up email for {{candidate_name}} who just applied to the {{role}} at {{company}}.\nTo: {{contact}}\nLength: 100-120 words. Subject includes role and standout credential.\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words. Close with Cheers.",
+    "variable_fields": ["candidate_name", "company", "role", "contact"]
+  },
+  {
+    "name": "CL — Email Day 5 Follow-Up",
+    "category": "Cover Letter",
+    "system_prompt": "Write a Day 5 follow-up email for {{candidate_name}} on their application for {{role}} at {{company}}.\nTo: {{contact}}\nLength: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words.",
+    "variable_fields": ["candidate_name", "company", "role", "contact"]
+  },
+  {
+    "name": "CL — Email Day 7 CEO/HM",
+    "category": "Cover Letter",
+    "system_prompt": "Write a Day 7 peer-to-peer email for {{candidate_name}} to the CEO or hiring manager at {{company}} about the {{role}} role.{{contact_line}}\nLength: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words. Close with Cheers.",
+    "variable_fields": ["candidate_name", "company", "role", "contact_line"]
+  },
+  {
+    "name": "CL — Post-Rejection Follow-Up",
+    "category": "Cover Letter",
+    "system_prompt": "Write a post-rejection follow-up email for {{candidate_name}} after being turned down for the {{role}} at {{company}}.{{contact_line}}\nLength: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.\n\nWRITING RULES: Sentences 15 words or fewer. Active voice. No em dashes. Contractions required. No banned words.",
+    "variable_fields": ["candidate_name", "company", "role", "contact_line"]
+  },
+  {
+    "name": "Outreach Sequence",
+    "category": "Outreach",
+    "system_prompt": "Write a 4-part outreach sequence for {{candidate_name}} targeting the {{role}} role at {{company}}.\n\nPrimary contact: {{primary_contact}} ({{primary_contact_label}}).\nHiring Manager: {{hiring_manager}}\n\nUse the primary contact's name in Day 1 and Day 5 touches. Use the hiring manager or CEO for Day 7.\nThe outreach must reference {{company}} and the {{role}} role specifically — not generic placeholders.\n\nCandidate's top wins to reference:\n{{wins}}\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.\n\nJob Description: {{job_description}}\nCompany URL: {{company_url}}\nRecent company context: {{company_context}}\n\nWRITING RULES: Most sentences under 15 words. Active voice only. Limit I-openings. Close directly. Use \"Let us talk\" instead of soft asks. Subject lines must include the role and a standout credential. No banned words.",
+    "variable_fields": ["candidate_name", "company", "role", "primary_contact", "primary_contact_label", "hiring_manager", "wins", "job_description", "company_url", "company_context"]
   }
 ]
 
@@ -6725,15 +6781,23 @@ async function seedPrompts() {
   const existingMap = {};
   if (Array.isArray(existing)) existing.forEach(p => { existingMap[p.name] = p.id; });
 
+  // Remove old combined entries that have been replaced by individual prompts
+  const obsoleteNames = ['Interview Prep Pack', 'Cover Letter', 'Outreach Sequence (4-Part)'];
+  for (const name of obsoleteNames) {
+    if (existingMap[name]) {
+      await dbDelete('prompts', existingMap[name]);
+    }
+  }
+
+  // Upsert all 17 individual prompts — inserts new ones, updates existing ones
   for (const p of SEED_PROMPTS) {
     if (existingMap[p.name]) {
-      // Update existing with latest content from document
       await dbPatch('prompts', existingMap[p.name], p);
     } else {
       await dbPost('prompts', p);
     }
   }
-  toast('Prompts library loaded with your 4 Claude Projects.', 'success');
+  toast('Prompts library updated with all 17 individual prompts.', 'success');
   loadPrompts();
 }
 
@@ -6756,6 +6820,7 @@ async function loadPrompts() {
       '<td><div class="table-actions">' +
         '<button class="action-btn" onclick="openFirePrompt(\'' + p.id + '\')" title="Fire prompt" style="font-size:16px;color:var(--burgundy)">▶</button>' +
         '<button class="action-btn" data-pid="' + p.id + '" onclick="editPrompt(this.dataset.pid)" title="Edit">✏️</button>' +
+        '<button class="action-btn" onclick="resetPrompt(\'' + p.id + '\', \'' + p.name.replace(/'/g, "\\'") + '\')" title="Reset to default">↺</button>' +
         '<button class="action-btn danger" onclick="deletePrompt(\"' + p.id + '\")" title="Delete">🗑</button>' +
       '</div></td>' +
     '</tr>';
@@ -6788,7 +6853,15 @@ async function savePrompt() {
   const name = getVal('pf-name');
   if (!name) { toast('Name required.', 'error'); return; }
   const vars = getVal('pf-vars') ? getVal('pf-vars').split(',').map(s=>s.trim()).filter(Boolean) : [];
-  const payload = { name, category: getVal('pf-category'), system_prompt: getVal('pf-prompt'), variable_fields: vars };
+  const promptText = getVal('pf-prompt');
+
+  // Warn if any declared variable placeholder is missing from the prompt text
+  const missing = vars.filter(function(v) { return promptText.indexOf('{{' + v + '}}') === -1; });
+  if (missing.length > 0) {
+    if (!confirm('Warning: these placeholders are listed as variables but missing from your prompt text: ' + missing.join(', ') + '.\n\nSaving without them may break this tool. Save anyway?')) return;
+  }
+
+  const payload = { name, category: getVal('pf-category'), system_prompt: promptText, variable_fields: vars };
   try {
     if (promptEditingId) {
       await dbPatch('prompts', promptEditingId, payload);
@@ -6808,6 +6881,15 @@ async function deletePrompt(id) {
   await dbDelete('prompts', id);
   loadPrompts();
   toast('Prompt deleted.');
+}
+
+async function resetPrompt(id, name) {
+  const seed = SEED_PROMPTS.find(function(p) { return p.name === name; });
+  if (!seed) { toast('No default found for this prompt.', 'error'); return; }
+  if (!confirm('Reset "' + name + '" to its default? Your edits will be lost.')) return;
+  await dbPatch('prompts', id, seed);
+  toast('"' + name + '" reset to default.', 'success');
+  loadPrompts();
 }
 
 // Fire prompt modal — shows variable fields dynamically
@@ -8106,48 +8188,49 @@ async function runInterviewPrep() {
     : 'Generating: ' + call2Names + '...';
 
   // Build prompt 1 dynamically based on selected docs 1-4
-  var p1DocSections = {
-    1: `## DOC 01: COMPANY OVERVIEW
-Write this as a dense research brief, not a summary. Include:
-- Company at a Glance: Founded (exact year if known), HQ, team size, revenue estimate with reasoning, ownership structure
-- What They Do: Core services explained specifically, who they serve, what makes them different
-- Named clients or portfolio examples if known
-- Leadership: Named executives and their backgrounds
-- Awards, milestones, recognizable projects or deals
-- Market position: exact competitive claim they make, how they back it up
-- Top 3-5 named competitors with one-line differentiation for each
-- 3-4 specific opportunities tied to market conditions right now
-- 3-4 specific risks the candidate needs to know walking in
-- Recent news or developments worth knowing`,
-    2: `## DOC 02: SWOT + COMPETITIVE ANALYSIS
-
-CRITICAL FORMATTING RULES FOR THE SWOT TABLE:
-- Use a 2x2 markdown table with headers: STRENGTHS | WEAKNESSES (row 1), OPPORTUNITIES | THREATS (row 2)
-- Inside EACH cell, list items as: bullet1. bullet2. bullet3. (separated by periods, NOT line breaks)
-- Each cell must have exactly 5 items written as complete sentences separated by periods
-- Do NOT use <br> tags. Do NOT use newlines inside cells. Use periods between items only.
-- Example cell format: Owner-only model eliminates conflicts. 25M SF portfolio provides scale. Chicago expertise spans decades. Trophy specialization commands premium fees. Institutional relationships with major owners.
-
-After the SWOT table:
-- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How We Win — 4-5 named real competitors
-- Pros of joining vs. a larger competitor (bullet list, not table)
-- Cons and honest trade-offs (bullet list)
-- One paragraph: sustainable competitive edge`,
-    3: `## DOC 03: TARGET NICHE ANALYSIS
-- Named customer segments with specific examples
-- What each segment actually cares about (specific to this company)
-- Unmet needs this company is positioned to solve
-- Where the candidate's marketing experience maps to their client acquisition challenges
-- 2-3 high-growth micro-segments worth prioritizing in first 90 days`,
-    4: `## DOC 04: 30-60-90 DAY PLAN
-Write as the candidate's actual plan — not a generic template. Use the company name throughout.
-- Days 0-30: Listen and Learn — specific people to meet, systems to audit, deliverable at day 30
-- Days 31-60: Test and Build — specific campaigns, brand decisions, infrastructure to build
-- Days 61-90: Scale and Optimize — what's launching, what's measured, what success looks like
-- Each phase covers: brand, content, partnerships, demand generation, team/vendor relationships
-- End with "Key 90-Day Commitment" — one paragraph on what the candidate commits to delivering`
+  // Fetch doc instructions from DB (falls back to hardcoded if DB unavailable)
+  var ipPromptDefaults = {
+    1: '## DOC 01: COMPANY OVERVIEW\nWrite this as a dense research brief, not a summary. Include:\n- Company at a Glance: Founded (exact year if known), HQ, team size, revenue estimate with reasoning, ownership structure\n- What They Do: Core services explained specifically, who they serve, what makes them different\n- Named clients or portfolio examples if known\n- Leadership: Named executives and their backgrounds\n- Awards, milestones, recognizable projects or deals\n- Market position: exact competitive claim they make, how they back it up\n- Top 3-5 named competitors with one-line differentiation for each\n- 3-4 specific opportunities tied to market conditions right now\n- 3-4 specific risks the candidate needs to know walking in\n- Recent news or developments worth knowing',
+    2: '## DOC 02: SWOT + COMPETITIVE ANALYSIS\n\nCRITICAL FORMATTING RULES FOR THE SWOT TABLE:\n- Use a 2x2 markdown table with headers: STRENGTHS | WEAKNESSES (row 1), OPPORTUNITIES | THREATS (row 2)\n- Inside EACH cell, list items as: bullet1. bullet2. bullet3. (separated by periods, NOT line breaks)\n- Each cell must have exactly 5 items written as complete sentences separated by periods\n- Do NOT use <br> tags. Do NOT use newlines inside cells. Use periods between items only.\n\nAfter the SWOT table:\n- Competitor grid (markdown table): Competitor | Scale | Key Strength | Key Weakness | How We Win — 4-5 named real competitors\n- Pros of joining vs. a larger competitor (bullet list, not table)\n- Cons and honest trade-offs (bullet list)\n- One paragraph: sustainable competitive edge',
+    3: '## DOC 03: TARGET NICHE ANALYSIS\n- Named customer segments with specific examples\n- What each segment actually cares about (specific to this company)\n- Unmet needs this company is positioned to solve\n- Where the candidate\'s marketing experience maps to their client acquisition challenges\n- 2-3 high-growth micro-segments worth prioritizing in first 90 days',
+    4: '## DOC 04: 30-60-90 DAY PLAN\nWrite as the candidate\'s actual plan — not a generic template. Use the company name throughout.\n- Days 0-30: Listen and Learn — specific people to meet, systems to audit, deliverable at day 30\n- Days 31-60: Test and Build — specific campaigns, brand decisions, infrastructure to build\n- Days 61-90: Scale and Optimize — what\'s launching, what\'s measured, what success looks like\n- Each phase covers: brand, content, partnerships, demand generation, team/vendor relationships\n- End with "Key 90-Day Commitment" — one paragraph on what the candidate commits to delivering',
+    5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Candidate Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from the candidate career\n- Section Key Overlaps: 4-5 paragraphs mapping candidate background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
+    6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges the candidate will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how the candidate drives it\n- Top 3 Talking Points: 3 things the candidate must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why this candidate is the right person right now.',
+    7: '## DOC 07: STRATEGIC QUESTIONS\nPure questions only — no answers. Demonstrate real research, not generic prep.\nMinimum 4 questions per category:\n**Team Dynamics** | **Strategic Priorities** | **Measurement and Success** | **Budget and Resources** | **Culture**',
+    8: '## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in the candidate voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us'
   };
-  var p1Sections = call1Docs.map(function(n){ return p1DocSections[n]; }).join('\n\n');
+  var ipPromptNames = {1:'IP — Company Overview',2:'IP — SWOT + Competitive Analysis',3:'IP — Target Niche Analysis',4:'IP — 30-60-90 Day Plan',5:'IP — Resume-to-Role Fit',6:'IP — Executive Summary',7:'IP — Strategic Questions',8:'IP — Interview Q&A Guide'};
+
+  // Fetch all IP prompts from DB in one call
+  var ipDbPrompts = {};
+  try {
+    var ipDbData = await dbGet('prompts', 'select=name,system_prompt&category=eq.Interview Prep');
+    if (Array.isArray(ipDbData)) {
+      ipDbData.forEach(function(p) { ipDbPrompts[p.name] = p.system_prompt; });
+    }
+  } catch(e) { /* fallback to hardcoded */ }
+
+  // Build section text: DB version if available, else hardcoded fallback
+  // For Doc 7, inject interviewer name into Strategic Questions section
+  function getIPDocText(docNum) {
+    var dbText = ipDbPrompts[ipPromptNames[docNum]];
+    if (dbText) {
+      // Strip the trailing Company/Role lines from DB prompt — context is injected separately
+      var cleaned = dbText.replace(/\n*Company:\s*\{\{company\}\}\n*Role:\s*\{\{role\}\}\n*/g, '').replace(/\n*Interviewer Name.*$/m, '').trim();
+      if (docNum === 7 && intName) {
+        cleaned = cleaned.replace('## DOC 07: STRATEGIC QUESTIONS', '## DOC 07: STRATEGIC QUESTIONS FOR ' + intName.toUpperCase());
+        cleaned += '\n**Questions Specifically for ' + intName + '**: 4 questions that only make sense given their background and role';
+      }
+      return cleaned;
+    }
+    // Hardcoded fallback
+    if (docNum === 7 && intName) {
+      return ipPromptDefaults[7].replace('## DOC 07: STRATEGIC QUESTIONS', '## DOC 07: STRATEGIC QUESTIONS FOR ' + intName.toUpperCase()) + '\n**Questions Specifically for ' + intName + '**: 4 questions that only make sense given their background and role';
+    }
+    return ipPromptDefaults[docNum];
+  }
+
+  var p1Sections = call1Docs.map(function(n){ return getIPDocText(n); }).join('\n\n');
 
   const prompt1 = 'You are a senior strategy consultant and career expert preparing a VP-level marketing executive for a high-stakes interview. Every section must be dense with specific facts, named examples, real market data, and actionable intelligence. No filler. No generic advice.\n\n' + context + '\n\nCandidate background: ' + (currentProfile.years_experience || '25') + ' years of marketing leadership. ' + (currentProfile.career_win_1 || '') + (currentProfile.career_win_2 ? '. ' + currentProfile.career_win_2 : '') + (currentProfile.career_win_3 ? '. ' + currentProfile.career_win_3 : '') + '. Industry background: ' + (currentProfile.industry_background || 'media, SaaS, Web3, FinTech, nonprofits') + '.\n\nCreate ONLY these documents:\n\n' + p1Sections + '\n\nFORMAT: Use **bold** for all statistics and key facts. Use markdown tables for SWOT and grids. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
   let result1 = '';
@@ -8168,14 +8251,7 @@ Write as the candidate's actual plan — not a generic template. Use the company
   }
 
   // ── CALL 2: Docs 5-8 ──────────────────────────────────────────────────
-  // Build prompt 2 dynamically based on selected docs 5-8
-  var p2DocSections = {
-    5: '## DOC 05: RESUME-TO-ROLE FIT ANALYSIS\n- Side-by-side markdown table: Company Need | Candidate Experience | Specific Evidence/Metric (minimum 10 rows)\n- Each row must cite a specific result, number, or named project from the candidate career\n- Section Key Overlaps: 4-5 paragraphs mapping candidate background to company biggest challenges. Use the company name.\n- Section The Multi-Industry Advantage: explain why cross-industry background is an asset for this role\n- Close with Fit Summary: 3 sentences. Direct, confident, no hedging.',
-    6: '## DOC 06: ONE-PAGE EXECUTIVE BRIEF\nBullet points ONLY — no tables, no prose paragraphs. Morning-of-interview cheat sheet.\n- Company Snapshot: 8-10 bullets (founded, size, revenue, positioning, key clients, awards, key deals)\n- Hiring Manager Intel: background, priorities, what they likely care about\n- Key Strengths to Lead With: 4-5 bullets on what makes this company compelling\n- Key Risks to Know: 4-5 honest bullets on challenges the candidate will face\n- Primary Growth Paths: 3-4 bullets on where company can grow and how the candidate drives it\n- Top 3 Talking Points: 3 things the candidate must land in this interview, as one-liners\n- Bottom-Line Takeaway: 2 sentences. Why this candidate is the right person right now.',
-    7: '## DOC 07: STRATEGIC QUESTIONS' + (intName ? ' FOR ' + intName.toUpperCase() : '') + '\nPure questions only — no answers. Demonstrate real research, not generic prep.\nMinimum 4 questions per category:\n**Team Dynamics** | **Strategic Priorities** | **Measurement and Success** | **Budget and Resources** | **Culture**' + (intName ? '\n**Questions Specifically for ' + intName + '**: 4 questions that only make sense given their background and role' : ''),
-    8: '## DOC 08: INTERVIEW Q&A GUIDE\n12 questions with prepared answers in the candidate voice. Rules: lead with a metric or named result — never start with I. Tie to this company by sentence 3. 4-6 sentences max. Under 90 seconds. Peer-to-peer, confident. No banned words (delve, leverage, cutting-edge, proactive, pivotal, seamless, passionate, excited, eager). No em dashes.\nQuestions: Tell me about yourself / Why this company / Greatest accomplishment / Building from scratch / Measuring success / Revenue impact story / Managing sales or broker teams / First 30 days / Why leaving current role / Experience in this industry / Leadership style / Your questions for us'
-  };
-  var p2Sections = call2Docs.map(function(n){ return p2DocSections[n]; }).join('\n\n');
+  var p2Sections = call2Docs.map(function(n){ return getIPDocText(n); }).join('\n\n');
 
   const prompt2 = 'You are a senior strategy consultant preparing a senior marketing executive for a high-stakes interview. Generate specific, opinionated documents written entirely in the candidate voice. Generic answers get people cut.\n\n' + context + '\n\nCandidate career: ' + (currentProfile.career_win_1 || '') + (currentProfile.career_win_2 ? '. ' + currentProfile.career_win_2 : '') + (currentProfile.career_win_3 ? '. ' + currentProfile.career_win_3 : '') + '. ' + (currentProfile.years_experience || '25') + ' years, multi-industry background: ' + (currentProfile.industry_background || 'media, SaaS, Web3, FinTech, nonprofits') + '.\n\nCreate ONLY these documents:\n\n' + p2Sections + '\n\nFORMAT: Bold all statistics. Markdown tables only in Doc 05. Sentences 15 words or fewer. Active voice. No em dashes. No filler.';
 
@@ -9303,14 +9379,41 @@ async function runCLGenerator() {
     clgStepIndex++;
   }, 4000);
 
+  // Fetch cover letter prompts from DB — falls back to hardcoded if unavailable
+  var clDbPrompts = {};
+  try {
+    var clDbData = await dbGet('prompts', 'select=name,system_prompt&category=eq.Cover Letter');
+    if (Array.isArray(clDbData)) {
+      clDbData.forEach(function(p) { clDbPrompts[p.name] = p.system_prompt; });
+    }
+  } catch(e) { /* fallback */ }
+
+  var candidateName = (currentProfile && currentProfile.full_name) || 'the candidate';
+  var contactLine = contact ? ' Address to ' + contact + '.' : '';
+  var contactLineAlt = contact ? '\nRecipient: ' + contact + '.' : '';
+
+  function buildCLPrompt(dbName, fallback) {
+    var dbText = clDbPrompts[dbName];
+    if (dbText) {
+      return dbText
+        .replace(/\{\{candidate_name\}\}/g, candidateName)
+        .replace(/\{\{company\}\}/g, company)
+        .replace(/\{\{role\}\}/g, role)
+        .replace(/\{\{contact\}\}/g, contact || 'the hiring manager')
+        .replace(/\{\{contact_line\}\}/g, contactLineAlt)
+        .replace(/\{\{job_description\}\}/g, jd || '(no job description provided)');
+    }
+    return fallback;
+  }
+
   const typePrompts = {
-    cover_letter: `Write a cover letter for ${(currentProfile && currentProfile.full_name) || 'the candidate'} applying to the ${role} role at ${company}.${contact ? ' Address to ' + contact + '.' : ''}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`,
-    inmail: `Write a LinkedIn InMail for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | ${(currentProfile && currentProfile.full_name) || 'the candidate'}\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`,
-    linkedin_connect: `Write a LinkedIn connection request note for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`,
-    email_day1: `Write a Day 1 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`,
-    email_followup: `Write a Day 5 follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} on their application for ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`,
-    email_ceo: `Write a Day 7 peer-to-peer email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''} Length: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.`,
-    rejection_followup: `Write a post-rejection follow-up email for ${(currentProfile && currentProfile.full_name) || 'the candidate'} after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`
+    cover_letter: buildCLPrompt('CL — Cover Letter', `Write a cover letter for ${candidateName} applying to the ${role} role at ${company}.${contactLine}${jd ? '\n\nJob description:\n' + jd : ''}\n\nLead with strongest result. Show company research. Match keywords naturally. Clear next step.`),
+    inmail: buildCLPrompt('CL — LinkedIn InMail', `Write a LinkedIn InMail for ${candidateName} to ${contact || 'the hiring manager'} at ${company} about the ${role} role.\n\nSubject: ${role} | ${candidateName}\nLength: 100-120 words. One paragraph. Open with hook or strong result. Never "I saw your posting." Direct ask to close.${jd ? '\n\nContext:\n' + jd : ''}`),
+    linkedin_connect: buildCLPrompt('CL — LinkedIn Connection Request', `Write a LinkedIn connection request note for ${candidateName} to ${contact || 'a contact'} at ${company}.\n\nUnder 300 characters. Reference something specific. Peer-to-peer, no generic phrases.`),
+    email_day1: buildCLPrompt('CL — Email Day 1', `Write a Day 1 follow-up email for ${candidateName} who just applied to the ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 100-120 words. Subject includes role and standout credential.`),
+    email_followup: buildCLPrompt('CL — Email Day 5 Follow-Up', `Write a Day 5 follow-up email for ${candidateName} on their application for ${role} at ${company}. To: ${contact || 'the recruiter'}. Length: 75-85 words. Natural opener. One metric. Clear ask. Close with Cheers.`),
+    email_ceo: buildCLPrompt('CL — Email Day 7 CEO/HM', `Write a Day 7 peer-to-peer email for ${candidateName} to the CEO or hiring manager at ${company} about the ${role} role.${contact ? ' Recipient: ' + contact + '.' : ''} Length: 90-100 words. Executive-to-executive. Lead with a business result. Direct closing ask.`),
+    rejection_followup: buildCLPrompt('CL — Post-Rejection Follow-Up', `Write a post-rejection follow-up email for ${candidateName} after being turned down for the ${role} at ${company}.${contact ? ' To: ' + contact + '.' : ''} Length: 75-90 words. Gracious, brief, forward-looking. Ask to be kept in mind. Close with Cheers.`)
   };
 
   const prompt = typePrompts[type] || typePrompts.cover_letter;
@@ -9538,7 +9641,7 @@ function runOutreachBuilder() {
   }, 100);
 }
 
-document.addEventListener('ob-run-ready', function() {
+document.addEventListener('ob-run-ready', async function() {
   var d = window._pendingOB;
   if (!d) return;
   var obProgPanel = document.getElementById('ob-progress-panel');
@@ -9571,16 +9674,42 @@ document.addEventListener('ob-run-ready', function() {
     currentProfile && currentProfile.career_win_3
   ].filter(Boolean);
   var winsText = wins.length ? wins.map(function(w,i){ return (i+1)+'. '+w; }).join('\n') : 'Use the most relevant wins from the resume.';
-  var prompt = 'Write a 4-part outreach sequence for ' + candidateName + ' targeting the ' + d.role + ' role at ' + d.company + '.';
-  if (primaryContact) prompt += '\n\nPrimary contact: ' + primaryContact + ' (' + primaryContactLabel + ').';
-  if (d.hm && d.recruiter) prompt += '\nHiring Manager: ' + d.hm + '.';
-  prompt += '\n\nUse the primary contact\'s name in Day 1 and Day 5 touches. Use the hiring manager or CEO (real or generic) for Day 7.';
-  prompt += '\n\nThe outreach must reference ' + d.company + ' and the ' + d.role + ' role specifically — not generic placeholders.';
-  if (d.jd) prompt += '\n\nJob Description (use key responsibilities and requirements to personalize the outreach):\n' + d.jd;
-  if (d.url) prompt += '\n\nCompany URL: ' + d.url;
-  if (d.context) prompt += '\n\nRecent company context: ' + d.context;
-  prompt += '\n\nCandidate\'s top wins to reference:\n' + winsText;
-  prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
+
+  // Fetch Outreach Sequence prompt from DB — falls back to hardcoded if unavailable
+  var obPromptText = '';
+  try {
+    var obDbData = await dbGet('prompts', 'select=system_prompt&name=eq.Outreach Sequence&category=eq.Outreach');
+    if (Array.isArray(obDbData) && obDbData[0]) {
+      obPromptText = obDbData[0].system_prompt
+        .replace(/\{\{candidate_name\}\}/g, candidateName)
+        .replace(/\{\{company\}\}/g, d.company)
+        .replace(/\{\{role\}\}/g, d.role)
+        .replace(/\{\{primary_contact\}\}/g, primaryContact || 'the appropriate contact')
+        .replace(/\{\{primary_contact_label\}\}/g, primaryContactLabel)
+        .replace(/\{\{hiring_manager\}\}/g, d.hm || '')
+        .replace(/\{\{wins\}\}/g, winsText)
+        .replace(/\{\{job_description\}\}/g, d.jd || '')
+        .replace(/\{\{company_url\}\}/g, d.url || '')
+        .replace(/\{\{company_context\}\}/g, d.context || '');
+    }
+  } catch(e) { /* fallback */ }
+
+  var prompt;
+  if (obPromptText) {
+    prompt = obPromptText;
+  } else {
+    // Hardcoded fallback
+    prompt = 'Write a 4-part outreach sequence for ' + candidateName + ' targeting the ' + d.role + ' role at ' + d.company + '.';
+    if (primaryContact) prompt += '\n\nPrimary contact: ' + primaryContact + ' (' + primaryContactLabel + ').';
+    if (d.hm && d.recruiter) prompt += '\nHiring Manager: ' + d.hm + '.';
+    prompt += '\n\nUse the primary contact\'s name in Day 1 and Day 5 touches. Use the hiring manager or CEO (real or generic) for Day 7.';
+    prompt += '\n\nThe outreach must reference ' + d.company + ' and the ' + d.role + ' role specifically — not generic placeholders.';
+    if (d.jd) prompt += '\n\nJob Description (use key responsibilities and requirements to personalize the outreach):\n' + d.jd;
+    if (d.url) prompt += '\n\nCompany URL: ' + d.url;
+    if (d.context) prompt += '\n\nRecent company context: ' + d.context;
+    prompt += '\n\nCandidate\'s top wins to reference:\n' + winsText;
+    prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
+  }
   var contentEl = document.getElementById('ob-output-content');
   var panel = document.getElementById('ob-output-panel');
   callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume()).then(function(result) {
