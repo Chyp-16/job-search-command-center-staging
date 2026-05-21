@@ -6777,6 +6777,11 @@ const SEED_PROMPTS = [
 ]
 
 async function seedPrompts() {
+  if (!window._cachedJWT) {
+    toast('Not signed in. Please log in and try again.', 'error');
+    return;
+  }
+
   const existing = await dbGet('prompts', 'select=id,name');
   const existingMap = {};
   if (Array.isArray(existing)) existing.forEach(p => { existingMap[p.name] = p.id; });
@@ -6790,14 +6795,23 @@ async function seedPrompts() {
   }
 
   // Upsert all 17 individual prompts — inserts new ones, updates existing ones
+  let failed = 0;
   for (const p of SEED_PROMPTS) {
-    if (existingMap[p.name]) {
-      await dbPatch('prompts', existingMap[p.name], p);
-    } else {
-      await dbPost('prompts', p);
-    }
+    try {
+      if (existingMap[p.name]) {
+        await dbPatch('prompts', existingMap[p.name], p);
+      } else {
+        const result = await dbPost('prompts', p);
+        if (result === null) failed++;
+      }
+    } catch(e) { failed++; }
   }
-  toast('Prompts library updated with all 17 individual prompts.', 'success');
+
+  if (failed > 0) {
+    toast('Some prompts failed to save (' + failed + '). Check your connection and try again.', 'error');
+  } else {
+    toast('Prompts library updated with all 17 individual prompts.', 'success');
+  }
   loadPrompts();
 }
 
