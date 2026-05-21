@@ -4513,14 +4513,13 @@ function saveApp() {
       if (duplicate) {
         if (!confirm('An application for ' + payload.job_title + ' at ' + payload.company + ' already exists. Add anyway?')) return;
       }
-      dbPost('applications', payload).then(function(result) {
-        const savedApp = Array.isArray(result) ? result[0] : result;
-        allApps.unshift(savedApp);
-        if (savedApp && savedApp.id) patchAppContacts(savedApp.id);
+      dbPost('applications', payload).then(function() {
+        return dbGet('applications', 'select=*&order=date_applied.desc&limit=5000');
+      }).then(function(data) {
+        allApps = Array.isArray(data) ? data : [];
         toast('Application added.', 'success');
         closeModal('modal-app');
         filterApps('keep-page');
-        if (savedApp) syncOutreachToHubSpot(savedApp);
       }).catch(function(e) {
         toast('Error saving application: ' + e.message, 'error');
       });
