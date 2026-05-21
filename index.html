@@ -6783,6 +6783,7 @@ async function seedPrompts() {
   }
 
   const existing = await dbGet('prompts', 'select=id,name');
+  console.log('seedPrompts existing:', JSON.stringify(existing));
   const existingMap = {};
   if (Array.isArray(existing)) existing.forEach(p => { existingMap[p.name] = p.id; });
 
@@ -6799,12 +6800,14 @@ async function seedPrompts() {
   for (const p of SEED_PROMPTS) {
     try {
       if (existingMap[p.name]) {
-        await dbPatch('prompts', existingMap[p.name], p);
+        const pr = await dbPatch('prompts', existingMap[p.name], p);
+        console.log('PATCH', p.name, pr);
       } else {
         const result = await dbPost('prompts', p);
+        console.log('POST', p.name, JSON.stringify(result));
         if (result === null) failed++;
       }
-    } catch(e) { failed++; }
+    } catch(e) { console.error('ERROR', p.name, e); failed++; }
   }
 
   if (failed > 0) {
