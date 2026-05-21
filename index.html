@@ -1978,7 +1978,7 @@ a { color: var(--burgundy); text-decoration: none; }
             <div id="ip-progress-bar" style="height:100%;width:0%;background:var(--burgundy);border-radius:4px;transition:width 0.6s ease"></div>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-light)">
-            <span>Step <span id="ip-progress-step">0</span> of <span id="ip-progress-total">8</span></span>
+            <span>Step <span id="ip-progress-step">0</span> of <span id="ip-progress-total">0</span></span>
             <span id="ip-progress-pct">0%</span>
           </div>
         </div>
@@ -8058,12 +8058,13 @@ async function runInterviewPrep() {
   var ipStepIndex = 0;
   var ipProgTotal = document.getElementById('ip-progress-total');
   if (ipProgTotal) ipProgTotal.textContent = ipTotalSteps;
-  var ipStepInterval = Math.max(5000, Math.round(55000 / ipTotalSteps));
+  // Spread evenly across 100s total — each doc gets equal time, bar caps at 85%
+  var ipStepInterval = Math.round(100000 / ipTotalSteps);
   var ipProgressInterval = setInterval(function() {
     if (ipStepIndex >= ipStepLabels.length) return;
     ipProgLabel.textContent = ipStepLabels[ipStepIndex];
     ipProgStep.textContent = ipStepIndex + 1;
-    var pct = Math.round(((ipStepIndex + 1) / ipTotalSteps) * 90);
+    var pct = Math.round(((ipStepIndex + 1) / ipTotalSteps) * 85);
     ipProgBar.style.width = pct + '%';
     ipProgPct.textContent = pct + '%';
     ipStepIndex++;
