@@ -1952,14 +1952,14 @@ a { color: var(--burgundy); text-decoration: none; }
                   <button class="btn btn-secondary btn-sm" onclick="ipCheckNone()">Check None</button>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px" id="ip-doc-selector">
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-1" checked> <span>01 — Company Overview</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-2" checked> <span>02 — SWOT + Competitive Analysis</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-3" checked> <span>03 — Target Niche Analysis</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-4" checked> <span>04 — 30-60-90 Day Plan</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-5" checked> <span>05 — Resume-to-Role Fit</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-6" checked> <span>06 — Executive Summary</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-7" checked> <span>07 — Strategic Questions</span></label>
-                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-8" checked> <span>08 — Interview Q&amp;A Guide</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-1" checked> <span>Company Overview</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-2" checked> <span>SWOT + Competitive Analysis</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-3" checked> <span>Target Niche Analysis</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-4" checked> <span>30-60-90 Day Plan</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-5" checked> <span>Resume-to-Role Fit</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-6" checked> <span>Executive Summary</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-7" checked> <span>Strategic Questions</span></label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="ip-doc-8" checked> <span>Interview Q&amp;A Guide</span></label>
                 </div>
                 <div style="display:flex;gap:10px">
                   <button class="btn btn-primary" style="flex:1;padding:12px" id="ip-gen-btn" onclick="setTimeout(runInterviewPrep,0)">✦ Generate Selected Docs</button>
@@ -8065,8 +8065,8 @@ async function runInterviewPrep() {
   ipProgBar.style.width = pct0 + '%';
   ipProgPct.textContent = pct0 + '%';
   ipStepIndex = 1;
-  // Spread evenly across 100s total — each doc gets equal time, bar caps at 85%
-  var ipStepInterval = Math.round(100000 / ipTotalSteps);
+  // Spread evenly across 130s total — each doc gets equal time, bar caps at 85%
+  var ipStepInterval = Math.round(130000 / ipTotalSteps);
   var ipProgressInterval = setInterval(function() {
     if (ipStepIndex >= ipStepLabels.length) return;
     ipProgLabel.textContent = ipStepLabels[ipStepIndex];
