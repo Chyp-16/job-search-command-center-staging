@@ -9421,8 +9421,15 @@ document.addEventListener('ob-run-ready', function() {
   prompt += '\n\n4 touches required:\n1) Day 1: Email or InMail to primary contact (100-120 words, include subject line)\n2) Day 3: LinkedIn connection request (under 200 characters)\n3) Day 5: Follow-up email to primary contact (75-85 words, include subject line)\n4) Day 7: Peer-to-peer email to CEO or hiring manager (90-100 words, include subject line)\n\nFor each: label the touch, include subject line, word count, and full formatted copy. Pick the 2-3 most relevant wins for this specific company and role.';
   var contentEl = document.getElementById('ob-output-content');
   callAI([{ role: 'user', content: prompt }], getSystemPromptWithResume()).then(function(result) {
-    obOutput = result;
-    contentEl.textContent = result;
+    var cleaned = result
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/^[-•]\s+/gm, '')
+      .replace(/`{1,3}/g, '')
+      .trim();
+    obOutput = cleaned;
+    contentEl.textContent = cleaned;
     dbPost('ai_outputs', { output_type: 'outreach_sequence', linked_application_id: d.linkedId, content: result });
     if (d.linkedId) {
       var app = allApps.find(function(a){ return a.id === d.linkedId; });
